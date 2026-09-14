@@ -1,9 +1,10 @@
 import { CommunityRole } from '../../../src/types'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import {
   mockCatalystClient,
+  mockRegistry,
   mockConfig,
   mockCdnCacheInvalidator,
   createMockedPubSubComponent,
@@ -22,6 +23,7 @@ import {
   CommunityPrivacyEnum,
   CommunityVisibilityEnum,
   CommunityPublicInformation,
+  CommunityPublicInformationWithVoiceChat,
   CommunityUpdates,
   CommunityMember,
   CommunityRequestType,
@@ -107,6 +109,7 @@ describe('Community Component', () => {
 
     communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
+      registry: mockRegistry,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       communityPlaces: mockCommunityPlaces,
@@ -218,8 +221,86 @@ describe('Community Component', () => {
         )
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityMembersCount).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
+      })
+
+      it('should not contact Gatekeeper from the profile-free lookup', async () => {
+        await expect(communityComponent.getCommunityWithoutProfile(communityId, { as: userAddress })).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when getting a public community', () => {
+    describe('and the community exists', () => {
+      const mockVoiceChatStatus = {
+        isActive: true,
+        participantCount: 5,
+        moderatorCount: 2
+      }
+      let publicCommunityResult: Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
+
+      beforeEach(async () => {
+        mockCommunitiesDB.getCommunityPublicInformation.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          membersCount: 10,
+          isHostingLiveEvent: false
+        })
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(mockVoiceChatStatus)
+        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        publicCommunityResult = await communityComponent.getCommunityPublicInformation(communityId)
+      })
+
+      it('should return public community information with owner name and voice chat status', () => {
+        expect(publicCommunityResult).toEqual({
+          id: mockCommunity.id,
+          name: mockCommunity.name,
+          description: mockCommunity.description,
+          ownerAddress: mockCommunity.ownerAddress,
+          ownerName: 'Test Owner Name',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: mockCommunity.active,
+          thumbnails: undefined,
+          membersCount: 10,
+          voiceChatStatus: mockVoiceChatStatus,
+          isHostingLiveEvent: false
+        })
+
+        expect(mockCommunitiesDB.getCommunityPublicInformation).toHaveBeenCalledWith(communityId)
         expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+        expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      })
+    })
+
+    describe('and the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityPublicInformation.mockResolvedValue(null)
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(communityComponent.getCommunityPublicInformation(communityId)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommunitiesDB.getCommunityPublicInformation).toHaveBeenCalledWith(communityId)
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
+      })
+
+      it('should not contact Gatekeeper from the profile-free public lookup', async () => {
+        await expect(communityComponent.getCommunityPublicInformationWithoutProfile(communityId)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
       })
     })
   })
@@ -246,7 +327,7 @@ describe('Community Component', () => {
     beforeEach(() => {
       mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
-      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       mockCommunityOwners.getOwnersNames.mockResolvedValue({
         [mockCommunity.ownerAddress]: 'Test Owner Name'
       })
@@ -297,7 +378,7 @@ describe('Community Component', () => {
         ...options,
         communityIds: undefined
       })
-      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
+      expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
@@ -323,7 +404,7 @@ describe('Community Component', () => {
           ...options,
           communityIds: undefined
         })
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
         expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
       })
     })
@@ -378,7 +459,7 @@ describe('Community Component', () => {
         ])
         mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
         mockStorage.exists.mockResolvedValue(false)
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
         mockCommunityOwners.getOwnersNames.mockResolvedValue({
           [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name'
         })
@@ -466,6 +547,110 @@ describe('Community Component', () => {
 
           // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
           expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('when there is an unlisted community with active voice chat', () => {
+        const unlistedCommunityId = 'unlisted-community-with-voice-chat'
+
+        beforeEach(() => {
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
+            { communityId: unlistedCommunityId, participantCount: 3, moderatorCount: 1 }
+          ])
+        })
+
+        describe('and the user is a member of the unlisted community', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getCommunities.mockResolvedValue([
+              {
+                ...mockCommunitiesWithVoiceChat[0],
+                id: unlistedCommunityId,
+                visibility: CommunityVisibilityEnum.Unlisted,
+                role: CommunityRole.Member
+              }
+            ])
+            mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+          })
+
+          it('should include the unlisted community in the results', async () => {
+            const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+            expect(result.communities).toHaveLength(1)
+            expect(result.communities[0].id).toBe(unlistedCommunityId)
+            expect(result.total).toBe(1)
+
+            // Verify DB was called with includeUnlisted: true
+            expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(
+              userAddress,
+              expect.objectContaining({
+                communityIds: [unlistedCommunityId],
+                includeUnlisted: true
+              })
+            )
+          })
+        })
+
+        describe('and the user is NOT a member of the unlisted community', () => {
+          beforeEach(() => {
+            // DB excludes unlisted communities for non-members
+            mockCommunitiesDB.getCommunities.mockResolvedValue([])
+            mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(0)
+          })
+
+          it('should filter out the unlisted community for non-members', async () => {
+            const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+            expect(result.communities).toHaveLength(0)
+            expect(result.total).toBe(0)
+          })
+        })
+
+        describe('and the unlisted community is private', () => {
+          describe('and the user is a member', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunities.mockResolvedValue([
+                {
+                  ...mockCommunitiesWithVoiceChat[0],
+                  id: unlistedCommunityId,
+                  privacy: CommunityPrivacyEnum.Private,
+                  visibility: CommunityVisibilityEnum.Unlisted,
+                  role: CommunityRole.Member
+                }
+              ])
+              mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+            })
+
+            it('should include the unlisted private community for members', async () => {
+              const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+              expect(result.communities).toHaveLength(1)
+              expect(result.communities[0].id).toBe(unlistedCommunityId)
+              expect(result.total).toBe(1)
+            })
+          })
+
+          describe('and the user is NOT a member', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunities.mockResolvedValue([
+                {
+                  ...mockCommunitiesWithVoiceChat[0],
+                  id: unlistedCommunityId,
+                  privacy: CommunityPrivacyEnum.Private,
+                  visibility: CommunityVisibilityEnum.Unlisted,
+                  role: CommunityRole.None
+                }
+              ])
+              mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+            })
+
+            it('should filter out the unlisted private community for non-members', async () => {
+              const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+              // Private community + non-member = should be filtered out
+              expect(result.communities).toHaveLength(0)
+              expect(result.total).toBe(0)
+            })
+          })
         })
       })
     })
@@ -691,6 +876,25 @@ describe('Community Component', () => {
 
       expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, options)
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, { onlyMemberOf: true })
+    })
+
+    describe('and only publicly visible communities are requested', () => {
+      it('should forward the restriction to both the listing and the count queries', async () => {
+        const restrictedOptions = { ...options, onlyPublicVisible: true }
+
+        const result = await communityComponent.getMemberCommunities(memberAddress, restrictedOptions)
+
+        expect(result).toEqual({
+          communities: mockMemberCommunities,
+          total: 1
+        })
+
+        expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, restrictedOptions)
+        expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, {
+          onlyMemberOf: true,
+          onlyPublicVisible: true
+        })
+      })
     })
   })
 
@@ -1617,6 +1821,12 @@ describe('Community Component', () => {
               thumbnailBuffer: Buffer.from('complete-thumbnail')
             }
 
+            mockCommunityPlaces.validateOwnership.mockResolvedValueOnce({
+              isValid: true,
+              ownedPlaces: completeUpdate.placeIds,
+              notOwnedPlaces: []
+            })
+
             mockCommunitiesDB.updateCommunity.mockResolvedValueOnce({
               ...mockCommunity,
               ...completeUpdate
@@ -2290,6 +2500,76 @@ describe('Community Component', () => {
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
         expect(mockFeatureFlags.getVariants).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when searching communities', () => {
+    const userAddress = '0x1234567890123456789012345678901234567890'
+    const searchQuery = 'test'
+    const limit = 10
+    const offset = 0
+
+    describe('and communities match the search', () => {
+      let searchResults: { id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }[]
+
+      beforeEach(() => {
+        searchResults = [
+          { id: 'community-1', name: 'Test Community 1', membersCount: 10, privacy: CommunityPrivacyEnum.Public },
+          { id: 'community-2', name: 'Test Community 2', membersCount: 5, privacy: CommunityPrivacyEnum.Private }
+        ]
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 2 })
+      })
+
+      it('should return matching communities with total count', async () => {
+        const result = await communityComponent.searchCommunities(searchQuery, { userAddress, limit, offset })
+
+        expect(result).toEqual({
+          communities: searchResults,
+          total: 2
+        })
+        expect(mockCommunitiesDB.searchCommunities).toHaveBeenCalledWith(searchQuery, { userAddress, limit, offset })
+      })
+    })
+
+    describe('and no communities match the search', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: [], total: 0 })
+      })
+
+      it('should return empty results with zero total', async () => {
+        const result = await communityComponent.searchCommunities(searchQuery, { userAddress, limit, offset })
+
+        expect(result).toEqual({
+          communities: [],
+          total: 0
+        })
+      })
+    })
+
+    describe('and pagination is applied', () => {
+      let searchResults: { id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }[]
+
+      beforeEach(() => {
+        searchResults = [
+          { id: 'community-11', name: 'Test Community 11', membersCount: 3, privacy: CommunityPrivacyEnum.Public },
+          { id: 'community-12', name: 'Test Community 12', membersCount: 7, privacy: CommunityPrivacyEnum.Private }
+        ]
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 15 })
+      })
+
+      it('should pass offset to the database query', async () => {
+        const result = await communityComponent.searchCommunities(searchQuery, { userAddress, limit: 5, offset: 10 })
+
+        expect(result).toEqual({
+          communities: searchResults,
+          total: 15
+        })
+        expect(mockCommunitiesDB.searchCommunities).toHaveBeenCalledWith(searchQuery, {
+          userAddress,
+          limit: 5,
+          offset: 10
+        })
       })
     })
   })

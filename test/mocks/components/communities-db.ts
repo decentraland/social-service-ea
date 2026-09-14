@@ -2,6 +2,7 @@ import { ICommunitiesDatabaseComponent } from '../../../src/types'
 
 export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   getCommunity: jest.fn(),
+  getCommunityPublicInformation: jest.fn(),
   getCommunityPlaces: jest.fn(),
   getCommunityPlacesCount: jest.fn(),
   addCommunityPlace: jest.fn(),
@@ -29,6 +30,7 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   banMemberFromCommunity: jest.fn(),
   unbanMemberFromCommunity: jest.fn(),
   isMemberBanned: jest.fn(),
+  getBannedMemberAddresses: jest.fn(),
   getBannedMembers: jest.fn(),
   getBannedMembersCount: jest.fn(),
   updateMemberRole: jest.fn(),
@@ -40,6 +42,7 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   getMemberRequests: jest.fn(),
   getMemberRequestsCount: jest.fn(),
   removeCommunityRequest: jest.fn(),
+  removeMemberRequests: jest.fn(),
   joinMemberAndRemoveRequests: jest.fn(),
   getCommunityInvites: jest.fn(),
   acceptAllRequestsToJoin: jest.fn(),
@@ -56,5 +59,7 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   transferCommunityOwnership: jest.fn(),
   getAllCommunitiesWithRankingMetrics: jest.fn(),
   updateCommunityRankingMetrics: jest.fn(),
-  updateCommunitiesRankingScores: jest.fn()
+  updateCommunitiesRankingScores: jest.fn(),
+  searchCommunities: jest.fn(),
+  getVisibleCommunitiesByIds: jest.fn()
 }

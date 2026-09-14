@@ -7,18 +7,13 @@ import {
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   User
 } from '../../types'
 
 const DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY = DBPrivateMessagesPrivacy.ALL
 const DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY = RPCPrivateMessagePrivacySetting.ALL
-// `SocialSettings.show_situation_reactions` (field 3 of
-// decentraland.social_service.v2.SocialSettings) is required by the protocol but has no DB column
-// yet, so it is not persisted: every read reports the most permissive value, matching how the other
-// two settings default (ALL / SHOW_MESSAGES). Replace this with the stored value once the column and
-// its migration exist.
-const DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY = RPCSituationReactionsVisibility.SHOW
 
 const RPC_PRIVATE_MESSAGE_PRIVACY_TO_DB_PRIVATE_MESSAGE_PRIVACY: Record<
   RPCPrivateMessagePrivacySetting,
@@ -39,6 +34,15 @@ const RPC_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_DB_BLOCKED_USERS_MESSAGES_VISIBIL
   [RPCBlockedUsersMessagesVisibilitySetting.UNRECOGNIZED]: undefined
 }
 
+const RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB: Record<
+  RPCSituationReactionsVisibility,
+  DBSituationReactionsVisibility | undefined
+> = {
+  [RPCSituationReactionsVisibility.SHOW]: DBSituationReactionsVisibility.SHOW,
+  [RPCSituationReactionsVisibility.HIDE]: DBSituationReactionsVisibility.HIDE,
+  [RPCSituationReactionsVisibility.UNRECOGNIZED]: undefined
+}
+
 const DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY: Record<
   DBPrivateMessagesPrivacy,
   RPCPrivateMessagePrivacySetting
@@ -56,6 +60,14 @@ const DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBIL
     RPCBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
 }
 
+const DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC: Record<
+  DBSituationReactionsVisibility,
+  RPCSituationReactionsVisibility
+> = {
+  [DBSituationReactionsVisibility.SHOW]: RPCSituationReactionsVisibility.SHOW,
+  [DBSituationReactionsVisibility.HIDE]: RPCSituationReactionsVisibility.HIDE
+}
+
 export class InvalidSocialSettingsError extends Error {
   constructor(message: string) {
     super(message)
@@ -70,8 +82,7 @@ export function convertDBSettingsToRPCSettings(settings: DBSocialSettings): RPCS
       DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY[
         settings.blocked_users_messages_visibility
       ],
-    // Not persisted yet: see DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY
-    showSituationReactions: DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY
+    showSituationReactions: DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC[settings.show_situation_reactions]
   }
 }
 
@@ -90,11 +101,11 @@ export function convertRPCSettingsIntoDBSettings(
     )
   }
 
-  // `settings.showSituationReactions` is intentionally ignored: there is no DB column to persist it
-  // into yet (see DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY). Note the consequence, which is
-  // deliberate (D1): `upsertSocialSettings` *accepts* a payload carrying the field and then drops
-  // it, so the response reports the default rather than the value the caller sent. Persistence
-  // lands with whoever adds the column and the migration; until then no caller can make it stick.
+  if (settings.showSituationReactions !== undefined) {
+    dbSettings.show_situation_reactions = convertRPCSituationReactionsVisibilityIntoDBSetting(
+      settings.showSituationReactions
+    )
+  }
 
   return dbSettings
 }
@@ -119,11 +130,22 @@ function convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
   return dbVisibility
 }
 
+function convertRPCSituationReactionsVisibilityIntoDBSetting(
+  visibility: RPCSituationReactionsVisibility
+): DBSituationReactionsVisibility {
+  const dbVisibility = RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB[visibility]
+  if (dbVisibility === undefined) {
+    throw new InvalidSocialSettingsError('Unknown situation reactions visibility setting')
+  }
+  return dbVisibility
+}
+
 export function getDefaultSettings(address: string): DBSocialSettings {
   return {
     address,
     private_messages_privacy: DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY,
-    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+    show_situation_reactions: DBSituationReactionsVisibility.SHOW
   }
 }
 

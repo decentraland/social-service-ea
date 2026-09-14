@@ -121,21 +121,75 @@ describe('when getting friendship status', () => {
   })
 
   describe('and there is no friendship action', () => {
-    beforeEach(() => {
-      getFriendshipStatusMethod.mockResolvedValue(undefined)
+    describe('and there is no block', () => {
+      beforeEach(() => {
+        getFriendshipStatusMethod.mockResolvedValue(undefined)
+      })
+
+      it('should return NONE status', async () => {
+        const response = await getFriendshipStatus(mockRequest, rpcContext)
+
+        expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+        expect(response).toEqual({
+          response: {
+            $case: 'accepted',
+            accepted: {
+              status: FriendshipStatus.NONE
+            }
+          }
+        })
+      })
     })
 
-    it('should return NONE status', async () => {
-      const response = await getFriendshipStatus(mockRequest, rpcContext)
+    describe('and the logged user blocked the other user', () => {
+      beforeEach(() => {
+        getFriendshipStatusMethod.mockResolvedValue({
+          id: '',
+          friendship_id: '',
+          action: Action.BLOCK,
+          acting_user: rpcContext.address,
+          timestamp: '2024-01-15T10:00:00.000Z'
+        })
+      })
 
-      expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
-      expect(response).toEqual({
-        response: {
-          $case: 'accepted',
-          accepted: {
-            status: FriendshipStatus.NONE
+      it('should return BLOCKED status', async () => {
+        const response = await getFriendshipStatus(mockRequest, rpcContext)
+
+        expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+        expect(response).toEqual({
+          response: {
+            $case: 'accepted',
+            accepted: {
+              status: FriendshipStatus.BLOCKED
+            }
           }
-        }
+        })
+      })
+    })
+
+    describe('and the logged user was blocked by the other user', () => {
+      beforeEach(() => {
+        getFriendshipStatusMethod.mockResolvedValue({
+          id: '',
+          friendship_id: '',
+          action: Action.BLOCK,
+          acting_user: userAddress,
+          timestamp: '2024-01-15T10:00:00.000Z'
+        })
+      })
+
+      it('should return BLOCKED_BY status', async () => {
+        const response = await getFriendshipStatus(mockRequest, rpcContext)
+
+        expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+        expect(response).toEqual({
+          response: {
+            $case: 'accepted',
+            accepted: {
+              status: FriendshipStatus.BLOCKED_BY
+            }
+          }
+        })
       })
     })
   })

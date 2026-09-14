@@ -1,4 +1,4 @@
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import { FeatureFlag } from '../../adapters/feature-flags'
@@ -7,8 +7,10 @@ import {
   GetCommunitiesOptions,
   GetCommunitiesWithTotal,
   ICommunitiesComponent,
+  CommunityPublicInformation,
   CommunityPublicInformationWithVoiceChat,
   AggregatedCommunityWithMemberAndVoiceChatData,
+  AggregatedCommunityWithMemberAndFriendsData,
   MemberCommunity,
   Community,
   CommunityUpdates,
@@ -16,13 +18,20 @@ import {
   CommunityPrivacyEnum,
   CommunityVisibilityEnum,
   CommunityForModeration,
-  CommunityVoiceChatStatus
+  CommunityVoiceChatStatus,
+  CommunitySearchResult,
+  AggregatedCommunityWithMemberAndVoiceChatDataV2,
+  CommunityWithUserInformationAndVoiceChatV2,
+  CommunityPublicInformationWithVoiceChatV2
 } from './types'
 import {
   isOwner,
   toCommunityWithMembersCount,
   toCommunityResultsWithVoiceChat,
-  toPublicCommunityWithVoiceChat
+  toPublicCommunityWithVoiceChat,
+  toCommunityWithMembersCountV2,
+  toCommunityResultsWithVoiceChatV2,
+  toPublicCommunityWithVoiceChatV2
 } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
@@ -33,6 +42,7 @@ export function createCommunityComponent(
   components: Pick<
     AppComponents,
     | 'communitiesDb'
+    | 'registry'
     | 'catalystClient'
     | 'communityRoles'
     | 'communityPlaces'
@@ -52,6 +62,7 @@ export function createCommunityComponent(
 ): ICommunitiesComponent {
   const {
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityPlaces,
@@ -115,6 +126,141 @@ export function createCommunityComponent(
     }
   }
 
+  async function broadcastCommunityDeleted(
+    id: string,
+    community: Community,
+    ownerDeletingOwnedCommunity: boolean,
+    thumbnailUrl: string
+  ) {
+    if (!ownerDeletingOwnedCommunity) {
+      await communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+        key: id,
+        timestamp: Date.now(),
+        metadata: {
+          id,
+          name: community.name,
+          ownerAddress: community.ownerAddress,
+          thumbnailUrl
+        }
+      })
+    }
+
+    await communityBroadcaster.broadcast({
+      type: Events.Type.COMMUNITY,
+      subType: Events.SubType.Community.DELETED,
+      key: id,
+      timestamp: Date.now(),
+      metadata: {
+        id,
+        name: community.name,
+        thumbnailUrl
+      }
+    })
+
+    await pubsub.publishInChannel(COMMUNITY_DELETED_UPDATES_CHANNEL, {
+      communityId: id
+    })
+  }
+
+  async function broadcastCommunityRenamed(
+    communityId: string,
+    eventKeySuffix: string,
+    oldName: string,
+    newName: string
+  ) {
+    await communityBroadcaster.broadcast({
+      type: Events.Type.COMMUNITY,
+      subType: Events.SubType.Community.RENAMED,
+      key: `${communityId}-${eventKeySuffix}`,
+      timestamp: Date.now(),
+      metadata: {
+        id: communityId,
+        oldName,
+        newName,
+        thumbnailUrl: (await communityThumbnail.getThumbnail(communityId)) || 'N/A'
+      }
+    })
+  }
+
+  /**
+   * Shared base fetch for the authenticated communities listing. Resolves the
+   * active-voice-chat filter and reads the page of communities (with raw mutual-friend
+   * addresses) from the database WITHOUT fetching owner or friend profiles.
+   */
+  async function fetchListedCommunities(
+    userAddress: string,
+    options: GetCommunitiesOptions
+  ): Promise<{
+    filteredCommunities: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[]
+    total: number
+    voiceChatStatusesFromFilter: Record<string, CommunityVoiceChatStatus>
+  }> {
+    const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
+      ? await getVoiceChatStatusFromActiveCommunities()
+      : {}
+
+    const communityIdsWithActiveVoiceChat = Object.keys(voiceChatStatusesFromFilter)
+    const communityIds = options.onlyWithActiveVoiceChat ? communityIdsWithActiveVoiceChat : options.communityIds
+
+    if (options.onlyWithActiveVoiceChat && communityIdsWithActiveVoiceChat.length === 0) {
+      return { filteredCommunities: [], total: 0, voiceChatStatusesFromFilter }
+    }
+
+    const dbOptions = {
+      ...options,
+      communityIds,
+      includeUnlisted: options.onlyWithActiveVoiceChat || options.includeUnlisted
+    }
+
+    const [communities, total] = await Promise.all([
+      communitiesDb.getCommunities(userAddress, dbOptions),
+      communitiesDb.getCommunitiesCount(userAddress, dbOptions)
+    ])
+
+    const filteredCommunities = options.onlyWithActiveVoiceChat
+      ? communities.filter(
+          (community) =>
+            community.role !== CommunityRole.None ||
+            (community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All)
+        )
+      : communities
+
+    return { filteredCommunities, total, voiceChatStatusesFromFilter }
+  }
+
+  /**
+   * Shared base fetch for the public communities listing. Resolves the active-voice-chat
+   * filter and reads the page of public communities from the database WITHOUT fetching
+   * the owners' profiles.
+   */
+  async function fetchListedPublicCommunities(options: GetCommunitiesOptions): Promise<{
+    communities: Omit<CommunityPublicInformation, 'ownerName'>[]
+    total: number
+    voiceChatStatusesFromFilter: Record<string, CommunityVoiceChatStatus>
+  }> {
+    const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
+      ? await getVoiceChatStatusFromActiveCommunities()
+      : {}
+
+    const communityIdsWithActiveVoiceChat = Object.keys(voiceChatStatusesFromFilter)
+    const communityIds = options.onlyWithActiveVoiceChat ? communityIdsWithActiveVoiceChat : options.communityIds
+
+    if (options.onlyWithActiveVoiceChat && communityIdsWithActiveVoiceChat.length === 0) {
+      return { communities: [], total: 0, voiceChatStatusesFromFilter }
+    }
+
+    const dbOptions = { ...options, communityIds }
+
+    const [communities, total] = await Promise.all([
+      communitiesDb.getCommunitiesPublicInformation(dbOptions),
+      communitiesDb.getPublicCommunitiesCount({ search: options.search, communityIds })
+    ])
+
+    return { communities, total, voiceChatStatusesFromFilter }
+  }
+
   return {
     getCommunity: async (
       id: string,
@@ -122,17 +268,15 @@ export function createCommunityComponent(
         as?: EthAddress
       }
     ): Promise<AggregatedCommunityWithMemberAndVoiceChatData> => {
-      const [community, membersCount, voiceChatStatus] = await Promise.all([
-        communitiesDb.getCommunity(id, options?.as),
-        communitiesDb.getCommunityMembersCount(id),
-        commsGatekeeper.getCommunityVoiceChatStatus(id)
-      ])
+      const community = await communitiesDb.getCommunity(id, options?.as)
 
       if (!community) {
         throw new CommunityNotFoundError(id)
       }
 
-      const [ownerName, isHostingLiveEvent] = await Promise.all([
+      const [membersCount, voiceChatStatus, ownerName, isHostingLiveEvent] = await Promise.all([
+        communitiesDb.getCommunityMembersCount(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id),
         communityOwners.getOwnerName(community.ownerAddress, community.id),
         communityEvents.isCurrentlyHostingEvents(community.id)
       ])
@@ -140,36 +284,74 @@ export function createCommunityComponent(
       return toCommunityWithMembersCount({ ...community, ownerName, isHostingLiveEvent }, membersCount, voiceChatStatus)
     },
 
+    getCommunityWithoutProfile: async (
+      id: string,
+      options: {
+        as?: EthAddress
+      }
+    ): Promise<AggregatedCommunityWithMemberAndVoiceChatDataV2> => {
+      const community = await communitiesDb.getCommunity(id, options?.as)
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      const [membersCount, voiceChatStatus, isHostingLiveEvent] = await Promise.all([
+        communitiesDb.getCommunityMembersCount(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id),
+        communityEvents.isCurrentlyHostingEvents(community.id)
+      ])
+
+      return toCommunityWithMembersCountV2({ ...community, isHostingLiveEvent }, membersCount, voiceChatStatus)
+    },
+
+    getCommunityPublicInformation: async (
+      id: string
+    ): Promise<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>> => {
+      const community = await communitiesDb.getCommunityPublicInformation(id)
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      const [voiceChatStatus, ownerName] = await Promise.all([
+        commsGatekeeper.getCommunityVoiceChatStatus(id),
+        communityOwners.getOwnerName(community.ownerAddress, community.id)
+      ])
+
+      return toPublicCommunityWithVoiceChat({ ...community, ownerName }, voiceChatStatus)
+    },
+
+    getCommunityPublicInformationWithoutProfile: async (
+      id: string
+    ): Promise<Omit<CommunityPublicInformationWithVoiceChatV2, 'isHostingLiveEvent'>> => {
+      const community = await communitiesDb.getCommunityPublicInformation(id)
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      const voiceChatStatus = await commsGatekeeper.getCommunityVoiceChatStatus(id)
+
+      return toPublicCommunityWithVoiceChatV2(community, voiceChatStatus)
+    },
+
     getCommunities: async (
       userAddress: string,
       options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>>> => {
-      const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
-        ? await getVoiceChatStatusFromActiveCommunities()
-        : {}
-
-      const communityIdsWithActiveVoiceChat = Object.keys(voiceChatStatusesFromFilter)
-
-      const communityIds = options.onlyWithActiveVoiceChat ? communityIdsWithActiveVoiceChat : options.communityIds
+      const { filteredCommunities, total, voiceChatStatusesFromFilter } = await fetchListedCommunities(
+        userAddress,
+        options
+      )
 
       // If filtering by active voice chat and no communities have active voice chat, return empty results
-      if (options.onlyWithActiveVoiceChat && communityIdsWithActiveVoiceChat.length === 0) {
+      if (options.onlyWithActiveVoiceChat && Object.keys(voiceChatStatusesFromFilter).length === 0) {
         return {
           communities: [],
           total: 0
         }
       }
-
-      const dbOptions = { ...options, communityIds }
-
-      const [communities, total] = await Promise.all([
-        communitiesDb.getCommunities(userAddress, dbOptions),
-        communitiesDb.getCommunitiesCount(userAddress, dbOptions)
-      ])
-
-      const filteredCommunities = options.onlyWithActiveVoiceChat
-        ? communities.filter((c) => c.privacy === CommunityPrivacyEnum.Public || c.role !== CommunityRole.None)
-        : communities
 
       const communityOwnersNames = await communityOwners.getOwnersNames(filteredCommunities.map((c) => c.ownerAddress))
 
@@ -181,7 +363,7 @@ export function createCommunityComponent(
       const friendsAddresses = Array.from(new Set(communitiesWithOwnerNames.flatMap((community) => community.friends)))
 
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
-        catalystClient.getProfiles(friendsAddresses),
+        registry.getProfiles(friendsAddresses),
         options.onlyWithActiveVoiceChat
           ? Promise.resolve(voiceChatStatusesFromFilter)
           : getVoiceChatStatuses(communitiesWithOwnerNames.map((c) => c.id))
@@ -193,31 +375,45 @@ export function createCommunityComponent(
       }
     },
 
-    getCommunitiesPublicInformation: async (
+    getCommunitiesWithoutProfiles: async (
+      userAddress: string,
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>> => {
-      const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
-        ? await getVoiceChatStatusFromActiveCommunities()
-        : {}
-
-      const communityIdsWithActiveVoiceChat = Object.keys(voiceChatStatusesFromFilter)
-
-      const communityIds = options.onlyWithActiveVoiceChat ? communityIdsWithActiveVoiceChat : options.communityIds
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChatV2, 'isHostingLiveEvent'>>> => {
+      const { filteredCommunities, total, voiceChatStatusesFromFilter } = await fetchListedCommunities(
+        userAddress,
+        options
+      )
 
       // If filtering by active voice chat and no communities have active voice chat, return empty results
-      if (options.onlyWithActiveVoiceChat && communityIdsWithActiveVoiceChat.length === 0) {
+      if (options.onlyWithActiveVoiceChat && Object.keys(voiceChatStatusesFromFilter).length === 0) {
         return {
           communities: [],
           total: 0
         }
       }
 
-      const dbOptions = { ...options, communityIds }
+      const voiceChatStatuses = options.onlyWithActiveVoiceChat
+        ? voiceChatStatusesFromFilter
+        : await getVoiceChatStatuses(filteredCommunities.map((c) => c.id))
 
-      const [communities, total] = await Promise.all([
-        communitiesDb.getCommunitiesPublicInformation(dbOptions),
-        communitiesDb.getPublicCommunitiesCount({ search: options.search, communityIds })
-      ])
+      return {
+        communities: toCommunityResultsWithVoiceChatV2(filteredCommunities, voiceChatStatuses),
+        total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
+      }
+    },
+
+    getCommunitiesPublicInformation: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>> => {
+      const { communities, total, voiceChatStatusesFromFilter } = await fetchListedPublicCommunities(options)
+
+      // If filtering by active voice chat and no communities have active voice chat, return empty results
+      if (options.onlyWithActiveVoiceChat && Object.keys(voiceChatStatusesFromFilter).length === 0) {
+        return {
+          communities: [],
+          total: 0
+        }
+      }
 
       const communityOwnersNames = await communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress))
 
@@ -238,13 +434,42 @@ export function createCommunityComponent(
       }
     },
 
+    getCommunitiesPublicInformationWithoutProfiles: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChatV2, 'isHostingLiveEvent'>>> => {
+      const { communities, total, voiceChatStatusesFromFilter } = await fetchListedPublicCommunities(options)
+
+      // If filtering by active voice chat and no communities have active voice chat, return empty results
+      if (options.onlyWithActiveVoiceChat && Object.keys(voiceChatStatusesFromFilter).length === 0) {
+        return {
+          communities: [],
+          total: 0
+        }
+      }
+
+      const voiceChatStatuses = options.onlyWithActiveVoiceChat
+        ? voiceChatStatusesFromFilter
+        : await getVoiceChatStatuses(communities.map((c) => c.id))
+
+      return {
+        communities: communities.map((community) =>
+          toPublicCommunityWithVoiceChatV2(community, voiceChatStatuses[community.id] || null)
+        ),
+        total: options.onlyWithActiveVoiceChat ? communities.length : total
+      }
+    },
+
     getMemberCommunities: async (
       memberAddress: string,
-      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
     ): Promise<GetCommunitiesWithTotal<MemberCommunity>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getMemberCommunities(memberAddress, options),
-        communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true, roles: options.roles })
+        communitiesDb.getCommunitiesCount(memberAddress, {
+          onlyMemberOf: true,
+          roles: options.roles,
+          onlyPublicVisible: options.onlyPublicVisible
+        })
       ])
 
       return { communities, total }
@@ -265,8 +490,10 @@ export function createCommunityComponent(
 
       const ownerName: string = await communityOwners.getOwnerName(community.ownerAddress)
 
+      let resolvedPlaceIds = placeIds
       if (placeIds.length > 0) {
-        await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
+        const { ownedPlaces } = await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
+        resolvedPlaceIds = ownedPlaces
       }
 
       await communityComplianceValidator.validateCommunityContent({
@@ -289,8 +516,8 @@ export function createCommunityComponent(
         role: CommunityRole.Owner
       })
 
-      if (placeIds.length > 0) {
-        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds)
+      if (resolvedPlaceIds.length > 0) {
+        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, resolvedPlaceIds)
       }
 
       logger.info('Community created', {
@@ -337,37 +564,8 @@ export function createCommunityComponent(
 
       const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
 
-      setImmediate(async () => {
-        if (!ownerDeletingOwnedCommunity) {
-          await communityBroadcaster.broadcast({
-            type: Events.Type.COMMUNITY,
-            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
-            key: id,
-            timestamp: Date.now(),
-            metadata: {
-              id,
-              name: community.name,
-              ownerAddress: community.ownerAddress,
-              thumbnailUrl
-            }
-          })
-        }
-
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.DELETED,
-          key: id,
-          timestamp: Date.now(),
-          metadata: {
-            id,
-            name: community.name,
-            thumbnailUrl
-          }
-        })
-
-        await pubsub.publishInChannel(COMMUNITY_DELETED_UPDATES_CHANNEL, {
-          communityId: id
-        })
+      void broadcastCommunityDeleted(id, community, ownerDeletingOwnedCommunity, thumbnailUrl).catch((error: any) => {
+        logger.error('Unhandled error in broadcastCommunityDeleted', { error: error.message, communityId: id })
       })
     },
 
@@ -404,11 +602,31 @@ export function createCommunityComponent(
       const isUpdatingVisibility =
         updates.visibility !== undefined && updates.visibility !== existingCommunity.visibility
 
-      if (placeIds && placeIds.length > 0) {
-        const uniquePlaceIds = Array.from(new Set(placeIds))
-        const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
-        const placeIdsToValidate = uniquePlaceIds.filter((placeId) => !currentPlaces.some((p) => p.id === placeId))
-        await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
+      let resolvedPlaceIds: string[] | undefined = placeIds
+      if (placeIds !== undefined) {
+        if (placeIds.length > 0) {
+          const uniquePlaceIds = Array.from(new Set(placeIds))
+          const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
+          const currentPlaceIds = currentPlaces.map((p) => p.id)
+          const placeIdsToValidate = uniquePlaceIds.filter((id) => !currentPlaceIds.includes(id))
+
+          logger.info('Place IDs to validate ownership for community update', {
+            communityId,
+            incomingPlaceIds: uniquePlaceIds.join(','),
+            currentPlaceIds: currentPlaceIds.join(','),
+            placeIdsToValidate: placeIdsToValidate.join(',')
+          })
+
+          if (placeIdsToValidate.length > 0) {
+            const { ownedPlaces } = await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
+            const existingPlaceIds = uniquePlaceIds.filter((id) => currentPlaceIds.includes(id))
+            resolvedPlaceIds = [...existingPlaceIds, ...ownedPlaces]
+          } else {
+            resolvedPlaceIds = uniquePlaceIds
+          }
+        } else {
+          resolvedPlaceIds = []
+        }
       }
 
       if (isUpdatingPrivacy || isUpdatingVisibility) {
@@ -449,25 +667,19 @@ export function createCommunityComponent(
       const updatedCommunity = await communitiesDb.updateCommunity(communityId, dbUpdates)
 
       if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
-        setImmediate(async () => {
-          const eventKeySuffix =
-            updates.name!.trim().toLowerCase().replace(/ /g, '-') +
-            '-' +
-            existingCommunity.name.trim().toLowerCase().replace(/ /g, '-')
+        const eventKeySuffix =
+          updates.name!.trim().toLowerCase().replace(/ /g, '-') +
+          '-' +
+          existingCommunity.name.trim().toLowerCase().replace(/ /g, '-')
 
-          await communityBroadcaster.broadcast({
-            type: Events.Type.COMMUNITY,
-            subType: Events.SubType.Community.RENAMED,
-            key: `${communityId}-${eventKeySuffix}`,
-            timestamp: Date.now(),
-            metadata: {
-              id: communityId,
-              oldName: existingCommunity.name,
-              newName: updates.name!,
-              thumbnailUrl: (await communityThumbnail.getThumbnail(communityId)) || 'N/A'
-            }
-          })
-        })
+        void broadcastCommunityRenamed(communityId, eventKeySuffix, existingCommunity.name, updates.name!).catch(
+          (error: any) => {
+            logger.error('Unhandled error in broadcastCommunityRenamed', {
+              error: error.message,
+              communityId
+            })
+          }
+        )
       }
 
       if (thumbnailBuffer) {
@@ -490,13 +702,13 @@ export function createCommunityComponent(
 
       // Update places if placeIds is provided (even if empty array to remove all places)
       // If placeIds is undefined, it means nothing changed related to places
-      if (placeIds !== undefined) {
-        await communityPlaces.updatePlaces(communityId, userAddress, placeIds)
+      if (resolvedPlaceIds !== undefined) {
+        await communityPlaces.updatePlaces(communityId, userAddress, resolvedPlaceIds)
 
         logger.info('Community places updated', {
           communityId,
           userAddress,
-          placeIds: placeIds.length
+          placeIds: resolvedPlaceIds.length
         })
       }
 
@@ -557,6 +769,14 @@ export function createCommunityComponent(
         visibility: community.visibility,
         active: community.active
       }))
+    },
+
+    searchCommunities: async (
+      search: string,
+      options: { userAddress: EthAddress; limit: number; offset: number }
+    ): Promise<GetCommunitiesWithTotal<CommunitySearchResult>> => {
+      const { results, total } = await communitiesDb.searchCommunities(search, options)
+      return { communities: results, total }
     },
 
     getAllCommunitiesForModeration: async (

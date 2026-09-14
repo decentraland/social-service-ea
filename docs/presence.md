@@ -16,8 +16,7 @@ message ParcelChange { string address = 1; string realm = 2; optional Parcel par
 message ParcelChangesBatch { string server_name = 1; uint64 seq = 2; bool snapshot = 3; uint64 server_time = 4; repeated ParcelChange changes = 5; }
 ```
 
-`address` and `realm` are lowercase by contract. Pulse publishes a snapshot batch on startup and on
-reconnect, and delta batches as players move, connect, disconnect or change realm/world — one entry
+`address` and `realm` are lowercase by contract. Pulse publishes a snapshot batch on startup, every 60 seconds and after outbox eviction, and delta batches as players move, connect, disconnect or change realm/world — one entry
 per affected wallet, at most once per batch (C1 §5).
 
 ## Consumer semantics (C5)
@@ -47,7 +46,8 @@ anything is written or published. Only the addresses whose status actually chang
 snapshot a no-op: every status already matches the cache, so nothing is re-published. Writes are
 issued in chunks of `STATUS_PUBLISH_CHUNK_SIZE` (100) rather than one `Promise.all` over the whole
 batch, since a publisher-start snapshot flips every peer of a server at once and each flip costs one
-`SET` plus two `PUBLISH`.
+`SET` plus two `PUBLISH`. Each chunk waits for all wallet updates to settle; failures are logged
+with a count, and processing continues through the remaining chunks.
 
 ### Known exposure: a dropped OFFLINE (unchanged, follow-up)
 
@@ -67,6 +67,13 @@ failure degrades to an empty set rather than failing its callers.
 
 There is no separate world-peer set any more: `/peers?all=true` already covers every realm.
 
+## Protocol dependency
+
+Presence decoding uses the planned `3ef4c52` build under the `@dcl/pulse-protocol` package name.
+The existing `@dcl/protocol` dependency stays at the version used by `main`: it includes social
+subscription stream-closure fields missing from the Pulse build. Consolidate them after protocol
+[#454](https://github.com/decentraland/protocol/pull/454) is released with both sets of messages.
+
 ## Required configuration
 
 | key | default | notes |
@@ -78,7 +85,7 @@ There is no separate world-peer set any more: `/peers?all=true` already covers e
 
 ## Deploy order
 
-1. Deploy this build **after** Pulse publishes `engine.parcel_changes` in the target environment —
+1. Inject a valid `PULSE_URL` before deploying; startup fails without it. Deploy this build **after** Pulse publishes `engine.parcel_changes` in the target environment —
    before that, this service would boot and never receive presence events.
 2. Deploy this build **before** worlds-content-server's Pulse-only build: that build stops
    publishing `peer.*.world.*`, which the previous image (still running `archipelago-stats` +

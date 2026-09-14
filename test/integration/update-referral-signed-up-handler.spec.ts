@@ -60,7 +60,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
     })
 
     describe('and authentication fails', () => {
-      it('should return 401 with invalid auth chain', async () => {
+      it('should return 400 with a malformed auth chain', async () => {
         const invalidIdentity: Identity = {
           ...invitedUserIdentity,
           authChain: {
@@ -73,7 +73,9 @@ test('PATCH /v1/referral-progress', ({ components }) => {
         }
 
         const response = await makeRequest(invalidIdentity, endpoint, 'PATCH')
-        expect(response.status).toBe(401)
+        // The appended link has no `signature`, so @dcl/crypto-middleware rejects the chain as
+        // structurally invalid (400 Bad Request) before signature verification.
+        expect(response.status).toBe(400)
       })
     })
 

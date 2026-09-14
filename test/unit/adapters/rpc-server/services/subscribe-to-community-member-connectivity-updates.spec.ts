@@ -1,10 +1,19 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { subscribeToCommunityMemberConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-member-connectivity-updates'
-import { createMockUpdateHandlerComponent, mockLogs } from '../../../../mocks/components'
+import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createLogsMockedComponent } from '../../../../mocks/components/logs'
+import { mockMetrics } from '../../../../mocks/components/metrics'
+import { mockConfig } from '../../../../mocks/components/config'
+import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
+import {
+  ConnectivityStatus,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityMemberConnectivityUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to community member connectivity updates', () => {
   let subscribeToCommunityMemberConnectivityUpdates: ReturnType<
@@ -13,6 +22,7 @@ describe('when subscribing to community member connectivity updates', () => {
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
+  let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
     communityId: 'community-1',
@@ -21,12 +31,13 @@ describe('when subscribing to community member connectivity updates', () => {
   }
 
   beforeEach(() => {
-    subscribersContext = createSubscribersContext()
+    logs = createLogsMockedComponent()
+    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToCommunityMemberConnectivityUpdates = subscribeToCommunityMemberConnectivityUpdatesService({
       components: {
-        logs: mockLogs,
+        logs,
         updateHandler: mockUpdateHandler
       }
     })
@@ -187,6 +198,32 @@ describe('when subscribing to community member connectivity updates', () => {
           member: { address: '0x456' },
           status
         })
+      })
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = subscribeToCommunityMemberConnectivityUpdates({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate
+
+      // communityId/member/status are the protobuf zero-value defaults; clients must ignore
+      // them when streamClosed is present.
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({
+        communityId: '',
+        member: undefined,
+        status: ConnectivityStatus.ONLINE,
+        streamClosed
       })
     })
   })

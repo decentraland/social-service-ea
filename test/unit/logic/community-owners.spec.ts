@@ -1,22 +1,21 @@
 import { createCommunityOwnersComponent } from '../../../src/logic/community/owners'
 import { ICommunityOwnersComponent } from '../../../src/logic/community/types'
 import { CommunityOwnerNotFoundError } from '../../../src/logic/community/errors'
-import { mockCatalystClient } from '../../mocks/components'
+import { mockRegistry } from '../../mocks/components'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 describe('community-owners', () => {
   let communityOwners: ICommunityOwnersComponent
-  let mockCatalystClientInstance: jest.Mocked<typeof mockCatalystClient>
+  let mockRegistryInstance: jest.Mocked<typeof mockRegistry>
 
   beforeEach(() => {
     // Create a fresh mock instance for each test to avoid interference
-    mockCatalystClientInstance = {
+    mockRegistryInstance = {
       getProfiles: jest.fn(),
-      getProfile: jest.fn(),
-      getOwnedNames: jest.fn()
+      getProfile: jest.fn()
     }
     communityOwners = createCommunityOwnersComponent({
-      catalystClient: mockCatalystClientInstance
+      registry: mockRegistryInstance
     })
   })
 
@@ -80,13 +79,13 @@ describe('community-owners', () => {
       ]
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistryInstance.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should return a record mapping addresses to names', async () => {
         const result = await communityOwners.getOwnersNames(ownerAddresses)
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
         expect(result).toEqual({
           [ownerAddresses[0]]: 'John Doe',
           [ownerAddresses[1]]: 'Jane Smith',
@@ -132,13 +131,13 @@ describe('community-owners', () => {
       ]
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistryInstance.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should prioritize claimed names over unclaimed names', async () => {
         const result = await communityOwners.getOwnersNames(ownerAddresses.slice(0, 2))
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 2))
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 2))
         expect(result).toEqual({
           [ownerAddresses[0]]: 'John Doe', // claimed name takes priority
           [ownerAddresses[1]]: 'UnclaimedUser456' // unclaimed name when no claimed name
@@ -168,13 +167,13 @@ describe('community-owners', () => {
       ]
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistryInstance.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should only return names for profiles that exist', async () => {
         const result = await communityOwners.getOwnersNames(ownerAddresses)
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
         expect(result).toEqual({
           [ownerAddresses[0]]: 'John Doe'
         })
@@ -183,26 +182,26 @@ describe('community-owners', () => {
 
     describe('and no profiles are found', () => {
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue([])
+        mockRegistryInstance.getProfiles.mockResolvedValue([])
       })
 
       it('should return an empty record', async () => {
         const result = await communityOwners.getOwnersNames(ownerAddresses)
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
         expect(result).toEqual({})
       })
     })
 
     describe('and empty address array is provided', () => {
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue([])
+        mockRegistryInstance.getProfiles.mockResolvedValue([])
       })
 
       it('should return an empty record', async () => {
         const result = await communityOwners.getOwnersNames([])
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith([])
         expect(result).toEqual({})
       })
     })
@@ -215,13 +214,13 @@ describe('community-owners', () => {
       ]
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistryInstance.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should skip profiles with no avatars', async () => {
         const result = await communityOwners.getOwnersNames(ownerAddresses.slice(0, 1))
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 1))
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 1))
         expect(result).toEqual({})
       })
     })
@@ -247,13 +246,13 @@ describe('community-owners', () => {
       ]
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistryInstance.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should skip profiles with no name information', async () => {
         const result = await communityOwners.getOwnersNames(ownerAddresses.slice(0, 1))
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 1))
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 1))
         expect(result).toEqual({})
       })
     })
@@ -262,7 +261,7 @@ describe('community-owners', () => {
       const catalystError = new Error('Catalyst service unavailable')
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfiles.mockRejectedValue(catalystError)
+        mockRegistryInstance.getProfiles.mockRejectedValue(catalystError)
       })
 
       it('should propagate the catalyst client error', async () => {
@@ -270,7 +269,7 @@ describe('community-owners', () => {
           'Catalyst service unavailable'
         )
 
-        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(mockRegistryInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
       })
     })
   })
@@ -298,20 +297,20 @@ describe('community-owners', () => {
       }
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfile.mockResolvedValue(mockProfile)
+        mockRegistryInstance.getProfile.mockResolvedValue(mockProfile)
       })
 
       it('should return the claimed name', async () => {
         const result = await communityOwners.getOwnerName(ownerAddress, communityId)
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
         expect(result).toBe('John Doe')
       })
 
       it('should work without providing community ID', async () => {
         const result = await communityOwners.getOwnerName(ownerAddress)
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
         expect(result).toBe('John Doe')
       })
     })
@@ -335,13 +334,13 @@ describe('community-owners', () => {
       }
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfile.mockResolvedValue(mockProfile)
+        mockRegistryInstance.getProfile.mockResolvedValue(mockProfile)
       })
 
       it('should return the unclaimed name', async () => {
         const result = await communityOwners.getOwnerName(ownerAddress, communityId)
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
         expect(result).toBe('UnclaimedUser123')
       })
     })
@@ -365,13 +364,13 @@ describe('community-owners', () => {
       }
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfile.mockResolvedValue(mockProfile)
+        mockRegistryInstance.getProfile.mockResolvedValue(mockProfile)
       })
 
       it('should prioritize the claimed name over unclaimed name', async () => {
         const result = await communityOwners.getOwnerName(ownerAddress, communityId)
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
         expect(result).toBe('John Doe')
       })
     })
@@ -382,7 +381,7 @@ describe('community-owners', () => {
       }
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfile.mockResolvedValue(mockProfile)
+        mockRegistryInstance.getProfile.mockResolvedValue(mockProfile)
       })
 
       it('should throw an error when trying to get profile name', async () => {
@@ -390,7 +389,7 @@ describe('community-owners', () => {
           'Missing profile avatar'
         )
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
       })
     })
 
@@ -413,7 +412,7 @@ describe('community-owners', () => {
       }
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfile.mockResolvedValue(mockProfile)
+        mockRegistryInstance.getProfile.mockResolvedValue(mockProfile)
       })
 
       it('should throw an error when no name is available', async () => {
@@ -421,15 +420,15 @@ describe('community-owners', () => {
           'Missing profile avatar name'
         )
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
       })
     })
 
     describe('and the profile is not found', () => {
       beforeEach(() => {
         // Reset the mock and explicitly set it to return null
-        mockCatalystClientInstance.getProfile.mockReset()
-        mockCatalystClientInstance.getProfile.mockResolvedValue(null)
+        mockRegistryInstance.getProfile.mockReset()
+        mockRegistryInstance.getProfile.mockResolvedValue(null)
       })
 
       it('should throw CommunityOwnerNotFoundError with community ID and owner address', async () => {
@@ -437,7 +436,7 @@ describe('community-owners', () => {
           CommunityOwnerNotFoundError
         )
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
       })
 
       it('should include the correct error message', async () => {
@@ -471,7 +470,7 @@ describe('community-owners', () => {
       const catalystError = new Error('Catalyst service unavailable')
 
       beforeEach(() => {
-        mockCatalystClientInstance.getProfile.mockRejectedValue(catalystError)
+        mockRegistryInstance.getProfile.mockRejectedValue(catalystError)
       })
 
       it('should propagate the catalyst client error', async () => {
@@ -479,7 +478,7 @@ describe('community-owners', () => {
           'Catalyst service unavailable'
         )
 
-        expect(mockCatalystClientInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
+        expect(mockRegistryInstance.getProfile).toHaveBeenCalledWith(ownerAddress)
       })
     })
   })

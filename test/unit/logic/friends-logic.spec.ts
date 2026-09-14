@@ -5,14 +5,20 @@ import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/
 import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
-import { mockCatalystClient } from '../../mocks/components/catalyst-client'
+import { mockConfig, mockMetrics, mockRedis, mockRegistry } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
 import { createLogsMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
+import { BLOCKED_USERS_DEFAULT_LIMIT, FRIENDS_DEFAULT_LIMIT } from '../../../src/utils/friendship-pagination'
 import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { BlockedUserError } from '../../../src/logic/friends/errors'
+import {
+  BlockedUserError,
+  FriendshipRateLimitError,
+  InvalidFriendshipActionError
+} from '../../../src/logic/friends/errors'
 import { sendNotification } from '../../../src/logic/notifications'
+import { normalizeBlockedUsersPagination } from '../../../src/utils/friendship-pagination'
 
 jest.mock('../../../src/logic/notifications', () => ({
   ...jest.requireActual('../../../src/logic/notifications'),
@@ -39,14 +45,19 @@ describe('Friends Component', () => {
     mockSNS = createSNSMockedComponent({})
     mockSendNotification = sendNotification as jest.MockedFunction<typeof sendNotification>
     mockSendNotification.mockResolvedValue()
+    // mockRedis is shared across the file and jest.clearAllMocks() keeps implementations: reset to permissive.
+    mockRedis.consumeRateLimit.mockReset().mockResolvedValue(true)
     const logs = createLogsMockedComponent()
 
     friendsComponent = await createFriendsComponent({
       friendsDb: mockFriendsDB,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       pubsub: mockPubSub,
       sns: mockSNS,
-      logs
+      logs,
+      redis: mockRedis,
+      config: mockConfig,
+      metrics: mockMetrics
     })
   })
 
@@ -71,7 +82,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should return friends profiles with total count', async () => {
@@ -89,7 +100,7 @@ describe('Friends Component', () => {
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
           onlyActive: true
         })
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2', '0xfriend3'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2', '0xfriend3'])
       })
 
       it('should handle pagination correctly', async () => {
@@ -116,7 +127,7 @@ describe('Friends Component', () => {
       beforeEach(() => {
         mockFriendsDB.getFriends.mockResolvedValue([])
         mockFriendsDB.getFriendsCount.mockResolvedValue(0)
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty profiles array with zero total', async () => {
@@ -134,7 +145,7 @@ describe('Friends Component', () => {
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
           onlyActive: true
         })
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       })
     })
 
@@ -148,7 +159,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(1)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should work without pagination', async () => {
@@ -160,13 +171,13 @@ describe('Friends Component', () => {
         })
 
         expect(mockFriendsDB.getFriends).toHaveBeenCalledWith(mockUserAddress, {
-          pagination: undefined,
+          pagination: { limit: FRIENDS_DEFAULT_LIMIT, offset: 0 },
           onlyActive: true
         })
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
           onlyActive: true
         })
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
       })
     })
 
@@ -183,7 +194,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getFriends.mockResolvedValue(friendsWithDuplicates)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should handle duplicate addresses correctly', async () => {
@@ -194,7 +205,7 @@ describe('Friends Component', () => {
           total: 3
         })
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([
           '0xfriend1',
           '0xfriend1', // Duplicate should be included as it comes from the database
           '0xfriend2'
@@ -219,7 +230,7 @@ describe('Friends Component', () => {
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
           onlyActive: true
         })
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
 
@@ -231,7 +242,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
-        mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
+        mockRegistry.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
       })
 
       it('should propagate the error', async () => {
@@ -246,7 +257,7 @@ describe('Friends Component', () => {
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
           onlyActive: true
         })
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2', '0xfriend3'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2', '0xfriend3'])
       })
     })
 
@@ -272,7 +283,7 @@ describe('Friends Component', () => {
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
           onlyActive: true
         })
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
 
@@ -285,10 +296,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
         // Catalyst returns only 2 profiles instead of 3
-        mockCatalystClient.getProfiles.mockResolvedValue([
-          createMockProfile('0xfriend1'),
-          createMockProfile('0xfriend2')
-        ])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xfriend1'), createMockProfile('0xfriend2')])
       })
 
       it('should return the profiles that were successfully retrieved', async () => {
@@ -299,7 +307,7 @@ describe('Friends Component', () => {
           total: 3
         })
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2', '0xfriend3'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2', '0xfriend3'])
       })
     })
 
@@ -312,10 +320,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(1)
         // Catalyst returns 2 profiles instead of 1
-        mockCatalystClient.getProfiles.mockResolvedValue([
-          createMockProfile('0xfriend1'),
-          createMockProfile('0xfriend2')
-        ])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xfriend1'), createMockProfile('0xfriend2')])
       })
 
       it('should return all profiles from catalyst', async () => {
@@ -326,12 +331,162 @@ describe('Friends Component', () => {
           total: 1
         })
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
+      })
+    })
+  })
+
+  describe('when the friendship mutation rate limit is exhausted', () => {
+    let error: Error | undefined
+    let targetAddress: string
+
+    beforeEach(async () => {
+      targetAddress = '0x2234567890123456789012345678901234567890'
+      mockRedis.consumeRateLimit.mockResolvedValueOnce(false)
+      error = await friendsComponent.blockUser(mockUserAddress, targetAddress).catch((caught) => caught)
+    })
+
+    it('should reject the mutation with a rate limit error', () => {
+      expect(error).toBeInstanceOf(FriendshipRateLimitError)
+    })
+
+    it('should reject before reading the target profile', () => {
+      expect(mockRegistry.getProfile).not.toHaveBeenCalled()
+    })
+
+    it('should reject before writing friendship state', () => {
+      expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the rate limiter backend is unreachable', () => {
+    let targetAddress: string
+    let result: Awaited<ReturnType<typeof friendsComponent.blockUser>> | undefined
+    let error: Error | undefined
+
+    beforeEach(async () => {
+      targetAddress = '0x2234567890123456789012345678901234567890'
+      // Scoped to this context only: the top-level beforeEach resets this mock back to permissive.
+      mockRedis.consumeRateLimit.mockRejectedValue(new Error('The client is closed'))
+      mockRegistry.getProfile.mockResolvedValueOnce(createMockProfile(targetAddress))
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as jest.Mocked<PoolClient>))
+      mockFriendsDB.getFriendship.mockResolvedValueOnce(undefined)
+      mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: new Date() })
+      result = await friendsComponent.blockUser(mockUserAddress, targetAddress).catch((caught) => {
+        error = caught
+        return undefined
+      })
+    })
+
+    it('should allow the mutation instead of failing the request', () => {
+      expect(error).toBeUndefined()
+    })
+
+    it('should complete the block', () => {
+      expect(result).toBeDefined()
+    })
+
+    it('should record that the limiter was bypassed', () => {
+      expect(mockMetrics.increment).toHaveBeenCalledWith('friendship_rate_limiter_unavailable')
+    })
+  })
+
+  describe('when the rate limiter counts consumption per bucket', () => {
+    let senderAddress: string
+    let recipientAddress: string
+    let pairRateLimit: number
+    let consumedByKey: Map<string, number>
+
+    beforeEach(() => {
+      senderAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      recipientAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      pairRateLimit = 10 // FRIENDSHIP_RATE_LIMIT_PER_PAIR default
+      consumedByKey = new Map<string, number>()
+
+      // Mirrors the INCR-and-compare limiter in the Redis adapter, so buckets are told apart by key.
+      mockRedis.consumeRateLimit.mockImplementation(async (key: string, limit: number) => {
+        const consumed = (consumedByKey.get(key) ?? 0) + 1
+        consumedByKey.set(key, consumed)
+        return consumed <= limit
+      })
+
+      mockFriendsDB.executeTx.mockImplementation(async (cb) => cb({} as jest.Mocked<PoolClient>))
+      mockFriendsDB.getFriendship.mockResolvedValue(undefined)
+      mockFriendsDB.blockUser.mockResolvedValue({ id: 'block-id', blocked_at: new Date() })
+      mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
+    })
+
+    describe('and one account exhausts the pair budget with friendship mutations against another', () => {
+      let senderError: Error | undefined
+      let recipientError: Error | undefined
+
+      beforeEach(async () => {
+        senderError = undefined
+        recipientError = undefined
+
+        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
+        mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: new Date() })
+        mockRegistry.getProfiles.mockResolvedValue([
+          createMockProfile(senderAddress),
+          createMockProfile(recipientAddress)
+        ])
+        mockRegistry.getProfile.mockResolvedValue(createMockProfile(senderAddress))
+
+        for (let attempt = 0; attempt < pairRateLimit; attempt++) {
+          await friendsComponent.upsertFriendship(senderAddress, recipientAddress, Action.REQUEST, null)
+        }
+
+        senderError = await friendsComponent
+          .upsertFriendship(senderAddress, recipientAddress, Action.REQUEST, null)
+          .then(() => undefined)
+          .catch((caught) => caught)
+        recipientError = await friendsComponent
+          .blockUser(recipientAddress, senderAddress)
+          .then(() => undefined)
+          .catch((caught) => caught)
+      })
+
+      it('should reject further friendship mutations from the sender', () => {
+        expect(senderError).toBeInstanceOf(FriendshipRateLimitError)
+      })
+
+      it('should still let the recipient block the sender', () => {
+        expect(recipientError).toBeUndefined()
+      })
+    })
+
+    describe('and the same actor loops block and unblock at the same target', () => {
+      let loopError: Error | undefined
+
+      beforeEach(async () => {
+        loopError = undefined
+
+        mockFriendsDB.unblockUser.mockResolvedValue(undefined)
+        mockRegistry.getProfile.mockResolvedValue(createMockProfile(recipientAddress))
+
+        for (let attempt = 0; attempt < pairRateLimit / 2; attempt++) {
+          await friendsComponent.blockUser(senderAddress, recipientAddress)
+          await friendsComponent.unblockUser(senderAddress, recipientAddress)
+        }
+
+        loopError = await friendsComponent
+          .blockUser(senderAddress, recipientAddress)
+          .then(() => undefined)
+          .catch((caught) => caught)
+      })
+
+      it('should reject the block once the directional pair budget is spent', () => {
+        expect(loopError).toBeInstanceOf(FriendshipRateLimitError)
       })
     })
   })
 
   describe('when getting blocked users', () => {
+    // The component takes a page explicitly; this is the same page the RPC handler resolves to
+    // when a caller sends no pagination.
+    const blockedUsersPage = normalizeBlockedUsersPagination()
+
     describe('and the user has blocked users', () => {
       let mockBlockedUsers: BlockedUserWithDate[]
       let mockProfiles: Profile[]
@@ -349,11 +504,12 @@ describe('Friends Component', () => {
         ]
 
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(3)
       })
 
       it('should return blocked users with profiles and total count', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)
 
         expect(result).toEqual({
           blockedUsers: mockBlockedUsers,
@@ -361,19 +517,23 @@ describe('Friends Component', () => {
           total: 3
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
       })
     })
 
     describe('and the user has no blocked users', () => {
       beforeEach(() => {
         mockFriendsDB.getBlockedUsers.mockResolvedValue([])
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(0)
       })
 
       it('should return empty arrays with zero total', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)
 
         expect(result).toEqual({
           blockedUsers: [],
@@ -381,8 +541,11 @@ describe('Friends Component', () => {
           total: 0
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       })
     })
 
@@ -392,10 +555,15 @@ describe('Friends Component', () => {
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Database connection failed')
+        await expect(friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)).rejects.toThrow(
+          'Database connection failed'
+        )
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
 
@@ -409,14 +577,19 @@ describe('Friends Component', () => {
         ]
 
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
-        mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
+        mockRegistry.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Catalyst service unavailable')
+        await expect(friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)).rejects.toThrow(
+          'Catalyst service unavailable'
+        )
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2'])
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2'])
       })
     })
 
@@ -431,15 +604,13 @@ describe('Friends Component', () => {
         ]
 
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(3)
         // Catalyst returns only 2 profiles instead of 3
-        mockCatalystClient.getProfiles.mockResolvedValue([
-          createMockProfile('0xblocked1'),
-          createMockProfile('0xblocked2')
-        ])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xblocked1'), createMockProfile('0xblocked2')])
       })
 
       it('should return the profiles that were successfully retrieved', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)
 
         expect(result).toEqual({
           blockedUsers: mockBlockedUsers,
@@ -447,7 +618,35 @@ describe('Friends Component', () => {
           total: 3
         })
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
+      })
+    })
+
+    describe('and there are more blocked users than fit in one page', () => {
+      let firstPage: BlockedUserWithDate[]
+      let result: { blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }
+
+      beforeEach(async () => {
+        firstPage = [
+          { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+          { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
+        ]
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(firstPage)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(57)
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xblocked1'), createMockProfile('0xblocked2')])
+        result = await friendsComponent.getBlockedUsers(mockUserAddress, { limit: 2, offset: 0 })
+      })
+
+      it('should report the full row count, not the size of the returned page', () => {
+        expect(result.total).toBe(57)
+      })
+
+      it('should return only the requested page', () => {
+        expect(result.blockedUsers).toEqual(firstPage)
+      })
+
+      it('should count without applying the pagination', () => {
+        expect(mockFriendsDB.getBlockedUsersCount).toHaveBeenCalledWith(mockUserAddress)
       })
     })
   })
@@ -481,7 +680,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
       })
 
-      it('should return NONE status', async () => {
+      it('should return undefined', async () => {
         const result = await friendsComponent.getFriendshipStatus('0x123', '0x456')
 
         expect(result).toEqual(undefined)
@@ -525,7 +724,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
         mockFriendsDB.getMutualFriendsCount.mockResolvedValue(3)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should return mutual friends profiles with total count', async () => {
@@ -538,7 +737,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xmutual1', '0xmutual2', '0xmutual3'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xmutual1', '0xmutual2', '0xmutual3'])
       })
     })
 
@@ -546,7 +745,7 @@ describe('Friends Component', () => {
       beforeEach(() => {
         mockFriendsDB.getMutualFriends.mockResolvedValue([])
         mockFriendsDB.getMutualFriendsCount.mockResolvedValue(0)
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty profiles array with zero total', async () => {
@@ -559,7 +758,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       })
     })
 
@@ -573,7 +772,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
         mockFriendsDB.getMutualFriendsCount.mockResolvedValue(1)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should work without pagination', async () => {
@@ -584,9 +783,12 @@ describe('Friends Component', () => {
           total: 1
         })
 
-        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, undefined)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, {
+          limit: FRIENDS_DEFAULT_LIMIT,
+          offset: 0
+        })
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xmutual1'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xmutual1'])
       })
     })
 
@@ -603,7 +805,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
 
@@ -624,7 +826,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
 
@@ -636,7 +838,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
         mockFriendsDB.getMutualFriendsCount.mockResolvedValue(2)
-        mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
+        mockRegistry.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
       })
 
       it('should propagate the error', async () => {
@@ -646,7 +848,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xmutual1', '0xmutual2'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xmutual1', '0xmutual2'])
       })
     })
   })
@@ -678,7 +880,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getReceivedFriendshipRequests.mockResolvedValue(mockPendingRequests)
         mockFriendsDB.getReceivedFriendshipRequestsCount.mockResolvedValue(2)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should return pending requests with total count', async () => {
@@ -692,7 +894,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getReceivedFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
         expect(mockFriendsDB.getReceivedFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xrequester1', '0xrequester2'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xrequester1', '0xrequester2'])
       })
     })
 
@@ -700,7 +902,7 @@ describe('Friends Component', () => {
       beforeEach(() => {
         mockFriendsDB.getReceivedFriendshipRequests.mockResolvedValue([])
         mockFriendsDB.getReceivedFriendshipRequestsCount.mockResolvedValue(0)
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty requests array with zero total', async () => {
@@ -714,7 +916,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getReceivedFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
         expect(mockFriendsDB.getReceivedFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       })
     })
 
@@ -730,7 +932,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getReceivedFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
         expect(mockFriendsDB.getReceivedFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
   })
@@ -762,7 +964,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getSentFriendshipRequests.mockResolvedValue(mockSentRequests)
         mockFriendsDB.getSentFriendshipRequestsCount.mockResolvedValue(2)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       it('should return sent requests with total count', async () => {
@@ -776,7 +978,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getSentFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
         expect(mockFriendsDB.getSentFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xrequested1', '0xrequested2'])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xrequested1', '0xrequested2'])
       })
     })
 
@@ -784,7 +986,7 @@ describe('Friends Component', () => {
       beforeEach(() => {
         mockFriendsDB.getSentFriendshipRequests.mockResolvedValue([])
         mockFriendsDB.getSentFriendshipRequestsCount.mockResolvedValue(0)
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty requests array with zero total', async () => {
@@ -798,7 +1000,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getSentFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
         expect(mockFriendsDB.getSentFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       })
     })
 
@@ -814,7 +1016,7 @@ describe('Friends Component', () => {
 
         expect(mockFriendsDB.getSentFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
         expect(mockFriendsDB.getSentFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
   })
@@ -828,26 +1030,56 @@ describe('Friends Component', () => {
     beforeEach(() => {
       mockClient = {} as jest.Mocked<PoolClient>
       mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
-      blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      blockedAddress = '0x12356abc4078a0cc3b89b419928b857b8af826ef'
       mockProfile = createMockProfile(blockedAddress)
       blockedAt = new Date()
     })
 
-    describe('and the profile is not found', () => {
-      beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(null)
+    describe('and the target address is checksummed', () => {
+      let checksummed: string
+      let lowercased: string
+
+      beforeEach(async () => {
+        checksummed = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+        lowercased = checksummed.toLowerCase()
+
+        mockFriendsDB.blockUser.mockResolvedValueOnce({ blocked_at: blockedAt } as any)
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+
+        await friendsComponent.blockUser(mockUserAddress, checksummed)
       })
 
-      it('should reject with a profileNotFound error', async () => {
-        await expect(friendsComponent.blockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
-          `Profile not found for address ${blockedAddress}`
-        )
+      it('should publish the block update with the address the subscription filters compare against', () => {
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+          blockerAddress: mockUserAddress,
+          blockedAddress: lowercased,
+          isBlocked: true
+        })
+      })
+    })
+
+    describe('and the registry cannot resolve a profile for the target', () => {
+      let result: Awaited<ReturnType<typeof friendsComponent.blockUser>>
+
+      beforeEach(async () => {
+        mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+        mockRegistry.getProfile.mockRejectedValueOnce(new Error(`Profile not found: ${blockedAddress}`))
+        result = await friendsComponent.blockUser(mockUserAddress, blockedAddress)
+      })
+
+      it('should still write the block', () => {
+        expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+      })
+
+      it('should report no profile rather than failing', () => {
+        expect(result.profile).toBeNull()
       })
     })
 
     describe('and there is an error blocking the user', () => {
       beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.blockUser.mockRejectedValueOnce(new Error('Error blocking user'))
       })
 
@@ -858,7 +1090,7 @@ describe('Friends Component', () => {
 
     describe('and the user is friends with the blocked user', () => {
       beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
         mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
         mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
@@ -913,7 +1145,7 @@ describe('Friends Component', () => {
 
     describe('and the user is not friends with the blocked user', () => {
       beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
         mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
       })
@@ -957,25 +1189,32 @@ describe('Friends Component', () => {
     beforeEach(() => {
       mockClient = {} as jest.Mocked<PoolClient>
       mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
-      blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      blockedAddress = '0x12356abc4078a0cc3b89b419928b857b8af826ef'
       mockProfile = createMockProfile(blockedAddress)
     })
 
-    describe('and the profile is not found', () => {
-      beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(null)
+    describe('and the registry cannot resolve a profile for the target', () => {
+      let result: Awaited<ReturnType<typeof friendsComponent.unblockUser>>
+
+      beforeEach(async () => {
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+        mockRegistry.getProfile.mockRejectedValueOnce(new Error(`Profile not found: ${blockedAddress}`))
+        result = await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
       })
 
-      it('should reject with a profileNotFound error', async () => {
-        await expect(friendsComponent.unblockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
-          `Profile not found for address ${blockedAddress}`
-        )
+      it('should still remove the block', () => {
+        expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+      })
+
+      it('should report no profile rather than failing', () => {
+        expect(result).toBeNull()
       })
     })
 
     describe('and there is an error unblocking the user', () => {
       beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.unblockUser.mockRejectedValueOnce(new Error('Error unblocking user'))
       })
 
@@ -992,7 +1231,7 @@ describe('Friends Component', () => {
       beforeEach(() => {
         now = Date.now()
         jest.spyOn(Date, 'now').mockReturnValueOnce(now)
-        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
         mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
         mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
@@ -1043,7 +1282,7 @@ describe('Friends Component', () => {
 
     describe('and the user is not friends with the blocked user', () => {
       beforeEach(() => {
-        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
         mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
       })
@@ -1096,7 +1335,7 @@ describe('Friends Component', () => {
       mockCreatedAt = new Date()
 
       mockFriendsDB.executeTx.mockImplementation(async (cb) => cb(mockClient))
-      mockCatalystClient.getProfiles.mockResolvedValue([mockUserProfile, mockFriendProfile])
+      mockRegistry.getProfiles.mockResolvedValue([mockUserProfile, mockFriendProfile])
       mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
     })
 
@@ -1123,105 +1362,137 @@ describe('Friends Component', () => {
       beforeEach(() => {
         friendshipId = 'existing-friendship-id'
         actionId = 'new-action-id'
-        mockLastAction = {
-          id: 'last-action-id',
-          friendship_id: friendshipId,
-          acting_user: userAddress,
-          action: Action.REQUEST,
-          timestamp: new Date().toISOString()
-        }
-
-        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockLastAction)
         mockFriendsDB.updateFriendshipStatus.mockResolvedValue({ id: friendshipId, created_at: mockCreatedAt })
         mockFriendsDB.recordFriendshipAction.mockResolvedValue(actionId)
       })
 
+      // Only legal state-machine transitions are exercised here. `actingUserMarker` is who performed the
+      // previous action ('user' = the caller, 'friend' = the other user); it determines whether the new
+      // action is allowed (e.g. a user may ACCEPT a request they received, but not one they sent).
       describe.each([
-        [Action.REQUEST, false, 'inactive'],
-        [Action.ACCEPT, true, 'active'],
-        [Action.REJECT, false, 'inactive'],
-        [Action.CANCEL, false, 'inactive'],
-        [Action.DELETE, false, 'inactive']
-      ])('and the action is %s', (actionType, expectedActiveStatus, statusDescription) => {
-        beforeEach(() => {
-          action = actionType
-        })
-
-        it(`should update the existing friendship status to ${statusDescription}`, async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith(userAddress, friendAddress)
-          expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(
-            friendshipId,
-            expectedActiveStatus,
-            mockClient
-          )
-          expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()
-        })
-
-        it('should record the friendship action', async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
-            friendshipId,
-            userAddress,
-            actionType,
-            metadata,
-            mockClient
-          )
-        })
-
-        it('should publish friendship update event', async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
-            id: actionId,
-            from: userAddress,
-            to: friendAddress,
-            action: actionType,
-            timestamp: expect.any(Number),
-            metadata
+        {
+          description: 'accepting a request received from the friend',
+          actingUserMarker: 'friend',
+          lastActionType: Action.REQUEST,
+          actionType: Action.ACCEPT,
+          expectedActiveStatus: true,
+          statusDescription: 'active'
+        },
+        {
+          description: 'rejecting a request received from the friend',
+          actingUserMarker: 'friend',
+          lastActionType: Action.REQUEST,
+          actionType: Action.REJECT,
+          expectedActiveStatus: false,
+          statusDescription: 'inactive'
+        },
+        {
+          description: 'cancelling a request the caller sent to the friend',
+          actingUserMarker: 'user',
+          lastActionType: Action.REQUEST,
+          actionType: Action.CANCEL,
+          expectedActiveStatus: false,
+          statusDescription: 'inactive'
+        },
+        {
+          description: 'deleting an already-accepted friendship',
+          actingUserMarker: 'friend',
+          lastActionType: Action.ACCEPT,
+          actionType: Action.DELETE,
+          expectedActiveStatus: false,
+          statusDescription: 'inactive'
+        }
+      ])(
+        'and the action is $description',
+        ({ actingUserMarker, lastActionType, actionType, expectedActiveStatus, statusDescription }) => {
+          beforeEach(() => {
+            action = actionType
+            mockLastAction = {
+              id: 'last-action-id',
+              friendship_id: friendshipId,
+              acting_user: actingUserMarker === 'user' ? userAddress : friendAddress,
+              action: lastActionType,
+              timestamp: new Date().toISOString()
+            }
+            mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockLastAction)
           })
-        })
 
-        it('should return the correct friendship request and receiver profile', async () => {
-          const result = await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+          it(`should update the existing friendship status to ${statusDescription}`, async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
 
-          expect(result).toEqual({
-            friendshipRequest: {
-              id: friendshipId,
-              address: friendAddress,
-              timestamp: mockCreatedAt.toString(),
-              metadata
-            },
-            receiverProfile: mockFriendProfile
-          })
-        })
-
-        it('should send notification for the friendship action when appropriate', async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          // Execute setImmediate callback
-          jest.runOnlyPendingTimers()
-
-          if (actionType === Action.REQUEST || actionType === Action.ACCEPT) {
-            expect(mockSendNotification).toHaveBeenCalledWith(
-              actionType,
-              {
-                requestId: actionId,
-                senderAddress: userAddress,
-                receiverAddress: friendAddress,
-                senderProfile: mockUserProfile,
-                receiverProfile: mockFriendProfile,
-                message: metadata?.message
-              },
-              { sns: mockSNS, logs: expect.any(Object) }
+            expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith(userAddress, friendAddress)
+            expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(
+              friendshipId,
+              expectedActiveStatus,
+              mockClient
             )
-          } else {
-            expect(mockSendNotification).not.toHaveBeenCalled()
-          }
-        })
-      })
+            expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()
+          })
+
+          it('should record the friendship action', async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
+              friendshipId,
+              userAddress,
+              actionType,
+              metadata,
+              mockClient
+            )
+          })
+
+          it('should publish friendship update event', async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+              id: actionId,
+              from: userAddress,
+              to: friendAddress,
+              action: actionType,
+              timestamp: expect.any(Number),
+              metadata
+            })
+          })
+
+          it('should return the correct friendship request and receiver profile', async () => {
+            const result = await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            expect(result).toEqual({
+              friendshipRequest: {
+                id: friendshipId,
+                address: friendAddress,
+                timestamp: mockCreatedAt.toString(),
+                metadata
+              },
+              receiverProfile: mockFriendProfile
+            })
+          })
+
+          it('should send notification for the friendship action when appropriate', async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            // Execute setImmediate callback
+            jest.runOnlyPendingTimers()
+
+            if (actionType === Action.REQUEST || actionType === Action.ACCEPT) {
+              expect(mockSendNotification).toHaveBeenCalledWith(
+                actionType,
+                {
+                  requestId: actionId,
+                  senderAddress: userAddress,
+                  receiverAddress: friendAddress,
+                  senderProfile: mockUserProfile,
+                  receiverProfile: mockFriendProfile,
+                  message: metadata?.message
+                },
+                { sns: mockSNS, logs: expect.any(Object) }
+              )
+            } else {
+              expect(mockSendNotification).not.toHaveBeenCalled()
+            }
+          })
+        }
+      )
     })
 
     describe('and there is no existing friendship action', () => {
@@ -1237,26 +1508,18 @@ describe('Friends Component', () => {
         mockFriendsDB.recordFriendshipAction.mockResolvedValue(actionId)
       })
 
-      describe.each([
-        [Action.REQUEST, false, 'inactive'],
-        [Action.ACCEPT, true, 'active'],
-        [Action.REJECT, false, 'inactive'],
-        [Action.CANCEL, false, 'inactive'],
-        [Action.DELETE, false, 'inactive']
-      ])('and the action is %s', (actionType, expectedActiveStatus, statusDescription) => {
+      // With no prior action the only legal transition is a REQUEST. Every other action (ACCEPT, REJECT,
+      // CANCEL, DELETE) is an illegal transition and is covered by the invalid-transition block below.
+      describe('and the action is a REQUEST', () => {
         beforeEach(() => {
-          action = actionType
+          action = Action.REQUEST
         })
 
-        it(`should create a new friendship with ${statusDescription} status`, async () => {
+        it('should create a new inactive friendship', async () => {
           await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
 
           expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith(userAddress, friendAddress)
-          expect(mockFriendsDB.createFriendship).toHaveBeenCalledWith(
-            [userAddress, friendAddress],
-            expectedActiveStatus,
-            mockClient
-          )
+          expect(mockFriendsDB.createFriendship).toHaveBeenCalledWith([userAddress, friendAddress], false, mockClient)
           expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
         })
 
@@ -1266,7 +1529,7 @@ describe('Friends Component', () => {
           expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
             friendshipId,
             userAddress,
-            actionType,
+            Action.REQUEST,
             metadata,
             mockClient
           )
@@ -1279,7 +1542,7 @@ describe('Friends Component', () => {
             id: actionId,
             from: userAddress,
             to: friendAddress,
-            action: actionType,
+            action: Action.REQUEST,
             timestamp: expect.any(Number),
             metadata
           })
@@ -1299,28 +1562,112 @@ describe('Friends Component', () => {
           })
         })
 
-        it('should send notification for the friendship action when appropriate', async () => {
+        it('should send a notification for the friendship request', async () => {
           await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
 
           // Execute setImmediate callback
           jest.runOnlyPendingTimers()
 
-          if (actionType === Action.REQUEST || actionType === Action.ACCEPT) {
-            expect(mockSendNotification).toHaveBeenCalledWith(
-              actionType,
-              {
-                requestId: actionId,
-                senderAddress: userAddress,
-                receiverAddress: friendAddress,
-                senderProfile: mockUserProfile,
-                receiverProfile: mockFriendProfile,
-                message: metadata?.message
-              },
-              { sns: mockSNS, logs: expect.any(Object) }
-            )
-          } else {
-            expect(mockSendNotification).not.toHaveBeenCalled()
-          }
+          expect(mockSendNotification).toHaveBeenCalledWith(
+            Action.REQUEST,
+            {
+              requestId: actionId,
+              senderAddress: userAddress,
+              receiverAddress: friendAddress,
+              senderProfile: mockUserProfile,
+              receiverProfile: mockFriendProfile,
+              message: metadata?.message
+            },
+            { sns: mockSNS, logs: expect.any(Object) }
+          )
+        })
+      })
+    })
+
+    // Regression coverage for the friendship state machine: an action that is not a legal transition
+    // from the current state must be rejected before any state is written. The canonical case is
+    // ACCEPT with no pending request, which previously forged an active friendship without consent.
+    describe('and the action is not a valid transition for the current friendship state', () => {
+      beforeEach(() => {
+        mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: mockCreatedAt })
+        mockFriendsDB.updateFriendshipStatus.mockResolvedValue({ id: 'friendship-id', created_at: mockCreatedAt })
+        mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
+      })
+
+      describe.each([
+        {
+          description: 'accepting when no request exists',
+          actionType: Action.ACCEPT,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'rejecting when no request exists',
+          actionType: Action.REJECT,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'cancelling when no request exists',
+          actionType: Action.CANCEL,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'deleting when no friendship exists',
+          actionType: Action.DELETE,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'accepting a request the caller sent themselves',
+          actionType: Action.ACCEPT,
+          lastActor: 'user',
+          lastActionType: Action.REQUEST
+        },
+        {
+          description: 'cancelling a request the friend sent',
+          actionType: Action.CANCEL,
+          lastActor: 'friend',
+          lastActionType: Action.REQUEST
+        },
+        {
+          description: 'accepting when the friendship is already active',
+          actionType: Action.ACCEPT,
+          lastActor: 'friend',
+          lastActionType: Action.ACCEPT
+        }
+      ])('and the action is $description', ({ actionType, lastActor, lastActionType }) => {
+        beforeEach(() => {
+          action = actionType
+          const lastAction =
+            lastActor === null
+              ? null
+              : {
+                  id: 'last-action-id',
+                  friendship_id: 'existing-friendship-id',
+                  acting_user: lastActor === 'user' ? userAddress : friendAddress,
+                  action: lastActionType as Action,
+                  timestamp: new Date().toISOString()
+                }
+          mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(lastAction)
+        })
+
+        it('should throw an InvalidFriendshipActionError', async () => {
+          await expect(friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)).rejects.toThrow(
+            InvalidFriendshipActionError
+          )
+        })
+
+        it('should not open a transaction or write any friendship state', async () => {
+          await expect(friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)).rejects.toThrow(
+            InvalidFriendshipActionError
+          )
+
+          expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+          expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()
+          expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
+          expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
         })
       })
     })
@@ -1330,7 +1677,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(null)
         mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: mockCreatedAt })
         mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
-        mockCatalystClient.getProfiles.mockResolvedValue([mockFriendProfile]) // Only friend profile, missing user profile
+        mockRegistry.getProfiles.mockResolvedValue([mockFriendProfile]) // Only friend profile, missing user profile
       })
 
       it('should throw ProfileNotFoundError for the user', async () => {
@@ -1338,7 +1685,7 @@ describe('Friends Component', () => {
           `Profile not found for address ${userAddress}`
         )
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([userAddress, friendAddress])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([userAddress, friendAddress])
       })
     })
 
@@ -1347,7 +1694,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(null)
         mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: mockCreatedAt })
         mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
-        mockCatalystClient.getProfiles.mockResolvedValue([mockUserProfile]) // Only user profile, missing friend profile
+        mockRegistry.getProfiles.mockResolvedValue([mockUserProfile]) // Only user profile, missing friend profile
       })
 
       it('should throw ProfileNotFoundError for the friend', async () => {
@@ -1355,7 +1702,7 @@ describe('Friends Component', () => {
           `Profile not found for address ${friendAddress}`
         )
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([userAddress, friendAddress])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([userAddress, friendAddress])
       })
     })
 
@@ -1408,6 +1755,9 @@ describe('Friends Component', () => {
       let mockLastAction: FriendshipAction
 
       beforeEach(() => {
+        // Caller previously sent a request (valid `REQUEST` by the caller), now cancels it — a legal
+        // transition that reaches updateFriendshipStatus, where the database error is triggered.
+        action = Action.CANCEL
         mockLastAction = {
           id: 'last-action-id',
           friendship_id: 'existing-friendship-id',

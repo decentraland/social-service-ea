@@ -33,6 +33,21 @@ export class CommunityPlaceNotFoundError extends Error {
 }
 
 /**
+ * This error is thrown when thumbnail bytes reach storage without a supported image signature,
+ * meaning a caller skipped validation
+ *
+ * @export
+ * @class UnsupportedThumbnailFormatError
+ * @extends {Error}
+ */
+export class UnsupportedThumbnailFormatError extends Error {
+  constructor() {
+    super('Thumbnail bytes carry no supported image signature')
+    this.name = 'UnsupportedThumbnailFormatError'
+  }
+}
+
+/**
  * This error is thrown when a community request (invite or request to join) is invalid
  *
  * @export

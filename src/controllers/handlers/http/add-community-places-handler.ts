@@ -1,6 +1,6 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community'
 import { AddCommunityPlacesRequestBody } from './schemas'

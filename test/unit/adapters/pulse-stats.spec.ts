@@ -159,6 +159,18 @@ describe('PulseStatsComponent', () => {
       })
     })
 
+    it('should cancel an unsuccessful response body before rejecting', async () => {
+      const cancel = jest.fn().mockResolvedValue(undefined)
+      mockFetcher.fetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Service Unavailable',
+        bodyUsed: false,
+        body: { cancel }
+      } as any)
+      await expect(pulseStats.fetchPeers()).rejects.toThrow('Error fetching peers: Service Unavailable')
+      expect(cancel).toHaveBeenCalledTimes(1)
+    })
+
     describe('and the fetch fails', () => {
       beforeEach(() => {
         mockFetcher.fetch.mockRejectedValue(new Error('Fetch failed'))

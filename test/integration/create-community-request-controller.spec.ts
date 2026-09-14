@@ -427,6 +427,63 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 )
                 expect(response.status).toBe(401)
               })
+
+              describe('and community is private', () => {
+                beforeEach(async () => {
+                  await components.communitiesDb.updateCommunity(communityId, {
+                    private: true
+                  })
+                })
+
+                describe('and the target is already a member of the community', () => {
+                  beforeEach(async () => {
+                    await components.communitiesDb.addCommunityMember({
+                      communityId,
+                      memberAddress: targetAddress as EthAddress,
+                      role: CommunityRole.Member
+                    })
+                  })
+
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [targetAddress])
+                  })
+
+                  it('should return the same 401 status code a target outside the community gets, so the answer discloses no membership', async () => {
+                    const response = await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
+                    expect(response.status).toBe(401)
+                  })
+                })
+
+                describe('and the target is banned from the community', () => {
+                  beforeEach(async () => {
+                    await components.communitiesDb.banMemberFromCommunity(
+                      communityId,
+                      ownerAddress as EthAddress,
+                      targetAddress as EthAddress
+                    )
+                  })
+
+                  it('should return a 401 whose message names the missing permission and not the ban', async () => {
+                    const response = await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
+                    const body = await response.json()
+
+                    expect(body).toEqual({
+                      error: 'Not Authorized',
+                      message: `The user ${identity.realAccount.address.toLowerCase()} doesn't have permission to invite users`
+                    })
+                  })
+                })
+              })
             })
           })
 

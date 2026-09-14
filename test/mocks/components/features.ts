@@ -1,4 +1,4 @@
-import { IFeaturesComponent } from '@well-known-components/features-component'
+import { IFeaturesComponent } from '@dcl/features-component'
 
 export function createFeaturesMockComponent({
   getIsFeatureEnabled = jest.fn(),

@@ -13,7 +13,14 @@ import {
   AggregatedCommunity,
   CommunityVoiceChatStatus,
   CommunityRequestType,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  MemberProfileInfo,
+  AggregatedCommunityV2,
+  AggregatedCommunityWithMemberAndVoiceChatDataV2,
+  CommunityWithUserInformationV2,
+  CommunityWithUserInformationAndVoiceChatV2,
+  CommunityPublicInformationV2,
+  CommunityPublicInformationWithVoiceChatV2
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -36,6 +43,44 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
   }
 }
 
+/**
+ * Whether the caller may see whether a community currently has a live voice chat: always
+ * for non-private communities, and only for members of a private one. Sole authority for
+ * this decision; every mapper that exposes a voice chat status must go through it.
+ */
+const isVoiceChatVisible = (community: { privacy: CommunityPrivacyEnum; role: CommunityRole }): boolean =>
+  community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
+
+/**
+ * Resolves the voice chat status to expose for a community: the real status when voice
+ * chat is visible to the caller (a public community, or any member of a private one) and
+ * is actually active, otherwise a zeroed/inactive default. Shared by the v1 and v2 mappers.
+ */
+const resolveVoiceChatStatus = (
+  community: { privacy: CommunityPrivacyEnum; role: CommunityRole },
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityVoiceChatStatus => {
+  return isVoiceChatVisible(community) && !!voiceChatStatus
+    ? voiceChatStatus
+    : {
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
+      }
+}
+
+/**
+ * Same decision as {@link resolveVoiceChatStatus} for the single-community responses, whose
+ * contract already uses `null` for "no active voice chat". A hidden status reuses that same
+ * `null`, so the response is identical either way.
+ */
+const resolveNullableVoiceChatStatus = (
+  community: { privacy: CommunityPrivacyEnum; role: CommunityRole },
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityVoiceChatStatus | null => {
+  return isVoiceChatVisible(community) ? voiceChatStatus : null
+}
+
 export const toCommunityWithMembersCount = (
   community: AggregatedCommunity & { role: CommunityRole },
   membersCount: number,
@@ -49,7 +94,7 @@ export const toCommunityWithMembersCount = (
     ...community,
     ownerAddress: community.ownerAddress,
     membersCount,
-    voiceChatStatus
+    voiceChatStatus: resolveNullableVoiceChatStatus(community, voiceChatStatus)
   })
 }
 
@@ -73,20 +118,9 @@ export const toCommunityWithUserInformationAndVoiceChat = (
 ): CommunityWithUserInformationAndVoiceChat => {
   const baseResult = toCommunityWithUserInformation(community, profilesMap)
 
-  const shouldIncludeVoiceChat =
-    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
-
   return {
     ...baseResult,
-    voiceChatStatus:
-      shouldIncludeVoiceChat && !!voiceChatStatus
-        ? voiceChatStatus
-        : // If voice chat is not included, return default values
-          {
-            isActive: false,
-            participantCount: 0,
-            moderatorCount: 0
-          }
+    voiceChatStatus: resolveVoiceChatStatus(community, voiceChatStatus)
   }
 }
 
@@ -120,53 +154,142 @@ export const toPublicCommunityWithVoiceChat = (
 ): CommunityPublicInformationWithVoiceChat => {
   return {
     ...toBaseCommunity(community),
-    voiceChatStatus
+    // Unauthenticated caller: no role, so a private community always hides its voice chat.
+    voiceChatStatus: resolveNullableVoiceChatStatus(
+      { privacy: community.privacy, role: CommunityRole.None },
+      voiceChatStatus
+    )
   }
 }
 
-export const mapMembersWithProfiles = <
-  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress },
-  R extends {
-    profilePictureUrl: string
-    hasClaimedName: boolean
-    name: string
-    friendshipStatus: FriendshipStatus
+// ---- v2 (address-only) community mappers ----
+// These mirror the v1 mappers above but never inflate the owner address into an owner
+// name and keep mutual friends as plain addresses (`friends: string[]`). v2 community
+// rows carry no `ownerName`, so nothing profile-derived ends up in the response.
+
+export const toCommunityWithMembersCountV2 = (
+  community: AggregatedCommunityV2 & { role: CommunityRole },
+  membersCount: number,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): AggregatedCommunityWithMemberAndVoiceChatDataV2 => {
+  return withMembersCount({
+    ...community,
+    ownerAddress: community.ownerAddress,
+    membersCount,
+    voiceChatStatus: resolveNullableVoiceChatStatus(community, voiceChatStatus)
+  })
+}
+
+export const toCommunityWithUserInformationV2 = (
+  community: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>
+): CommunityWithUserInformationV2 => {
+  return {
+    ...toBaseCommunity(community),
+    friends: community.friends
   }
+}
+
+export const toCommunityWithUserInformationAndVoiceChatV2 = (
+  community: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityWithUserInformationAndVoiceChatV2 => {
+  const baseResult = toCommunityWithUserInformationV2(community)
+
+  return {
+    ...baseResult,
+    voiceChatStatus: resolveVoiceChatStatus(community, voiceChatStatus)
+  }
+}
+
+export const toCommunityResultsWithVoiceChatV2 = (
+  communities: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[],
+  voiceChatStatuses: Record<string, CommunityVoiceChatStatus> | undefined
+): CommunityWithUserInformationAndVoiceChatV2[] => {
+  const safeVoiceChatStatuses = voiceChatStatuses || {}
+  return communities.map((community) =>
+    toCommunityWithUserInformationAndVoiceChatV2(community, safeVoiceChatStatuses[community.id] || null)
+  )
+}
+
+export const toPublicCommunityWithVoiceChatV2 = (
+  community: CommunityPublicInformationV2,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityPublicInformationWithVoiceChatV2 => {
+  return {
+    ...toBaseCommunity(community),
+    // Unauthenticated caller: no role, so a private community always hides its voice chat.
+    voiceChatStatus: resolveNullableVoiceChatStatus(
+      { privacy: community.privacy, role: CommunityRole.None },
+      voiceChatStatus
+    )
+  }
+}
+
+const computeFriendshipStatus = (
+  member: { lastFriendshipAction?: Action; actingUser?: EthAddress },
+  userAddress: EthAddress | undefined
+): FriendshipStatus => {
+  const { lastFriendshipAction, actingUser } = member
+
+  if (lastFriendshipAction && actingUser && userAddress) {
+    const friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> = {
+      action: lastFriendshipAction,
+      acting_user: actingUser
+    }
+    return getFriendshipRequestStatus(friendshipAction, userAddress)
+  }
+
+  return FriendshipStatus.NONE
+}
+
+export const mapMembersWithProfiles = <
+  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress }
 >(
   userAddress: EthAddress | undefined,
   members: T[],
   profiles: Profile[]
-): (T & R)[] => {
+): (T & MemberProfileInfo)[] => {
   const profileMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
   return members
     .map((member) => {
       const memberProfile = profileMap.get(member.memberAddress)
-      const { lastFriendshipAction, actingUser } = member
-      let friendshipStatus: FriendshipStatus = FriendshipStatus.NONE
-
-      if (lastFriendshipAction && actingUser && userAddress) {
-        const friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> = {
-          action: lastFriendshipAction,
-          acting_user: actingUser
-        }
-        friendshipStatus = getFriendshipRequestStatus(friendshipAction, userAddress)
-      }
+      const friendshipStatus = computeFriendshipStatus(member, userAddress)
 
       if (!memberProfile) {
         return undefined
       }
 
-      const { profilePictureUrl, hasClaimedName, name } = getProfileInfo(memberProfile)
+      const { profilePictureUrl, hasClaimedName, name, nameColor } = getProfileInfo(memberProfile)
 
       return {
         ...member,
         profilePictureUrl,
         hasClaimedName,
         name,
+        ...(nameColor && { nameColor }),
         friendshipStatus
-      }
+      } as T & MemberProfileInfo
     })
-    .filter((member): member is T & R => member !== undefined)
+    .filter((member): member is T & MemberProfileInfo => member !== undefined)
+}
+
+/**
+ * v2 mapper: attaches the friendship status to each member WITHOUT fetching any profile
+ * and WITHOUT dropping members. Returns only the base entity plus `friendshipStatus`.
+ * The internal `lastFriendshipAction`/`actingUser` fields (used only to derive the status)
+ * are stripped so they don't leak into the address-only response.
+ */
+export const mapMembersWithFriendshipStatus = <
+  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress }
+>(
+  userAddress: EthAddress | undefined,
+  members: T[]
+): (T & { friendshipStatus: FriendshipStatus })[] => {
+  return members.map((member) => {
+    const friendshipStatus = computeFriendshipStatus(member, userAddress)
+    const { lastFriendshipAction, actingUser, ...rest } = member
+    return { ...rest, friendshipStatus } as T & { friendshipStatus: FriendshipStatus }
+  })
 }
 
 export const getCommunityThumbnailPath = (communityId: string) => {

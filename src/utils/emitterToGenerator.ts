@@ -1,15 +1,21 @@
 import { EventType, Emitter } from 'mitt'
 
+// TODO: Choose a proper value based on real metrics from peak queue sizes in production.
+export const MAX_VALUE_QUEUE_SIZE = 1000
+
+export type DestroyableAsyncGenerator<T> = AsyncGenerator<T> & { destroy(): void }
+
 /**
  * Turns an `EventEmitter` into an `AsyncGenerator`
  * @param emitter `Emitter` from `mitt` package
  * @param event type of event to listen to
- * @returns `AsyncGenerator`
+ * @returns `DestroyableAsyncGenerator`
  */
 export default function emitterToAsyncGenerator<Events extends Record<EventType, unknown>, T extends keyof Events>(
   emitter: Emitter<Events>,
-  event: T
-): AsyncGenerator<Events[T]> {
+  event: T,
+  onOverflowDrop?: () => void
+): DestroyableAsyncGenerator<Events[T]> {
   let isDone = false
   const nextQueue: {
     resolve: (value: IteratorResult<Events[T], any> | PromiseLike<IteratorResult<Events[T], any>>) => void
@@ -28,10 +34,32 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
       return
     }
 
+    if (valueQueue.length >= MAX_VALUE_QUEUE_SIZE) {
+      // Drop the oldest event to prevent unbounded memory growth for a slow consumer. Surface it
+      // via the optional hook so callers can track how often (and for which event) updates are
+      // being lost — a sustained rate means a client isn't keeping up with the stream.
+      valueQueue.shift()
+      onOverflowDrop?.()
+    }
     valueQueue.push(value)
   }
 
   emitter.on(event, eventHandler)
+
+  /**
+   * Synchronously terminates the generator from outside the consumer loop.
+   * Resolves any pending next() calls with { done: true } and removes the handler.
+   */
+  function destroy(): void {
+    if (isDone) return
+    isDone = true
+    emitter.off(event, eventHandler)
+    while (nextQueue.length > 0) {
+      const { resolve } = nextQueue.shift()!
+      resolve({ done: true, value: undefined })
+    }
+    valueQueue.length = 0
+  }
 
   return {
     [Symbol.asyncIterator]() {
@@ -52,17 +80,26 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
       })
     },
     async return(value) {
-      isDone = true
-      emitter.off(event, eventHandler)
+      destroy()
       return {
         done: true,
         value
       }
     },
+    // Note: throw() intentionally does NOT delegate to destroy() because
+    // destroy() resolves pending next() calls, while throw() must reject them.
+    // Callers should ensure unregisterGenerator() is called separately (the
+    // finally block in handleSubscriptionUpdates handles this).
     async throw(e) {
       isDone = true
       emitter.off(event, eventHandler)
+      valueQueue.length = 0
+      while (nextQueue.length > 0) {
+        const { reject } = nextQueue.shift()!
+        reject(e)
+      }
       throw e
-    }
+    },
+    destroy
   }
 }

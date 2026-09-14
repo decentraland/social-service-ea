@@ -11,14 +11,14 @@ export async function createS3Adapter({ config }: Pick<AppComponents, 'config'>)
 
   const s3 = new S3Client({ region, endpoint: bucketEndpoint })
 
-  async function storeFile(file: Buffer, key: string): Promise<string> {
+  async function storeFile(file: Buffer, key: string, contentType = 'image/png'): Promise<string> {
     const upload = new Upload({
       client: s3,
       params: {
         Bucket: bucket,
         Key: `${bucketPrefix}/${key}`,
         Body: file,
-        ContentType: 'image/png'
+        ContentType: contentType
       }
     })
 

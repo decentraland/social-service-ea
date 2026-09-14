@@ -1,8 +1,9 @@
-import { IUWsComponent } from '@well-known-components/uws-http-server'
+import { IUWsComponent } from '@dcl/uws-http-server'
 import * as uws from 'uWebSockets.js'
 
 export const mockUWs: jest.Mocked<IUWsComponent> = {
   start: jest.fn(),
+  stop: jest.fn(),
   app: {
     listen: jest.fn(),
     listen_unix: jest.fn(),

@@ -9,7 +9,7 @@ import {
   CommunityPrivacyEnum
 } from './types'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
 import { CommunityRole } from '../../types/entities'
@@ -18,10 +18,10 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 export function createCommunityPostsComponent(
   components: Pick<
     AppComponents,
-    'communityBroadcaster' | 'communitiesDb' | 'communityRoles' | 'catalystClient' | 'communityThumbnail' | 'logs'
+    'communityBroadcaster' | 'communitiesDb' | 'communityRoles' | 'registry' | 'communityThumbnail' | 'logs'
   >
 ): ICommunityPostsComponent {
-  const { communityBroadcaster, communitiesDb, communityRoles, catalystClient, communityThumbnail, logs } = components
+  const { communityBroadcaster, communitiesDb, communityRoles, registry, communityThumbnail, logs } = components
   const logger = logs.getLogger('community-posts-component')
 
   function aggregatePostWithProfile<T extends CommunityPostWithLikes | CommunityPost>(
@@ -42,7 +42,7 @@ export function createCommunityPostsComponent(
     }
 
     const authorAddresses = Array.from(new Set(posts.map((post) => post.authorAddress)))
-    const authorProfiles = await catalystClient.getProfiles(authorAddresses)
+    const authorProfiles = await registry.getProfiles(authorAddresses)
     const authorProfilesByAddress = new Map(authorProfiles.map((p) => [getProfileUserId(p), p]))
 
     return posts.map((post) => {
@@ -75,9 +75,37 @@ export function createCommunityPostsComponent(
     }
 
     const post = await communitiesDb.getPost(postId)
-    if (!post) {
+    if (!post || post.communityId !== communityId) {
       throw new CommunityPostNotFoundError(postId)
     }
+  }
+
+  /**
+   * Shared base fetch for the community posts endpoints. Validates the community exists
+   * and the caller's access, then reads the posts (with like info) from the database
+   * WITHOUT any author-profile enrichment.
+   */
+  async function fetchPosts(
+    communityId: string,
+    options: GetCommunityPostsOptions
+  ): Promise<{ posts: CommunityPostWithLikes[]; total: number }> {
+    const community = await communitiesDb.getCommunity(communityId, options.userAddress)
+    if (!community) {
+      throw new CommunityNotFoundError(communityId)
+    }
+
+    if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+      throw new NotAuthorizedError(
+        `${options.userAddress} is not a member of private community ${communityId}. You need to be a member to get posts in this community.`
+      )
+    }
+
+    const [posts, total] = await Promise.all([
+      communitiesDb.getPosts(communityId, options),
+      communitiesDb.getPostsCount(communityId)
+    ])
+
+    return { posts, total }
   }
 
   return {
@@ -101,24 +129,22 @@ export function createCommunityPostsComponent(
         authorAddress: authorAddress.toLowerCase()
       })
 
-      const authorProfile = await catalystClient.getProfile(authorAddress)
+      const authorProfile = await registry.getProfile(authorAddress)
       const postWithAuthorProfile = aggregatePostWithProfile(post, authorProfile)
 
-      setImmediate(() => {
-        void communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.POST_ADDED,
-          key: post.id,
-          timestamp: Date.now(),
-          metadata: {
-            postId: post.id,
-            communityId,
-            communityName: community.name,
-            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId),
-            authorAddress: authorAddress.toLowerCase(),
-            addressesToNotify: [] // This is populated by the broadcaster
-          }
-        })
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.POST_ADDED,
+        key: post.id,
+        timestamp: Date.now(),
+        metadata: {
+          postId: post.id,
+          communityId,
+          communityName: community.name,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId),
+          authorAddress: authorAddress.toLowerCase(),
+          addressesToNotify: [] // This is populated by the broadcaster
+        }
       })
 
       return postWithAuthorProfile
@@ -128,21 +154,7 @@ export function createCommunityPostsComponent(
       communityId: string,
       options: GetCommunityPostsOptions
     ): Promise<{ posts: CommunityPostWithProfile[]; total: number }> {
-      const community = await communitiesDb.getCommunity(communityId, options.userAddress)
-      if (!community) {
-        throw new CommunityNotFoundError(communityId)
-      }
-
-      if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
-        throw new NotAuthorizedError(
-          `${options.userAddress} is not a member of private community ${communityId}. You need to be a member to get posts in this community.`
-        )
-      }
-
-      const [posts, total] = await Promise.all([
-        communitiesDb.getPosts(communityId, options),
-        communitiesDb.getPostsCount(communityId)
-      ])
+      const { posts, total } = await fetchPosts(communityId, options)
 
       const postsWithProfiles = await aggregatePostsWithProfiles(posts)
 
@@ -152,6 +164,13 @@ export function createCommunityPostsComponent(
       }
     },
 
+    async getPostsWithoutProfiles(
+      communityId: string,
+      options: GetCommunityPostsOptions
+    ): Promise<{ posts: CommunityPostWithLikes[]; total: number }> {
+      return fetchPosts(communityId, options)
+    },
+
     async deletePost(postId: string, deleterAddress: EthAddress): Promise<void> {
       const post = await communitiesDb.getPost(postId)
 
@@ -159,7 +178,7 @@ export function createCommunityPostsComponent(
         throw new CommunityPostNotFoundError(postId)
       }
 
-      await communityRoles.validatePermissionToDeletePost(post.communityId, deleterAddress)
+      await communityRoles.validatePermissionToDeletePost(post, deleterAddress)
 
       await communitiesDb.deletePost(postId)
 

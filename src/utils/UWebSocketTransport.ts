@@ -19,6 +19,9 @@ export type RecognizedString =
 export type IUWebSocketEventMap = {
   close: any
   message: RecognizedString
+  // Emitted by the ws-handler when the socket's backpressure buffer drains, so the
+  // transport can retry queued messages immediately instead of waiting for a timer.
+  drain: void
 }
 
 export enum UWebSocketSendResult {
@@ -90,21 +93,34 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   let isTransportActive = true
   let isInitialized = false
 
-  // Simple queue for messages that couldn't be sent immediately
-  const messageQueue: Array<{
-    message: Uint8Array
-    future: IFuture<void>
-    attempts: number
-  }> = []
-
-  let isProcessing = false
-  let processingTimeout: NodeJS.Timeout | null = null
+  /**
+   * Safely checks if the socket is still connected.
+   * Returns false if the socket is closed or if accessing it throws an error.
+   * This is necessary because uWebSockets.js throws when accessing a closed socket.
+   */
+  function isSocketConnected(): boolean {
+    if (!isTransportActive || !isInitialized) {
+      return false
+    }
+    try {
+      return socket.getUserData().isConnected
+    } catch {
+      // Socket is closed or invalid, accessing it throws
+      return false
+    }
+  }
 
   type QueuedMessage = {
     message: Uint8Array
     future: IFuture<void>
     attempts: number
   }
+
+  // Simple queue for messages that couldn't be sent immediately
+  const messageQueue: QueuedMessage[] = []
+
+  let isProcessing = false
+  let processingTimeout: NodeJS.Timeout | null = null
 
   function trackQueueVsBackpressureRatio() {
     try {
@@ -131,19 +147,34 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     try {
-      while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
+      while (messageQueue.length > 0 && isSocketConnected()) {
         const currentMessage = messageQueue[0]
 
-        // Check max retries
+        // The RPC framing cannot survive a silently dropped message: a stream would stall
+        // forever awaiting its ack and a unary response would leave the client call hanging.
+        // A connection that couldn't drain after all retries is dead — emit an error so the
+        // RPC server closes the transport (which rejects everything still queued) and the
+        // ws-handler ends the socket, letting the client reconnect cleanly.
         if (currentMessage.attempts >= maxRetryAttempts) {
-          logger.warn('Message dropped after max retries', {
+          logger.warn('Closing transport: message not deliverable after max retries', {
             transportId,
             attempts: currentMessage.attempts,
-            messageSize: currentMessage.message.byteLength
+            messageSize: currentMessage.message.byteLength,
+            queueLength: messageQueue.length
           })
-          currentMessage.future.reject(new Error('Message dropped after max retries'))
-          messageQueue.shift()
-          continue
+          metrics.increment('ws_backpressure_events', { result: 'max_retries' })
+          // Contract: the RPC server listens for 'error' and closes this transport
+          // (handleTransportError), which rejects everything queued and lets the ws-handler
+          // end the socket — that teardown runs synchronously inside this emit.
+          events.emit('error', new Error('Message not deliverable after max retries'))
+          // Defensive fallback: if no listener closed the transport (e.g. a future refactor
+          // swaps in a log-only listener), drop the poisoned head message so the queue can
+          // never spin on it — silent loss is the least-bad outcome at that point.
+          if (isTransportActive && messageQueue[0] === currentMessage) {
+            currentMessage.future.reject(new Error('Message not deliverable after max retries'))
+            messageQueue.shift()
+          }
+          return
         }
 
         const result = processNextMessage(currentMessage)
@@ -158,7 +189,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         // Schedule retry with exponential backoff
         processingTimeout = setTimeout(() => {
           processingTimeout = null
-          void processQueue()
+          runQueueProcessing()
         }, backoffDelay)
 
         // Exit the loop after scheduling retry
@@ -191,11 +222,14 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
       switch (result) {
         case UWebSocketSendResult.SUCCESS:
+          metrics.increment('ws_messages_sent')
           item.future.resolve()
           messageQueue.shift()
           break
 
         case UWebSocketSendResult.BACKPRESSURE:
+          // The message was accepted and buffered by uWS — it counts as sent.
+          metrics.increment('ws_messages_sent')
           metrics.increment('ws_backpressure_events', { result: 'backpressure' })
           // Message is already queued by the underlying library, no need to retry
           item.future.resolve()
@@ -236,26 +270,42 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
   }
 
-  async function send(msg: Uint8Array) {
+  // processQueue is always kicked fire-and-forget (from send(), the retry timer and
+  // handleDrain). It has no internal catch and, although it has no awaits today, its
+  // synchronous body emits 'error' events whose listeners tear the transport down across
+  // modules — if any link in that chain throws, the promise it returns rejects. Route every
+  // call through here so such a throw is logged instead of surfacing as an unhandled rejection
+  // that crashes the process (issue #435).
+  function runQueueProcessing() {
+    processQueue().catch((error: unknown) => {
+      logger.error('Unhandled error while processing the message queue', {
+        transportId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    })
+  }
+
+  function send(msg: Uint8Array) {
     if (!isInitialized) {
       const error = new Error('Transport is not ready')
       logger.error('Transport is not ready', {
         transportId,
         isTransportActive: String(isTransportActive),
         isInitialized: String(isInitialized),
-        isConnected: String(socket.getUserData().isConnected)
+        isConnected: String(isSocketConnected())
       })
-      return events.emit('error', error)
+      events.emit('error', error)
+      return Promise.resolve()
     }
 
-    if (!isTransportActive || !socket.getUserData().isConnected) {
+    if (!isSocketConnected()) {
       // The transport is not active or the socket is not connected, skip message
       logger.debug('Skipping message because transport is not active or socket is not connected', {
         transportId,
         isTransportActive: String(isTransportActive),
-        isConnected: String(socket.getUserData().isConnected)
+        isConnected: String(isSocketConnected())
       })
-      return
+      return Promise.resolve()
     }
 
     if (messageQueue.length >= maxQueueSize) {
@@ -265,10 +315,16 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         queueSize: messageQueue.length,
         maxQueueSize
       })
-      return events.emit('error', error)
+      events.emit('error', error)
+      return Promise.resolve()
     }
 
     const messageFuture = future<void>()
+    // The RPC layer calls sendMessage fire-and-forget, so nothing awaits this future;
+    // without a pre-attached handler every reject() (drop, send error, connection closed)
+    // would surface as an unhandled promise rejection. Callers that do await it still
+    // observe the rejection.
+    messageFuture.catch(() => {})
 
     messageQueue.push({
       message: msg,
@@ -276,8 +332,11 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       attempts: 0
     })
 
-    if (!isProcessing) {
-      void processQueue()
+    // Don't kick the queue while a backoff retry is scheduled: processQueue cancels the
+    // timer and re-sends the backpressured head message immediately, which burns its retry
+    // attempts within a burst instead of giving the socket time to drain.
+    if (!isProcessing && !processingTimeout) {
+      runQueueProcessing()
     }
 
     return messageFuture
@@ -321,19 +380,35 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     uServerEmitter.off('message', handleMessage)
+    uServerEmitter.off('drain', handleDrain)
+  }
+
+  function handleDrain() {
+    if (!isTransportActive || !isInitialized) return
+
+    // The socket just drained its backpressure buffer — retry queued messages now instead
+    // of waiting for the scheduled backoff.
+    if (processingTimeout) {
+      clearTimeout(processingTimeout)
+      processingTimeout = null
+    }
+
+    if (!isProcessing) {
+      runQueueProcessing()
+    }
   }
 
   const events = mitt<TransportEvents>()
 
   isInitialized = true
-  events.emit('connect', {})
 
   uServerEmitter.on('message', handleMessage)
+  uServerEmitter.on('drain', handleDrain)
 
   const api: Transport = {
     ...events,
     get isConnected() {
-      return isTransportActive && isInitialized && socket.getUserData().isConnected
+      return isSocketConnected()
     },
     sendMessage(message: any) {
       if (!(message instanceof Uint8Array)) {
@@ -343,6 +418,12 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       return send(message)
     },
     close() {
+      // Idempotent: close() can be reached twice (RPC-initiated close ends the socket,
+      // whose close event runs the ws-handler cleanup, which calls close() again). A second
+      // 'close' emission would re-trigger every listener's teardown.
+      if (!isTransportActive) {
+        return
+      }
       cleanup()
       events.emit('close', {})
     }

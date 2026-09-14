@@ -4,14 +4,22 @@ import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/
 import { Action, BlockedUserWithDate, FriendshipAction, FriendshipRequest } from '../../types'
 
 export type BlockedUser = {
-  profile: Profile
+  /** Null when the registry has no resolvable profile; the block still happened. */
+  profile: Profile | null
   blockedAt: Date
 }
 
 export interface IFriendsComponent {
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
+  /**
+   * Reads one page of the caller's blocked users.
+   *
+   * The page is required: this returns a bounded page, never the full list, and an omitted
+   * argument would quietly mean "the first default page" to a caller expecting everything.
+   */
   getBlockedUsers(
-    userAddress: string
+    userAddress: string,
+    pagination: Pagination
   ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }>
   getBlockingStatus(userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }>
   getFriendsProfiles(
@@ -19,7 +27,7 @@ export interface IFriendsComponent {
     pagination?: Pagination
   ): Promise<{ friendsProfiles: Profile[]; total: number }>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
-  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile>
+  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile | null>
   upsertFriendship(
     userAddress: EthAddress,
     friendAddress: EthAddress,

@@ -19,7 +19,7 @@ export async function createTracingComponent({
   })
 
   return {
-    captureException(error: Error, context?: Record<string, any>) {
+    captureException(error: unknown, context?: Record<string, any>) {
       try {
         Sentry.withScope((scope) => {
           if (context?.address) {

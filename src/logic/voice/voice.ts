@@ -32,6 +32,18 @@ export async function createVoiceComponent({
   async function startPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
     logger.info(`Starting private voice chat from ${callerAddress} to ${calleeAddress}`)
 
+    // A user cannot start a private voice chat with themselves.
+    if (callerAddress.toLowerCase() === calleeAddress.toLowerCase()) {
+      throw new VoiceChatNotAllowedError()
+    }
+
+    // A voice chat is not allowed if either user has blocked the other (isFriendshipBlocked
+    // normalizes both addresses internally, so it is case-insensitive).
+    const isBlocked = await friendsDb.isFriendshipBlocked(callerAddress, calleeAddress)
+    if (isBlocked) {
+      throw new VoiceChatNotAllowedError()
+    }
+
     // Check privacy settings of the callee and the caller
     const [calleeSettings, callerSettings] = await settings.getUsersSettings([calleeAddress, callerAddress])
     if (
@@ -65,6 +77,9 @@ export async function createVoiceComponent({
 
     // Records the call intent in the database
     const callId = await voiceDb.createPrivateVoiceChat(callerAddress, calleeAddress)
+    if (!callId) {
+      throw new UsersAreCallingSomeoneElseError()
+    }
 
     // Send the call to the callee and send the event to the analytics
     await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -190,7 +205,9 @@ export async function createVoiceComponent({
           status: VoiceChatStatus.ENDED
         })
         analytics.fireEvent(AnalyticsEvent.END_CALL, {
-          call_id: callId
+          call_id: callId,
+          user_id: privateVoiceChat.caller_address,
+          receiver_id: privateVoiceChat.callee_address
         })
         return
       }
@@ -205,15 +222,18 @@ export async function createVoiceComponent({
     }
 
     // Notify the other user that the call ended and send the event to the analytics
+    const otherUserInVoiceChat = usersInVoiceChat.find((user) => user !== address)
     await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
       callId,
       // Set the caller address to the other user in the voice chat
       // We don't know if it's the callee or the caller, but the event handler will resolve it
-      callerAddress: usersInVoiceChat.find((user) => user !== address),
+      callerAddress: otherUserInVoiceChat,
       status: VoiceChatStatus.ENDED
     })
     analytics.fireEvent(AnalyticsEvent.END_CALL, {
-      call_id: callId
+      call_id: callId,
+      user_id: address,
+      receiver_id: otherUserInVoiceChat ?? ''
     })
   }
 
@@ -242,7 +262,11 @@ export async function createVoiceComponent({
     try {
       const privateVoiceChat = await voiceDb.getPrivateVoiceChatOfUser(address)
       if (privateVoiceChat) {
-        await endPrivateVoiceChat(privateVoiceChat.id, privateVoiceChat.callee_address)
+        // End it as whoever actually dropped. The lookup matches caller or callee, and the end path
+        // nulls the acting side out of the ENDED payload so the *other* party is the one notified —
+        // so naming the callee here meant a caller's disconnect told only the caller, leaving the
+        // callee ringing until expiry.
+        await endPrivateVoiceChat(privateVoiceChat.id, address)
       }
     } catch (error) {
       logger.error(

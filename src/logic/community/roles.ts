@@ -1,7 +1,8 @@
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityRole, CommunityPermission } from '../../types/entities'
 import { AppComponents } from '../../types/system'
-import { ICommunityRolesComponent } from './types'
+import { ICommunityRolesComponent, CommunityPost } from './types'
+import { normalizeAddress } from '../../utils/address'
 
 export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'edit_info',
@@ -90,8 +91,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [ownerAddress, targetAddress])
-      const updaterRole = roles[ownerAddress]
-      const targetRole = roles[targetAddress]
+      const updaterRole = roles[normalizeAddress(ownerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       // Only current owners can transfer; target must be an existing member (not None)
       if (updaterRole !== CommunityRole.Owner) {
@@ -110,10 +111,16 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [kickerAddress, targetAddress])
-      const kickerRole = roles[kickerAddress]
-      const targetRole = roles[targetAddress]
+      const kickerRole = roles[normalizeAddress(kickerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
-      if (!canActOnMember(kickerRole, targetRole)) {
+      // A non-member has no role to rank against, and nothing can act on None, so ranking against it
+      // would refuse every caller. Authorize against the lowest actionable role instead: an owner or
+      // moderator passes and the kick is a no-op, anyone else gets the same refusal they would get
+      // for a member — which is what stops the two answers from revealing who is in the community.
+      const effectiveTargetRole = isMember(targetRole) ? targetRole : CommunityRole.Member
+
+      if (!canActOnMember(kickerRole, effectiveTargetRole)) {
         throw new NotAuthorizedError(
           `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
         )
@@ -128,8 +135,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [bannerAddress, targetAddress])
-      const bannerRole = roles[bannerAddress]
-      const targetRole = roles[targetAddress]
+      const bannerRole = roles[normalizeAddress(bannerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (
         !hasPermission(bannerRole, 'ban_players') ||
@@ -147,8 +154,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [unbannerAddress, targetAddress])
-      const unbannerRole = roles[unbannerAddress]
-      const targetRole = roles[targetAddress]
+      const unbannerRole = roles[normalizeAddress(unbannerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (
         !hasPermission(unbannerRole, 'ban_players') ||
@@ -173,8 +180,8 @@ export function createCommunityRolesComponent(
       }
 
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [updaterAddress, targetAddress])
-      const updaterRole = roles[updaterAddress]
-      const targetRole = roles[targetAddress]
+      const updaterRole = roles[normalizeAddress(updaterAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (
         !hasPermission(updaterRole, 'assign_roles') ||
@@ -215,6 +222,26 @@ export function createCommunityRolesComponent(
     validatePermissionToInviteUsers: validatePermission('invite_users', 'invite users'),
     validatePermissionToEditCommunityName: validatePermission('edit_name', 'edit the community name'),
     validatePermissionToCreatePost: validatePermission('create_posts', 'create posts in the community'),
-    validatePermissionToDeletePost: validatePermission('delete_posts', 'delete posts from the community')
+    async validatePermissionToDeletePost(post: CommunityPost, deleterAddress: string): Promise<void> {
+      const role = await communitiesDb.getCommunityMemberRole(post.communityId, deleterAddress)
+
+      if (!role || !hasPermission(role, 'delete_posts')) {
+        throw new NotAuthorizedError(
+          `The user ${deleterAddress} doesn't have permission to delete posts from the community`
+        )
+      }
+
+      // If the user is a moderator (not owner), they can only delete their own posts
+      if (role === CommunityRole.Moderator) {
+        const normalizedDeleterAddress = deleterAddress.toLowerCase()
+        const normalizedAuthorAddress = post.authorAddress.toLowerCase()
+
+        if (normalizedDeleterAddress !== normalizedAuthorAddress) {
+          throw new NotAuthorizedError(
+            `The user ${deleterAddress} doesn't have permission to delete posts from the community`
+          )
+        }
+      }
+    }
   }
 }

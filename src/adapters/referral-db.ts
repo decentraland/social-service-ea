@@ -18,11 +18,19 @@ export async function createReferralDBComponent(
   const logger = logs.getLogger('database')
   const MAX_IP_MATCHES = await config.requireNumber('REFERRAL_MAX_IP_MATCHES')
 
+  /**
+   * Inserts a referral for the invited user.
+   *
+   * Relies on the unique index over invited_user to settle concurrent creates:
+   * the loser of the race conflicts and gets null back instead of inserting a
+   * second, contradictory attribution. Callers decide what a conflict means
+   * (idempotent when the stored referrer matches, an error otherwise).
+   */
   const createReferral = async (referralInput: {
     referrer: string
     invitedUser: string
     invitedUserIP: string
-  }): Promise<ReferralProgress> => {
+  }): Promise<ReferralProgress | null> => {
     logger.debug(`Creating referral_progress for ${referralInput.referrer} and ${referralInput.invitedUser}`)
     const now = Date.now()
 
@@ -52,10 +60,11 @@ export async function createReferralDBComponent(
           ${now},
           ${now}
           FROM other_users_invited
+        ON CONFLICT (invited_user) DO NOTHING
         RETURNING *
     `
     const result = await pg.query<ReferralProgress>(query)
-    return result.rows[0]
+    return result.rows[0] ?? null
   }
 
   const findReferralProgress = async (filter: ReferralProgressFilter): Promise<ReferralProgress[]> => {
@@ -85,7 +94,7 @@ export async function createReferralDBComponent(
   const updateReferralProgress = async (
     invited_user: string,
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
-  ): Promise<void> => {
+  ): Promise<number> => {
     logger.debug(`Updating referral_progress for invited_user ${invited_user} with ${status}`)
     const fields: SQLStatement[] = []
     const now = Date.now()
@@ -103,8 +112,14 @@ export async function createReferralDBComponent(
       query = query.append(f)
     })
     query = query.append(SQL` WHERE invited_user = ${invited_user.toLowerCase()}`)
+    // Guard the tier-granted transition so it can only happen once: concurrent
+    // finalize calls for the same user must not each grant the referrer a reward.
+    if (status === ReferralProgressStatus.TIER_GRANTED) {
+      query = query.append(SQL` AND tier_granted = false`)
+    }
 
-    await pg.query(query)
+    const result = await pg.query(query)
+    return result.rowCount
   }
 
   async function hasReferralProgress(invited_user: string): Promise<boolean> {

@@ -40,10 +40,16 @@ export async function createRedisComponent(
   async function get<T>(key: string): Promise<T | null> {
     try {
       const serializedValue = await client.get(key)
-      if (serializedValue) {
-        return JSON.parse(serializedValue) as T
+      if (!serializedValue) {
+        return null
       }
-      return null
+      try {
+        return JSON.parse(serializedValue) as T
+      } catch (parseErr: any) {
+        // A corrupted/legacy value must not break callers that expect a value-or-null contract.
+        logger.error(`Error parsing value for key "${key}"`, parseErr)
+        return null
+      }
     } catch (err: any) {
       logger.error(`Error getting key "${key}"`, err)
       throw err
@@ -68,13 +74,59 @@ export async function createRedisComponent(
   async function put<T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }): Promise<void> {
     try {
       const serializedValue = JSON.stringify(value)
+      // Use nullish coalescing so an explicit EX is honored; `|| TWO_HOURS` would silently
+      // override a caller-provided value of 0.
       await client.set(key, serializedValue, {
-        EX: options?.noTTL ? undefined : options?.EX || TWO_HOURS_IN_SECONDS
+        EX: options?.noTTL ? undefined : (options?.EX ?? TWO_HOURS_IN_SECONDS)
       })
     } catch (err: any) {
       logger.error(`Error setting key "${key}"`, err)
       throw err
     }
+  }
+
+  async function sAdd(key: string, member: string): Promise<number> {
+    try {
+      return await client.sAdd(key, member)
+    } catch (err: any) {
+      logger.error(`Error adding member to set "${key}"`, err)
+      throw err
+    }
+  }
+
+  async function sRem(key: string, members: string | string[]): Promise<number> {
+    try {
+      return await client.sRem(key, members)
+    } catch (err: any) {
+      logger.error(`Error removing member(s) from set "${key}"`, err)
+      throw err
+    }
+  }
+
+  async function sMembers(key: string): Promise<string[]> {
+    try {
+      return await client.sMembers(key)
+    } catch (err: any) {
+      logger.error(`Error getting members from set "${key}"`, err)
+      throw err
+    }
+  }
+
+  async function sCard(key: string): Promise<number> {
+    try {
+      return await client.sCard(key)
+    } catch (err: any) {
+      logger.error(`Error getting cardinality of set "${key}"`, err)
+      throw err
+    }
+  }
+
+  async function consumeRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+    const count = await client.eval(
+      "local current = redis.call('INCR', KEYS[1]); if current == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return current",
+      { keys: [key], arguments: [windowSeconds.toString()] }
+    )
+    return Number(count) <= limit
   }
 
   return {
@@ -83,6 +135,11 @@ export async function createRedisComponent(
     stop,
     get,
     mGet,
-    put
+    put,
+    sAdd,
+    sRem,
+    sMembers,
+    sCard,
+    consumeRateLimit
   }
 }

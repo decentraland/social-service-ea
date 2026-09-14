@@ -1,6 +1,6 @@
 import { IBaseComponent, START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents } from '../types'
-import { ApplicationName } from '@well-known-components/features-component'
+import { ApplicationName } from '@dcl/features-component'
 
 export enum FeatureFlag {
   // Feature flag to enable/disable AI compliance for communities.
@@ -15,7 +15,15 @@ export enum FeatureFlag {
    * @example
    * Variant value: "0x1234567890123456789012345678901234567890,0x1234567890123456789012345678901234567891"
    */
-  COMMUNITIES_GLOBAL_MODERATORS = 'communities_global_moderators'
+  COMMUNITIES_GLOBAL_MODERATORS = 'communities_global_moderators',
+  /*
+   * Kill switch for referral registration. INVERTED on purpose: the feature works
+   * while this flag is absent/off (the adapter defaults missing flags to false),
+   * so deploys don't depend on the flag existing. Turn it ON to stop accepting
+   * new referral registrations; clients treat the rejection as best-effort and
+   * degrade gracefully. Referrals already created keep finalizing normally.
+   */
+  REFERRAL_REGISTRATION_DISABLED = 'referral_registration_disabled'
 }
 
 export type IFeatureFlagsAdapter = IBaseComponent & {
@@ -37,19 +45,24 @@ export async function createFeatureFlagsAdapter(
 
   async function refresh() {
     try {
-      const [isEnabled, isDevEnabled] = await Promise.all([
+      const [isEnabled, isDevEnabled, isGlobalModeratorsEnabled, isReferralRegistrationDisabled] = await Promise.all([
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS),
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.REFERRAL_REGISTRATION_DISABLED)
       ])
 
       logger.debug(`Refreshed feature flags`, {
         [FeatureFlag.COMMUNITIES_AI_COMPLIANCE]: String(isEnabled),
-        [FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE]: String(isDevEnabled)
+        [FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE]: String(isDevEnabled),
+        [FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS]: String(isGlobalModeratorsEnabled),
+        [FeatureFlag.REFERRAL_REGISTRATION_DISABLED]: String(isReferralRegistrationDisabled)
       })
 
       featuresFlagMap.set(FeatureFlag.COMMUNITIES_AI_COMPLIANCE, isEnabled)
       featuresFlagMap.set(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE, isDevEnabled)
+      featuresFlagMap.set(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS, isGlobalModeratorsEnabled)
+      featuresFlagMap.set(FeatureFlag.REFERRAL_REGISTRATION_DISABLED, isReferralRegistrationDisabled)
     } catch (error) {
       logger.error('Failed to refresh feature flags', {
         error: error instanceof Error ? error.message : String(error)
@@ -65,7 +78,7 @@ export async function createFeatureFlagsAdapter(
 
     if (variant?.payload?.value) {
       const values = variant.payload.value
-        .replace('\n', '')
+        .replace(/\r?\n/g, '')
         .split(',')
         .map((domain) => domain.toLowerCase().trim())
 
@@ -80,6 +93,12 @@ export async function createFeatureFlagsAdapter(
    */
   async function start() {
     logger.info('Starting feature flags adapter')
+
+    // Guard against a double start orphaning a previous interval.
+    if (refreshInterval) {
+      clearInterval(refreshInterval)
+      refreshInterval = null
+    }
 
     // Do initial refresh
     await refresh()

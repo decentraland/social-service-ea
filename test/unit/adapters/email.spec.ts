@@ -63,23 +63,28 @@ describe('EmailComponent', () => {
     })
 
     describe('when the API returns a bad request error', () => {
-      beforeEach(() => {
+      let readResponseText: jest.Mock
+      let thrown: Error | undefined
+
+      beforeEach(async () => {
+        readResponseText = jest.fn().mockResolvedValue(JSON.stringify({ error: 'Invalid email format' }))
         mockFetcher.fetch.mockResolvedValue({
           ok: false,
           status: 400,
           statusText: 'Bad Request',
-          text: jest.fn().mockResolvedValue(
-            JSON.stringify({
-              error: 'Invalid email format'
-            })
-          )
+          text: readResponseText
         } as any)
+        thrown = await emailComponent.sendEmail(email, subject, content).catch((error) => error)
       })
 
-      it('should throw an error with response details', async () => {
-        await expect(emailComponent.sendEmail(email, subject, content)).rejects.toThrow(
-          'Failed to fetch https://notification-service.decentraland.org/notifications/email: 400 {"error":"Invalid email format"}'
+      it('should throw an error carrying the status but not the upstream body', () => {
+        expect(thrown).toEqual(
+          new Error('Failed to fetch https://notification-service.decentraland.org/notifications/email: 400')
         )
+      })
+
+      it('should not read the response body', () => {
+        expect(readResponseText).not.toHaveBeenCalled()
       })
     })
 
@@ -103,8 +108,10 @@ describe('EmailComponent', () => {
         } as any)
       })
 
-      it('should throw the text reading error', async () => {
-        await expect(emailComponent.sendEmail(email, subject, content)).rejects.toThrow('Cannot read response')
+      it('should still surface the status, since the body is never read', async () => {
+        await expect(emailComponent.sendEmail(email, subject, content)).rejects.toThrow(
+          'Failed to fetch https://notification-service.decentraland.org/notifications/email: 500'
+        )
       })
     })
   })

@@ -1,4 +1,5 @@
 import { isErrorWithMessage } from '../../utils/errors'
+import { CachedCommunityVoiceChat } from './community-voice-cache'
 import { AppComponents } from '../../types'
 import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -101,7 +102,7 @@ export function createCommunityVoiceChatPollingComponent({
   /**
    * Sends an "ended" notification for a community voice chat
    */
-  async function sendEndedNotification(cachedChat: { communityId: string; createdAt: number }): Promise<void> {
+  async function sendEndedNotification(cachedChat: CachedCommunityVoiceChat): Promise<void> {
     try {
       const endedAt = Date.now()
 
@@ -117,11 +118,13 @@ export function createCommunityVoiceChatPollingComponent({
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId: cachedChat.communityId,
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
-        ended_at: endedAt,
+        endedAt,
         positions: [], // Empty for ended events
         worlds: [], // Empty for ended events
         communityName: '', // Will be fetched by handler if needed
-        communityImage: undefined
+        communityImage: undefined,
+        // Preserve the start-time fanout class for best-effort cleanup by the update handler.
+        notificationScope: cachedChat.notificationScope
       })
 
       logger.debug(`Community voice chat ended notification sent successfully for community ${cachedChat.communityId}`)

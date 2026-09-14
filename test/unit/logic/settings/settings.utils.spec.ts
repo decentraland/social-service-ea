@@ -1,8 +1,8 @@
 import {
   PrivateMessagePrivacySetting,
   BlockedUsersMessagesVisibilitySetting,
-  SituationReactionsVisibility,
-  SocialSettings
+  SocialSettings,
+  SituationReactionsVisibility as RPCSituationReactionsVisibility
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   convertDBSettingsToRPCSettings,
@@ -13,6 +13,7 @@ import {
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedVisibility,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   User
 } from '../../../../src/types'
@@ -25,13 +26,14 @@ describe('convertDBSettingsToRPCSettings', () => {
     const dbSettings: DBSocialSettings = {
       address: '0x123',
       private_messages_privacy: dbPrivacy,
-      blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
       privateMessagesPrivacy: rpcPrivacy,
       blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
-      showSituationReactions: SituationReactionsVisibility.SHOW
+      showSituationReactions: RPCSituationReactionsVisibility.SHOW
     })
   })
 
@@ -44,33 +46,38 @@ describe('convertDBSettingsToRPCSettings', () => {
       const dbSettings: DBSocialSettings = {
         address: '0x123',
         private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-        blocked_users_messages_visibility: dbVisibility
+        blocked_users_messages_visibility: dbVisibility,
+        show_situation_reactions: DBSituationReactionsVisibility.SHOW
       }
 
       expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
         privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
         blockedUsersMessagesVisibility: rpcVisibility,
-        showSituationReactions: SituationReactionsVisibility.SHOW
+        showSituationReactions: RPCSituationReactionsVisibility.SHOW
       })
     }
   )
 
-  describe('and the situation reactions visibility is not persisted in the DB', () => {
-    it.each([DBBlockedVisibility.SHOW_MESSAGES, DBBlockedVisibility.DO_NOT_SHOW_MESSAGES])(
-      'should default showSituationReactions to SHOW regardless of the other DB settings ("%s")',
-      (dbVisibility) => {
-        const dbSettings: DBSocialSettings = {
-          address: '0x123',
-          private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: dbVisibility
-        }
-
-        expect(convertDBSettingsToRPCSettings(dbSettings).showSituationReactions).toEqual(
-          SituationReactionsVisibility.SHOW
-        )
+  it.each([
+    [DBSituationReactionsVisibility.SHOW, RPCSituationReactionsVisibility.SHOW],
+    [DBSituationReactionsVisibility.HIDE, RPCSituationReactionsVisibility.HIDE]
+  ])(
+    'should convert the DB situation reactions visibility setting "%s" to RPC settings',
+    (dbVisibility, rpcVisibility) => {
+      const dbSettings: DBSocialSettings = {
+        address: '0x123',
+        private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
+        blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES,
+        show_situation_reactions: dbVisibility
       }
-    )
-  })
+
+      expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
+        privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
+        blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+        showSituationReactions: rpcVisibility
+      })
+    }
+  )
 })
 
 describe('convertRPCSettingsIntoDBSettings', () => {
@@ -117,25 +124,6 @@ describe('convertRPCSettingsIntoDBSettings', () => {
     })
   })
 
-  it('should ignore showSituationReactions since there is no DB column for it yet', () => {
-    const rpcSettings: Partial<SocialSettings> = {
-      privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
-      showSituationReactions: SituationReactionsVisibility.HIDE
-    }
-
-    expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({
-      private_messages_privacy: DBPrivateMessagesPrivacy.ALL
-    })
-  })
-
-  it('should return no DB settings when only showSituationReactions is provided', () => {
-    const rpcSettings: Partial<SocialSettings> = {
-      showSituationReactions: SituationReactionsVisibility.HIDE
-    }
-
-    expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({})
-  })
-
   it('should throw error for unknown private messages privacy setting', () => {
     const rpcSettings = {
       privateMessagesPrivacy: PrivateMessagePrivacySetting.UNRECOGNIZED
@@ -153,6 +141,32 @@ describe('convertRPCSettingsIntoDBSettings', () => {
       'Unknown blocked users messages visibility setting'
     )
   })
+
+  it.each([
+    [RPCSituationReactionsVisibility.SHOW, DBSituationReactionsVisibility.SHOW],
+    [RPCSituationReactionsVisibility.HIDE, DBSituationReactionsVisibility.HIDE]
+  ])(
+    'should convert the RPC situation reactions visibility setting "%s" to DB settings',
+    (rpcVisibility, dbVisibility) => {
+      const rpcSettings: Partial<SocialSettings> = {
+        showSituationReactions: rpcVisibility
+      }
+
+      expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({
+        show_situation_reactions: dbVisibility
+      })
+    }
+  )
+
+  it('should throw error for unknown situation reactions visibility setting', () => {
+    const rpcSettings: Partial<SocialSettings> = {
+      showSituationReactions: RPCSituationReactionsVisibility.UNRECOGNIZED
+    }
+
+    expect(() => convertRPCSettingsIntoDBSettings(rpcSettings)).toThrow(
+      'Unknown situation reactions visibility setting'
+    )
+  })
 })
 
 describe('getDefaultSettings', () => {
@@ -163,7 +177,8 @@ describe('getDefaultSettings', () => {
     expect(defaultSettings).toEqual({
       address,
       private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-      blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     })
   })
 })
@@ -203,12 +218,14 @@ describe('buildPrivateMessagesRPCSettingsForAddresses', () => {
         {
           address: '0x123',
           private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES
+          blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES,
+          show_situation_reactions: DBSituationReactionsVisibility.SHOW
         },
         {
           address: '0x789',
           private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES
+          blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES,
+          show_situation_reactions: DBSituationReactionsVisibility.SHOW
         }
       ]
       friends = []
@@ -258,7 +275,8 @@ describe('buildPrivateMessagesRPCSettingsForAddresses', () => {
         {
           address: '0x123',
           private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES
+          blocked_users_messages_visibility: DBBlockedVisibility.SHOW_MESSAGES,
+          show_situation_reactions: DBSituationReactionsVisibility.SHOW
         }
       ]
       friends = [{ address: '0x456' }]

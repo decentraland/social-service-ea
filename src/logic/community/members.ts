@@ -1,22 +1,28 @@
-import { NotAuthorizedError, InvalidRequestError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
+  CommunityMember,
   CommunityMemberProfile,
+  CommunityMemberV2,
   GetCommunityMembersOptions,
   ICommunityMembersComponent,
   CommunityPrivacyEnum
 } from './types'
-import { mapMembersWithProfiles } from './utils'
+import { mapMembersWithProfiles, mapMembersWithFriendshipStatus } from './utils'
 import { EthAddress, Events } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  FriendshipStatus
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AnalyticsEvent } from '../../types/analytics'
 
 export async function createCommunityMembersComponent(
   components: Pick<
     AppComponents,
     | 'communitiesDb'
+    | 'registry'
     | 'catalystClient'
     | 'communityRoles'
     | 'communityThumbnail'
@@ -30,6 +36,7 @@ export async function createCommunityMembersComponent(
 ): Promise<ICommunityMembersComponent> {
   const {
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityThumbnail,
@@ -51,14 +58,27 @@ export async function createCommunityMembersComponent(
       return []
     }
 
-    const profiles = await catalystClient.getProfiles(members.map((member) => member.memberAddress))
+    const profiles = await registry.getProfiles(members.map((member) => member.memberAddress))
 
-    const membersWithProfile = mapMembersWithProfiles<T, T & CommunityMemberProfile>(userAddress, members, profiles)
-
-    return membersWithProfile
+    return mapMembersWithProfiles(userAddress, members, profiles) as (T & CommunityMemberProfile)[]
   }
 
-  const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
+  const aggregateWithFriendshipStatus = <T extends { memberAddress: EthAddress }>(
+    userAddress: EthAddress | undefined,
+    members: T[]
+  ): (T & { friendshipStatus: FriendshipStatus })[] => {
+    return mapMembersWithFriendshipStatus(userAddress, members)
+  }
+
+  /**
+   * Shared base fetch for the community members endpoints. Performs the existence,
+   * privacy and permission checks, resolves the online-peers filter and reads the
+   * members from the database WITHOUT any profile enrichment.
+   */
+  const fetchCommunityMembers = async (
+    id: string,
+    options: GetCommunityMembersOptions
+  ): Promise<{ members: CommunityMember[]; totalMembers: number }> => {
     const { pagination, onlyOnline, as: userAddress, byPassPrivacy } = options
     const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress && !byPassPrivacy })
 
@@ -96,9 +116,7 @@ export async function createCommunityMembersComponent(
     })
     const totalMembers = await communitiesDb.getCommunityMembersCount(id, { filterByMembers: onlinePeers })
 
-    const membersWithProfile = await aggregateWithProfiles(userAddress, communityMembers)
-
-    return { members: membersWithProfile, totalMembers }
+    return { members: communityMembers, totalMembers }
   }
 
   const transferOwnership = async (
@@ -119,25 +137,28 @@ export async function createCommunityMembersComponent(
     }
 
     await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
-    setImmediate(async () => {
-      const community = await communitiesDb.getCommunity(communityId)
 
-      if (!community) return
+    void broadcastOwnershipTransferred(communityId, updaterAddress, targetAddress).catch((error: any) => {
+      logger.error('Unhandled error in broadcastOwnershipTransferred', { error: error.message, communityId })
+    })
+  }
 
-      const timestamp = Date.now()
-      await communityBroadcaster.broadcast({
-        type: Events.Type.COMMUNITY,
-        subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
-        key: `${communityId}-${updaterAddress}-${targetAddress}-${timestamp}`,
-        timestamp,
-        metadata: {
-          communityId,
-          communityName: community.name,
-          oldOwnerAddress: updaterAddress,
-          newOwnerAddress: targetAddress,
-          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
-        }
-      })
+  async function broadcastOwnershipTransferred(communityId: string, updaterAddress: string, targetAddress: string) {
+    const community = await communitiesDb.getCommunity(communityId)
+    if (!community) return
+    const timestamp = Date.now()
+    await communityBroadcaster.broadcast({
+      type: Events.Type.COMMUNITY,
+      subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
+      key: `${communityId}-${updaterAddress}-${targetAddress}-${timestamp}`,
+      timestamp,
+      metadata: {
+        communityId,
+        communityName: community.name,
+        oldOwnerAddress: updaterAddress,
+        newOwnerAddress: targetAddress,
+        thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+      }
     })
   }
 
@@ -146,7 +167,17 @@ export async function createCommunityMembersComponent(
       id: string,
       options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return filterAndCountCommunityMembers(id, options)
+      const { members, totalMembers } = await fetchCommunityMembers(id, options)
+      const membersWithProfile = await aggregateWithProfiles(options.as, members)
+      return { members: membersWithProfile, totalMembers }
+    },
+
+    getCommunityMembersWithoutProfiles: async (
+      id: string,
+      options: GetCommunityMembersOptions
+    ): Promise<{ members: CommunityMemberV2[]; totalMembers: number }> => {
+      const { members, totalMembers } = await fetchCommunityMembers(id, options)
+      return { members: aggregateWithFriendshipStatus(options.as, members), totalMembers }
     },
 
     async *getOnlineMembersFromCommunity(
@@ -200,14 +231,17 @@ export async function createCommunityMembersComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
+      // Authorize before reading membership. The two outcomes differ — 204 for a non-member, 401 for
+      // a member — so checking membership first let an unauthorized caller probe a private roster one
+      // address at a time. banMember and unbanMember already order it this way.
+      await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
+
       const doesTargetUserBelongsToCommunity = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
 
       if (!doesTargetUserBelongsToCommunity) {
         logger.info(`Target ${targetAddress} is not a member of community ${communityId}, returning 204`)
         return
       }
-
-      await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
 
@@ -239,28 +273,33 @@ export async function createCommunityMembersComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      setImmediate(async () => {
-        const timestamp = Date.now()
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.MEMBER_REMOVED,
-          key: `${communityId}-${targetAddress}-${timestamp}`,
-          timestamp,
-          metadata: {
-            id: communityId,
-            name: community.name,
-            memberAddress: targetAddress,
-            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
-          }
-        })
+      const timestamp = Date.now()
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.MEMBER_REMOVED,
+        key: `${communityId}-${targetAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          id: communityId,
+          name: community.name,
+          memberAddress: targetAddress,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+        }
       })
     },
 
     joinCommunity: async (communityId: string, memberAddress: EthAddress): Promise<void> => {
-      const communityExists = await communitiesDb.communityExists(communityId)
+      const community = await communitiesDb.getCommunity(communityId)
 
-      if (!communityExists) {
+      if (!community) {
         throw new CommunityNotFoundError(communityId)
+      }
+
+      // Private communities can only be joined through the request/invite approval flow.
+      if (community.privacy === CommunityPrivacyEnum.Private) {
+        throw new NotAuthorizedError(
+          `Cannot join private community ${communityId} directly; a join request or invite is required`
+        )
       }
 
       const isAlreadyMember = await communitiesDb.isMemberOfCommunity(communityId, memberAddress)
@@ -325,6 +364,18 @@ export async function createCommunityMembersComponent(
         memberAddress,
         status: ConnectivityStatus.OFFLINE
       })
+
+      const timestamp = Date.now()
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.MEMBER_LEFT,
+        key: `${communityId}-${memberAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          id: communityId,
+          memberAddress
+        }
+      })
     },
 
     updateMemberRole: async (
@@ -351,6 +402,7 @@ export async function createCommunityMembersComponent(
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
     },
 
-    aggregateWithProfiles
+    aggregateWithProfiles,
+    aggregateWithFriendshipStatus
   }
 }

@@ -1,5 +1,6 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { IHttpServerComponent } from '@dcl/core-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
+import { FeatureFlag } from '../../../adapters/feature-flags'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   ReferralInvalidInputError,
@@ -9,12 +10,13 @@ import {
 import type { HandlerContextWithPath } from '../../../types/http'
 import type { CreateReferralWithInvitedUser } from '../../../types/create-referral-handler.type'
 import type { CreateReferralRequestBody } from './schemas'
+import { resolveClientIp } from '../../../utils/client-ip'
 
 export async function createReferralHandler(
-  ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'request' | 'verification'>
+  ctx: Pick<HandlerContextWithPath<'logs' | 'referral' | 'featureFlags'>, 'components' | 'request' | 'verification'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
-    components: { logs, referral },
+    components: { logs, referral, featureFlags },
     request,
     verification
   } = ctx
@@ -24,17 +26,29 @@ export async function createReferralHandler(
     throw new InvalidRequestError('Authentication required')
   }
 
+  // Kill switch: when the flag is ON no new referral is registered. 503 (not 400)
+  // so clients and dashboards can tell "temporarily disabled" apart from a bad
+  // request; every client treats this as best-effort and degrades silently.
+  if (featureFlags.isEnabled(FeatureFlag.REFERRAL_REGISTRATION_DISABLED)) {
+    logger.info('Referral registration is disabled by feature flag; rejecting create', {
+      invitedUser: verification.auth
+    })
+    return {
+      status: 503,
+      body: {
+        error: 'Service Unavailable',
+        message: 'Referral registration is temporarily disabled'
+      }
+    }
+  }
+
   const rawBody: CreateReferralRequestBody = await request.json()
 
-  const cfConnectingIp = request.headers.get('cf-connecting-ip')
-  const forwardedFor = request.headers.get('x-forwarded-for')
-  const realIp = request.headers.get('x-real-ip')
-
-  const invitedUserIP = cfConnectingIp || forwardedFor?.split(',')[0]?.trim() || realIp
+  const invitedUserIP = resolveClientIp(request.headers)
 
   if (!invitedUserIP) {
-    logger.error('Unable to determine client IP address from connection headers')
-    throw new InvalidRequestError('Unable to determine client IP address from connection headers')
+    logger.error('Unable to determine client IP address')
+    throw new InvalidRequestError('Unable to determine client IP address')
   }
 
   const body: CreateReferralWithInvitedUser = {

@@ -7,13 +7,17 @@ import nock from 'nock'
 describe('Comms Gatekeeper Community Voice Chat', () => {
   let commsGatekeeper: ICommsGatekeeperComponent
   let mockFetch: jest.Mock
-  const gatekeeperUrl = 'default-value' // Use the actual mock value
-  const gatekeeperToken = 'default-value' // Use the actual mock value
-  const testCommunityId = 'test-community-123'
-  const testUserAddress = '0x1234567890123456789012345678901234567890'
+  let gatekeeperUrl: string
+  let gatekeeperToken: string
+  let testCommunityId: string
+  let testUserAddress: string
 
   beforeEach(async () => {
     mockFetch = jest.fn()
+    gatekeeperUrl = 'default-value'
+    gatekeeperToken = 'default-value'
+    testCommunityId = '550e8400-e29b-41d4-a716-446655440010'
+    testUserAddress = '0x1234567890123456789012345678901234567890'
 
     // Create a mock config with default behavior
     const mockConfig = createMockConfigComponent({
@@ -283,26 +287,30 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       let communityIds: string[]
 
       beforeEach(() => {
-        communityIds = ['community-1', 'community-2', 'community-3']
+        communityIds = [
+          '550e8400-e29b-41d4-a716-446655440011',
+          '550e8400-e29b-41d4-a716-446655440012',
+          '550e8400-e29b-41d4-a716-446655440013'
+        ]
         mockFetch.mockResolvedValue({
           ok: true,
           json: () =>
             Promise.resolve({
               data: [
                 {
-                  community_id: 'community-1',
+                  community_id: communityIds[0],
                   active: true,
                   participant_count: 5,
                   moderator_count: 2
                 },
                 {
-                  community_id: 'community-2',
+                  community_id: communityIds[1],
                   active: false,
                   participant_count: 0,
                   moderator_count: 0
                 },
                 {
-                  community_id: 'community-3',
+                  community_id: communityIds[2],
                   active: true,
                   participant_count: 3,
                   moderator_count: 1
@@ -316,17 +324,17 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
         const result = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
 
         expect(result).toEqual({
-          'community-1': {
+          [communityIds[0]]: {
             isActive: true,
             participantCount: 5,
             moderatorCount: 2
           },
-          'community-2': {
+          [communityIds[1]]: {
             isActive: false,
             participantCount: 0,
             moderatorCount: 0
           },
-          'community-3': {
+          [communityIds[2]]: {
             isActive: true,
             participantCount: 3,
             moderatorCount: 1
@@ -346,14 +354,17 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
     })
 
     describe('and the request is successful with single community', () => {
+      let communityId: string
+
       beforeEach(() => {
+        communityId = '550e8400-e29b-41d4-a716-446655440014'
         mockFetch.mockResolvedValue({
           ok: true,
           json: () =>
             Promise.resolve({
               data: [
                 {
-                  community_id: 'single-community',
+                  community_id: communityId,
                   active: true,
                   participant_count: 2,
                   moderator_count: 1
@@ -364,10 +375,10 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should return status for single community', async () => {
-        const result = await commsGatekeeper.getCommunitiesVoiceChatStatus(['single-community'])
+        const result = await commsGatekeeper.getCommunitiesVoiceChatStatus([communityId])
 
         expect(result).toEqual({
-          'single-community': {
+          [communityId]: {
             isActive: true,
             participantCount: 2,
             moderatorCount: 1
@@ -380,14 +391,17 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
             Authorization: `Bearer ${gatekeeperToken}`
           },
           body: JSON.stringify({
-            community_ids: ['single-community']
+            community_ids: [communityId]
           })
         })
       })
     })
 
     describe('and the request is successful with empty data', () => {
+      let communityIds: string[]
+
       beforeEach(() => {
+        communityIds = ['550e8400-e29b-41d4-a716-446655440015', '550e8400-e29b-41d4-a716-446655440016']
         mockFetch.mockResolvedValue({
           ok: true,
           json: () =>
@@ -398,14 +412,17 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should return empty object', async () => {
-        const result = await commsGatekeeper.getCommunitiesVoiceChatStatus(['community-1', 'community-2'])
+        const result = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
 
         expect(result).toEqual({})
       })
     })
 
     describe('and the request is successful with missing data field', () => {
+      let communityId: string
+
       beforeEach(() => {
+        communityId = '550e8400-e29b-41d4-a716-446655440017'
         mockFetch.mockResolvedValue({
           ok: true,
           json: () => Promise.resolve({})
@@ -413,14 +430,17 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should return empty object', async () => {
-        const result = await commsGatekeeper.getCommunitiesVoiceChatStatus(['community-1'])
+        const result = await commsGatekeeper.getCommunitiesVoiceChatStatus([communityId])
 
         expect(result).toEqual({})
       })
     })
 
     describe('and the request fails', () => {
+      let communityId: string
+
       beforeEach(() => {
+        communityId = '550e8400-e29b-41d4-a716-446655440018'
         mockFetch.mockResolvedValue({
           ok: false,
           status: 500,
@@ -429,7 +449,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should throw an error', async () => {
-        await expect(commsGatekeeper.getCommunitiesVoiceChatStatus(['community-1'])).rejects.toThrow(
+        await expect(commsGatekeeper.getCommunitiesVoiceChatStatus([communityId])).rejects.toThrow(
           'Server responded with status 500'
         )
       })
@@ -751,9 +771,6 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
   })
 
   describe('when muting speaker in community voice chat', () => {
-    const testCommunityId = 'test-community-id'
-    const testUserAddress = '0x1234567890abcdef'
-
     describe('and the request is successful', () => {
       beforeEach(() => {
         mockFetch.mockResolvedValue({

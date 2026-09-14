@@ -42,7 +42,11 @@ describe('peers-synchronizer', () => {
     await scheduler.syncPeers()
 
     expect(mockPulseStats.fetchPeers).toHaveBeenCalled()
-    expect(mockRedis.put).toHaveBeenCalledWith(PEERS_CACHE_KEY, mockPeers, expect.objectContaining({ EX: TEN_SECS_IN_MS / 1000 }))
+    expect(mockRedis.put).toHaveBeenCalledWith(
+      PEERS_CACHE_KEY,
+      mockPeers,
+      expect.objectContaining({ EX: TEN_SECS_IN_MS / 1000 })
+    )
   })
 
   it('should sync peers periodically', async () => {
@@ -72,12 +76,13 @@ describe('peers-synchronizer', () => {
     expect(mockPulseStats.fetchPeers).toHaveBeenCalledTimes(1)
   })
 
-  it('should handle errors gracefully', async () => {
+  it('should preserve the cached peers when fetching Pulse fails', async () => {
     mockPulseStats.fetchPeers.mockRejectedValue(new Error('Network error'))
 
     await scheduler.syncPeers()
     await scheduler.stop()
 
+    expect(mockRedis.put).not.toHaveBeenCalled()
     expect(mockLogs.getLogger('peers-synchronizer-component').error).toHaveBeenCalled()
   })
 })

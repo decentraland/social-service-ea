@@ -127,7 +127,7 @@ describe('Community Voice Chat Polling Component', () => {
         expect(mockPublishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
           communityId,
           status: 1, // COMMUNITY_VOICE_CHAT_ENDED enum value
-          ended_at: expect.any(Number),
+          endedAt: expect.any(Number),
           positions: [],
           worlds: [],
           communityName: '',

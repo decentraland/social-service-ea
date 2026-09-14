@@ -29,10 +29,8 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
     _request: Empty,
     context: RpcServerContext
   ): AsyncGenerator<CommunityMemberConnectivityUpdate> {
-    let cleanup: (() => void) | undefined
-
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<
+      yield* updateHandler.handleSubscriptionUpdates<
         CommunityMemberConnectivityUpdate,
         SubscriptionEventsEmitter['communityMemberConnectivityUpdate']
       >({
@@ -41,14 +39,14 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']) =>
           update.memberAddress,
         shouldHandleUpdate: (_update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']) => true,
-        parser: parseEmittedUpdateToCommunityMemberConnectivityUpdate
+        parser: parseEmittedUpdateToCommunityMemberConnectivityUpdate,
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => CommunityMemberConnectivityUpdate.fromPartial({ streamClosed })
       })
     } catch (error: any) {
       logger.error('Error in community member connectivity updates subscription:', error)
       throw error
-    } finally {
-      logger.info('Cleaning up community member connectivity updates subscription')
-      cleanup?.()
     }
   }
 }

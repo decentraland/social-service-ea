@@ -12,7 +12,10 @@ describe('when handling peers stats operations', () => {
   describe('and getting connected peers', () => {
     describe('when pulse returns peers successfully', () => {
       beforeEach(() => {
-        mockPulseStats.getPeers.mockResolvedValue(['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222'])
+        mockPulseStats.getPeers.mockResolvedValue([
+          '0x1111111111111111111111111111111111111111',
+          '0x2222222222222222222222222222222222222222'
+        ])
       })
 
       it('should return the peers pulse reports', async () => {
@@ -27,7 +30,7 @@ describe('when handling peers stats operations', () => {
         expect(result).toHaveLength(2)
       })
 
-      it('should read pulse only', async () => {
+      it('should read the Pulse peer cache', async () => {
         await peersStatsComponent.getConnectedPeers()
 
         expect(mockPulseStats.getPeers).toHaveBeenCalled()

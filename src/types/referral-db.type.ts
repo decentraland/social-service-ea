@@ -1,14 +1,18 @@
 export interface IReferralDatabaseComponent {
+  /**
+   * Inserts a referral, or resolves to null when a concurrent create already
+   * inserted one for the same invited user (unique index conflict).
+   */
   createReferral(referralInput: {
     referrer: string
     invitedUser: string
     invitedUserIP: string
-  }): Promise<ReferralProgress>
+  }): Promise<ReferralProgress | null>
   findReferralProgress(filter: ReferralProgressFilter): Promise<ReferralProgress[]>
   updateReferralProgress(
     invitedUser: string,
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
-  ): Promise<void>
+  ): Promise<number>
   hasReferralProgress(invitedUser: string): Promise<boolean>
   listAllReferralProgress(filter?: Pick<ReferralProgressFilter, 'limit' | 'offset'>): Promise<ReferralProgress[]>
   countAcceptedInvitesByReferrer(referrer: string): Promise<number>

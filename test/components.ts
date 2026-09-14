@@ -2,17 +2,15 @@
 // Here we define the test components to be used in the testing environment
 
 import { resolve } from 'path'
-import {
-  createRunner,
-  createLocalFetchCompoment as createLocalFetchComponent
-} from '@well-known-components/test-helpers'
+import { createRunner, createLocalFetchComponent } from '@dcl/test-helpers'
 import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
-import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { createLogComponent } from '@well-known-components/logger'
-import { createUWsComponent } from '@well-known-components/uws-http-server'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createUWsComponent } from '@dcl/uws-http-server'
+import { createFetchComponent } from '@dcl/fetch-component'
 import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from '../src/adapters/pg'
+import { createSqsHandlers } from '../src/controllers/handlers/sqs/handler'
 
 import { main } from '../src/service'
 import { GlobalContext, TestComponents } from '../src/types'
@@ -23,6 +21,7 @@ import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createCatalystClient } from '../src/adapters/catalyst-client'
+import { createRegistryComponent } from '../src/adapters/registry'
 import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
@@ -30,6 +29,8 @@ import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createPulseStatsComponent } from '../src/adapters/pulse-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
+import { createUserMutesDBComponent } from '../src/adapters/user-mutes-db'
+import { createUserMutesComponent } from '../src/logic/user-mutes'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import {
   mockPeersSynchronizer,
@@ -38,8 +39,7 @@ import {
   createAIComplianceMock
 } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
-import { createServerComponent } from '@well-known-components/http-server'
-import { createStatusCheckComponent } from '@well-known-components/http-server'
+import { createServerComponent, createStatusCheckComponent } from '@dcl/http-server'
 import {
   createCommunityBansComponent,
   createCommunityComponent,
@@ -61,10 +61,9 @@ import { createCommunityVoiceComponent } from '../src/logic/community-voice'
 import { createCommunityVoiceChatCacheComponent } from '../src/logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from '../src/logic/community-voice/community-voice-polling'
 import { createSettingsComponent } from '../src/logic/settings'
-import { createMessageProcessorComponent, createMessagesConsumerComponent } from '../src/logic/sqs'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
 import { createReferralComponent } from '../src/logic/referral/referral'
-import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
+import { createMemoryQueueComponent } from '@dcl/memory-queue-component'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
@@ -74,11 +73,12 @@ import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
-import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeaturesComponent } from '@dcl/features-component'
 import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 import { createMockCommunityBroadcasterComponent } from './mocks/communities'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
+import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -93,9 +93,14 @@ export const test = createRunner<TestComponents>({
 })
 
 async function initComponents(): Promise<TestComponents> {
-  const config = await createDotEnvConfigComponent({
-    path: ['.env.default', '.env.test']
-  })
+  const config = await createDotEnvConfigComponent(
+    {
+      path: ['.env.default', '.env.test']
+    },
+    {
+      REGISTRY_URL: 'https://registry.test.com'
+    }
+  )
 
   const uwsHttpServerConfig = createConfigComponent({
     HTTP_SERVER_PORT: await config.requireString('UWS_SERVER_PORT'),
@@ -126,12 +131,10 @@ async function initComponents(): Promise<TestComponents> {
 
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
-  let databaseUrl: string = await config.requireString('PG_COMPONENT_PSQL_CONNECTION_STRING')
   const pg = await createPgComponent(
     { logs, config, metrics },
     {
       migration: {
-        databaseUrl,
         dir: resolve(__dirname, '../src/migrations'),
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',
@@ -141,6 +144,7 @@ async function initComponents(): Promise<TestComponents> {
       }
     }
   )
+  const userMutesDb = createUserMutesDBComponent({ pg, logs })
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const voiceDb = await createVoiceDBComponent({ pg, config })
@@ -148,10 +152,12 @@ async function initComponents(): Promise<TestComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
+  const catalystClient = await createCatalystClient({ config, fetcher })
+  const registry = await createRegistryComponent({ fetcher, config, redis, logs })
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
-  const subscribersContext = createSubscribersContext()
+  const wsPool = await createWsPoolComponent({ logs, metrics, config })
+  const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const pulseStats = await createPulseStatsComponent({ logs, config, redis, fetcher })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
@@ -177,7 +183,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityPosts = createCommunityPostsComponent({
     communitiesDb,
     communityRoles,
-    catalystClient,
+    registry,
     logs,
     communityBroadcaster,
     communityThumbnail
@@ -197,6 +203,7 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityBroadcaster,
     logs,
+    registry,
     catalystClient,
     peersStats,
     pubsub,
@@ -209,12 +216,12 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityBroadcaster,
     logs,
-    catalystClient,
+    registry,
     pubsub,
     commsGatekeeper,
     analytics
   })
-  const communityOwners = createCommunityOwnersComponent({ catalystClient })
+  const communityOwners = createCommunityOwnersComponent({ registry })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const aiCompliance = createAIComplianceMock({})
   const features = await createFeaturesComponent(
@@ -225,6 +232,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
   const communities = createCommunityComponent({
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityPlaces,
@@ -244,8 +252,11 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     subscribersContext,
     friendsDb,
+    communitiesDb,
     communityMembers,
-    catalystClient
+    registry,
+    metrics,
+    peersStats
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,
@@ -253,11 +264,12 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     analytics,
     communitiesDb,
-    catalystClient,
+    registry,
     communityVoiceChatCache,
     placesApi,
     communityThumbnail,
-    communityPlaces
+    communityPlaces,
+    communityBroadcaster
   })
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
@@ -265,7 +277,7 @@ async function initComponents(): Promise<TestComponents> {
     communityRoles,
     communityBroadcaster,
     communityThumbnail,
-    catalystClient,
+    registry,
     pubsub,
     logs,
     analytics
@@ -295,7 +307,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const referralDb = await createReferralDBComponent({ pg, logs, config })
 
-  const rewards = await createRewardComponent({ fetcher, config })
+  const rewards = await createRewardComponent({ fetcher, config, logs })
 
   const email = await createEmailComponent({ fetcher, config })
 
@@ -308,29 +320,20 @@ async function initComponents(): Promise<TestComponents> {
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
-  const queue = createMemoryQueueAdapter()
-
-  const messageProcessor = await createMessageProcessorComponent({
-    logs,
-    referral,
-    communitiesDb
-  })
-
-  const messageConsumer = createMessagesConsumerComponent({
-    logs,
-    queue,
-    messageProcessor
-  })
+  const queue = createMemoryQueueComponent()
+  const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
+  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 
   const storageHelper = await createStorageHelper({ config })
 
-  const wsPool = createWsPoolComponent({ logs, metrics })
-
-  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
+  const userMutes = await createUserMutesComponent({ userMutesDb, logs })
+  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs, redis, config, metrics })
 
   return {
     aiCompliance,
     analytics,
+    pulseStats,
+    registry,
     catalystClient,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     commsGatekeeper,
@@ -365,9 +368,8 @@ async function initComponents(): Promise<TestComponents> {
     localUwsFetch,
     logs,
     memoryCache,
-    messageConsumer,
-    messageProcessor,
     metrics,
+    queueProcessor,
     nats,
     peerTracking,
     peersStats,
@@ -375,7 +377,6 @@ async function initComponents(): Promise<TestComponents> {
     pg,
     placesApi,
     pubsub,
-    pulseStats,
     queue,
     redis,
     referral,
@@ -392,6 +393,8 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     tracing: mockTracing,
     updateHandler,
+    userMutes,
+    userMutesDb,
     uwsServer,
     voice,
     voiceDb,

@@ -77,12 +77,12 @@ describe('PubSubComponent', () => {
       expect(mockSubClient.subscribe).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, handler)
     })
 
-    it('should handle subscription errors gracefully', async () => {
+    it('should log and rethrow subscription errors so callers can fail loud', async () => {
       const error = new Error('Redis subscribe error')
       mockSubClient.subscribe.mockRejectedValueOnce(error)
 
       const handler = jest.fn()
-      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)
+      await expect(pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)).rejects.toThrow(error)
 
       expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
         `Error while subscribing to channel ${FRIEND_STATUS_UPDATES_CHANNEL}: ${error.message}`
@@ -94,7 +94,7 @@ describe('PubSubComponent', () => {
       mockSubClient.subscribe.mockRejectedValueOnce(error)
 
       const handler = jest.fn()
-      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)
+      await expect(pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)).rejects.toThrow(error)
 
       expect(handler).not.toHaveBeenCalled()
     })
@@ -139,6 +139,25 @@ describe('PubSubComponent', () => {
       expect(mockSubClient.unsubscribe).not.toHaveBeenCalled()
       expect(mockSubClient.disconnect).not.toHaveBeenCalled()
       expect(mockPubClient.disconnect).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('client error handling', () => {
+    const errorRegistrations = () =>
+      (mockSubClient.on as unknown as jest.Mock).mock.calls.filter(([event]: [string]) => event === 'error')
+
+    it('should register an error listener on both duplicated clients', () => {
+      expect(errorRegistrations()).toHaveLength(2)
+    })
+
+    it('should log client errors instead of leaving them unhandled', () => {
+      const error = new Error('Socket closed unexpectedly')
+      const handlers = errorRegistrations().map(([, handler]: [string, (error: Error) => void]) => handler)
+
+      handlers.forEach((handler) => expect(() => handler(error)).not.toThrow())
+
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(error, { client: 'sub' })
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(error, { client: 'pub' })
     })
   })
 })

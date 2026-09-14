@@ -1,10 +1,14 @@
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { muteSpeakerFromCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/mute-speaker-from-community-voice-chat'
 import { createLogsMockedComponent } from '../../../../mocks/components'
+import { createCommunityVoiceMockedComponent } from '../../../../mocks/components/community-voice'
 import {
+  CommunityVoiceChatNotFoundError,
   CommunityVoiceChatPermissionError,
   InvalidCommunityIdError,
-  InvalidUserAddressError
+  InvalidUserAddressError,
+  UserNotCommunityMemberError
 } from '../../../../../src/logic/community-voice/errors'
 import { ICommunityVoiceComponent } from '../../../../../src/logic/community-voice/types'
 import {
@@ -27,15 +31,7 @@ describe('MuteSpeakerFromCommunityVoiceChat RPC Service', () => {
 
   beforeEach(() => {
     logs = createLogsMockedComponent()
-    mockCommunityVoice = {
-      startCommunityVoiceChat: jest.fn(),
-      endCommunityVoiceChat: jest.fn(),
-      joinCommunityVoiceChat: jest.fn(),
-      muteSpeakerInCommunityVoiceChat: jest.fn(),
-      getCommunityVoiceChat: jest.fn(),
-      getActiveCommunityVoiceChats: jest.fn(),
-      getActiveCommunityVoiceChatsForUser: jest.fn()
-    }
+    mockCommunityVoice = createCommunityVoiceMockedComponent({})
 
     service = muteSpeakerFromCommunityVoiceChatService({
       components: {
@@ -174,6 +170,53 @@ describe('MuteSpeakerFromCommunityVoiceChat RPC Service', () => {
           }
         })
         expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when the caller is not entitled to be in the room', () => {
+    describe('and the caller is not a member of a private community', () => {
+      let result: MuteSpeakerFromCommunityVoiceChatResponse
+
+      beforeEach(async () => {
+        mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(
+          new UserNotCommunityMemberError(userAddress, communityId)
+        )
+        result = await service(request, { address: userAddress } as any)
+      })
+
+      it('should return a forbidden error', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+    })
+
+    describe('and the caller is banned from the community', () => {
+      let result: MuteSpeakerFromCommunityVoiceChatResponse
+
+      beforeEach(async () => {
+        mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(
+          new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+        )
+        result = await service(request, { address: userAddress } as any)
+      })
+
+      it('should return a forbidden error', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+    })
+
+    describe('and there is no active voice chat for the community', () => {
+      let result: MuteSpeakerFromCommunityVoiceChatResponse
+
+      beforeEach(async () => {
+        mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(
+          new CommunityVoiceChatNotFoundError(communityId)
+        )
+        result = await service(request, { address: userAddress } as any)
+      })
+
+      it('should return a not found error', () => {
+        expect(result.response?.$case).toBe('notFoundError')
       })
     })
   })

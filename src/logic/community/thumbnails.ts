@@ -1,4 +1,6 @@
 import { AppComponents } from '../../types'
+import { UnsupportedThumbnailFormatError } from './errors'
+import { detectImageMimeType } from './image-signature'
 import { ICommunityThumbnailComponent } from './types'
 import { getCommunityThumbnailPath } from './utils'
 
@@ -40,7 +42,17 @@ export async function createCommunityThumbnailComponent(
   }
 
   async function uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string> {
-    await storage.storeFile(thumbnail, `communities/${communityId}/raw-thumbnail.png`)
+    // The key keeps its .png name because it is a published URL, but the object
+    // is served as what it is: the validator accepts JPEG, GIF and WebP too, and
+    // a browser goes by the Content-Type rather than the extension.
+    const contentType = detectImageMimeType(thumbnail)
+
+    // Callers validate before uploading; unrecognized bytes mean that contract broke.
+    if (!contentType) {
+      throw new UnsupportedThumbnailFormatError()
+    }
+
+    await storage.storeFile(thumbnail, `communities/${communityId}/raw-thumbnail.png`, contentType)
     return buildThumbnailUrl(communityId)
   }
 

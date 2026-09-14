@@ -9,3 +9,4 @@ test/stress
 .cursor
 .claude
 AGENTS.md
+.worktrees/

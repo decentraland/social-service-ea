@@ -1,6 +1,6 @@
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   CommunityOwnerNotFoundError,

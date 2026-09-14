@@ -1,10 +1,19 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
+import {
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, RpcServerContext } from '../../../../../src/types'
-import { createMockUpdateHandlerComponent, mockLogs } from '../../../../mocks/components'
+import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { createLogsMockedComponent } from '../../../../mocks/components/logs'
+import { mockMetrics } from '../../../../mocks/components/metrics'
+import { mockConfig } from '../../../../mocks/components/config'
+import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to friendship updates', () => {
   let subscribeToFriendshipUpdates: ReturnType<typeof subscribeToFriendshipUpdatesService>
@@ -12,6 +21,7 @@ describe('when subscribing to friendship updates', () => {
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
   let mockFriendProfile: any
+  let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
     id: '1',
@@ -22,13 +32,14 @@ describe('when subscribing to friendship updates', () => {
   }
 
   beforeEach(() => {
-    subscribersContext = createSubscribersContext()
+    logs = createLogsMockedComponent()
+    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockFriendProfile = createMockProfile('0x456')
 
     subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({
       components: {
-        logs: mockLogs,
+        logs,
         updateHandler: mockUpdateHandler
       }
     })
@@ -166,6 +177,25 @@ describe('when subscribing to friendship updates', () => {
       expect(shouldHandleUpdate(mockUpdateFromOther)).toBe(true) // Should handle: from different, to self
       expect(shouldHandleUpdate(mockUpdateFromSelf)).toBe(false) // Should not handle: from self
       expect(shouldHandleUpdate(mockUpdateToOther)).toBe(false) // Should not handle: to different
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = subscribeToFriendshipUpdates({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update carrying only the stream-closed notice', () => {
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate
+
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({ streamClosed })
     })
   })
 })

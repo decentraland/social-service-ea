@@ -1,14 +1,9 @@
-import type {
-  IConfigComponent,
-  ILoggerComponent,
-  IMetricsComponent,
-  IFetchComponent,
-  IHttpServerComponent
-} from '@well-known-components/interfaces'
+import type { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import type { IFetchComponent, IHttpServerComponent } from '@dcl/core-commons'
 import { metricDeclarations } from '../metrics'
-import { IUWsComponent } from '@well-known-components/uws-http-server'
+import { IUWsComponent } from '@dcl/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
-import { IFeaturesComponent } from '@well-known-components/features-component'
+import { IFeaturesComponent } from '@dcl/features-component'
 import { IAnalyticsComponent } from '@dcl/analytics-component'
 import {
   IFriendsDatabaseComponent,
@@ -35,7 +30,8 @@ import {
   IUpdateHandlerComponent,
   IRewardComponent,
   IEmailComponent,
-  ICdnCacheInvalidatorComponent
+  ICdnCacheInvalidatorComponent,
+  IRegistryComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -61,17 +57,19 @@ import { ICommunityVoiceComponent } from '../logic/community-voice'
 import { IReferralComponent } from '../logic/referral'
 import { IReferralDatabaseComponent } from './referral-db.type'
 import { IQueueComponent } from '@dcl/sqs-component'
-import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
-import { IJobComponent } from '../logic/job'
+import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { IUserMutesComponent } from '../logic/user-mutes'
+import { IUserMutesDatabaseComponent } from './components'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
 import { IPublisherComponent } from '@dcl/sns-component'
 import { ISchemaValidatorComponent } from '@dcl/schema-validator-component'
+import { IQueueConsumerComponent } from '@dcl/queue-consumer-component'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -83,6 +81,7 @@ export type MetricsDeclaration = keyof typeof metricDeclarations
 export type BaseComponents = {
   aiCompliance: IAIComplianceComponent
   analytics: IAnalyticsComponent<AnalyticsEventPayload>
+  registry: IRegistryComponent
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
   communities: ICommunitiesComponent
@@ -111,8 +110,6 @@ export type BaseComponents = {
   httpServer: IHttpServerComponent<GlobalContext>
   logs: ILoggerComponent
   memoryCache: ICacheComponent
-  messageConsumer: IMessageConsumerComponent
-  messageProcessor: IMessageProcessorComponent
   metrics: IMetricsComponent<MetricsDeclaration>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
@@ -147,6 +144,9 @@ export type BaseComponents = {
   communityRankingCalculationJob?: IJobComponent
   slack: ISlackComponent
   schemaValidator: ISchemaValidatorComponent<GlobalContext>
+  queueProcessor: IQueueConsumerComponent
+  userMutesDb: IUserMutesDatabaseComponent
+  userMutes: IUserMutesComponent
 }
 
 // components used in runtime

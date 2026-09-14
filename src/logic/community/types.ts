@@ -2,6 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { ProfileAvatarsItemNameColor } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { CommunityRole, Action } from '../../types/entities'
 import {
   CommunityInviteReceivedEvent,
@@ -12,16 +13,22 @@ import {
   EthAddress,
   PaginatedParameters,
   CommunityPostAddedEvent,
-  CommunityOwnershipTransferredEvent
+  CommunityOwnershipTransferredEvent,
+  CommunityMemberLeftEvent
 } from '@dcl/schemas'
 import {
   CommunityDeletedEventReducedMetadata,
   CommunityRenamedEventReducedMetadata,
-  CommunityRequestToJoinReceivedEventReducedMetadata
+  CommunityRequestToJoinReceivedEventReducedMetadata,
+  CommunityVoiceChatStartedEventReducedMetadata,
+  BroadcastOptions
 } from './broadcaster'
 
 export interface ICommunitiesComponent {
   getCommunity(id: string, options: { as?: EthAddress }): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
+  getCommunityPublicInformation(
+    id: string
+  ): Promise<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions
@@ -29,9 +36,13 @@ export interface ICommunitiesComponent {
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
   ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>>
+  searchCommunities(
+    search: string,
+    options: { userAddress: EthAddress; limit: number; offset: number }
+  ): Promise<GetCommunitiesWithTotal<CommunitySearchResult>>
   getMemberCommunities(
     memberAddress: string,
-    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
   ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
   getAllCommunitiesForModeration(
     options: GetCommunitiesOptions
@@ -45,6 +56,35 @@ export interface ICommunitiesComponent {
   updateEditorChoice(communityId: string, userAddress: EthAddress, editorsChoice: boolean): Promise<void>
   deleteCommunity(id: string, userAddress: string): Promise<void>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
+  /**
+   * Same as {@link getCommunity} but without fetching the owner's profile.
+   * Returns the owner address instead of the owner name and never throws
+   * CommunityOwnerNotFoundError.
+   */
+  getCommunityWithoutProfile(
+    id: string,
+    options: { as?: EthAddress }
+  ): Promise<AggregatedCommunityWithMemberAndVoiceChatDataV2>
+  /**
+   * Same as {@link getCommunityPublicInformation} but without fetching the owner's profile.
+   */
+  getCommunityPublicInformationWithoutProfile(
+    id: string
+  ): Promise<Omit<CommunityPublicInformationWithVoiceChatV2, 'isHostingLiveEvent'>>
+  /**
+   * Same as {@link getCommunities} but without fetching owner or mutual-friend profiles.
+   * Returns the owner address and mutual-friend addresses (string[]) only.
+   */
+  getCommunitiesWithoutProfiles(
+    userAddress: string,
+    options: GetCommunitiesOptions
+  ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChatV2, 'isHostingLiveEvent'>>>
+  /**
+   * Same as {@link getCommunitiesPublicInformation} but without fetching the owner's profile.
+   */
+  getCommunitiesPublicInformationWithoutProfiles(
+    options: GetCommunitiesOptions
+  ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChatV2, 'isHostingLiveEvent'>>>
 }
 
 export interface ICommunityMembersComponent {
@@ -78,6 +118,22 @@ export interface ICommunityMembersComponent {
     userAddress: EthAddress | undefined,
     members: T[]
   ): Promise<(T & CommunityMemberProfile)[]>
+  /**
+   * Same as {@link getCommunityMembers} but without fetching member profiles.
+   * Returns the member address (and friendship status) only, and never drops
+   * members whose profile is missing.
+   */
+  getCommunityMembersWithoutProfiles(
+    id: string,
+    options: GetCommunityMembersOptions
+  ): Promise<{ members: CommunityMemberV2[]; totalMembers: number }>
+  /**
+   * Aggregates any member data with the friendship status only (no profile fetch).
+   */
+  aggregateWithFriendshipStatus<T extends { memberAddress: EthAddress }>(
+    userAddress: EthAddress | undefined,
+    members: T[]
+  ): (T & { friendshipStatus: FriendshipStatus })[]
 }
 
 export interface ICommunityRolesComponent {
@@ -120,7 +176,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToInviteUsers: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToEditCommunityName: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToCreatePost: (communityId: string, memberAddress: string) => Promise<void>
-  validatePermissionToDeletePost: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToDeletePost: (post: CommunityPost, deleterAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {
@@ -134,7 +190,7 @@ export interface ICommunityPlacesComponent {
       userAddress?: EthAddress
       pagination: PaginatedParameters
     }
-  ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
+  ): Promise<{ places: CommunityPlaceWithDetails[]; totalPlaces: number }>
   validateAndAddPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
   addPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
   removePlace(communityId: string, userAddress: EthAddress, placeId: string): Promise<void>
@@ -158,6 +214,15 @@ export interface ICommunityBansComponent {
   ) => Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
   banMember: (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
   unbanMember: (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
+  /**
+   * Same as {@link getBannedMembers} but without fetching member profiles.
+   * Returns the member address (and friendship status) only.
+   */
+  getBannedMembersWithoutProfiles: (
+    id: string,
+    userAddress: EthAddress,
+    pagination: Required<PaginatedParameters>
+  ) => Promise<{ members: BannedMemberV2[]; totalMembers: number }>
 }
 
 export interface ICommunityOwnersComponent {
@@ -198,6 +263,9 @@ export interface ICommunityBroadcasterComponent {
       | CommunityDeletedContentViolationEvent
       | CommunityPostAddedEvent
       | CommunityOwnershipTransferredEvent
+      | CommunityVoiceChatStartedEventReducedMetadata
+      | CommunityMemberLeftEvent,
+    options?: BroadcastOptions
   ): Promise<void>
 }
 
@@ -205,6 +273,7 @@ export interface ICommunityThumbnailComponent {
   buildThumbnailUrl(communityId: string): string
   getThumbnail(communityId: string): Promise<string | undefined>
   getThumbnails(communityIds: string[]): Promise<Record<string, string | undefined>>
+  /** @throws {UnsupportedThumbnailFormatError} when the bytes carry no supported image signature */
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
@@ -255,6 +324,14 @@ export interface ICommunityRequestsComponent {
     memberAddress: EthAddress,
     requests: MemberRequest[]
   ): Promise<MemberCommunityRequest[]>
+  /**
+   * Same as {@link aggregateRequestsWithCommunities} but without fetching owner or
+   * mutual-friend profiles. Returns the owner address and mutual-friend addresses only.
+   */
+  aggregateRequestsWithCommunitiesWithoutProfiles(
+    memberAddress: EthAddress,
+    requests: MemberRequest[]
+  ): Promise<MemberCommunityRequestV2[]>
 }
 
 export type CommunityDB = {
@@ -330,19 +407,27 @@ export type BannedMember = {
   bannedBy: string
 } & FriendshipAction
 
-export type CommunityMemberProfile = CommunityMember & {
+export type MemberProfileInfo = {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  nameColor?: ProfileAvatarsItemNameColor
   friendshipStatus: FriendshipStatus
 }
 
-export type BannedMemberProfile = BannedMember & {
-  profilePictureUrl: string
-  hasClaimedName: boolean
-  name: string
-  friendshipStatus: FriendshipStatus
-}
+export type CommunityMemberProfile = CommunityMember & MemberProfileInfo
+
+export type BannedMemberProfile = BannedMember & MemberProfileInfo
+
+/**
+ * v2 (address-only) shapes: the base entity plus the friendship status, with no
+ * profile information (name, avatar, hasClaimedName, nameColor).
+ */
+export type WithFriendshipStatus<T> = T & { friendshipStatus: FriendshipStatus }
+
+export type CommunityMemberV2 = WithFriendshipStatus<CommunityMember>
+
+export type BannedMemberV2 = WithFriendshipStatus<BannedMember>
 
 export type AggregatedCommunityWithMemberData = AggregatedCommunity & {
   role: CommunityRole
@@ -373,6 +458,8 @@ export type GetCommunitiesOptions = {
   roles?: CommunityRole[]
   communityIds?: string[]
   includeUnlisted?: boolean
+  /** Restrict results to communities anyone can see: public privacy AND listed visibility. */
+  onlyPublicVisible?: boolean
 }
 
 export type GetCommunityMembersOptions = {
@@ -403,11 +490,46 @@ export type CommunityWithUserInformationAndVoiceChat = CommunityWithUserInformat
   voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
+// `privacy` is not narrowed to Public: since #346/#347 this shape also carries private communities.
 export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
-  privacy: CommunityPrivacyEnum.Public
+  privacy: CommunityPrivacyEnum
 }
 
 export type CommunityPublicInformationWithVoiceChat = CommunityPublicInformation & {
+  voiceChatStatus: CommunityVoiceChatStatus | null
+}
+
+/*
+  v2 (address-only) community shapes: same as the v1 chain but without the owner's
+  profile name (only `ownerAddress`, inherited from Community) and with mutual friends
+  represented as plain addresses (`friends: string[]`) instead of FriendProfile objects.
+*/
+export type AggregatedCommunityV2 = Community & {
+  isHostingLiveEvent: boolean
+}
+
+export type AggregatedCommunityWithMemberDataV2 = AggregatedCommunityV2 & {
+  role: CommunityRole
+  membersCount: number
+}
+
+export type AggregatedCommunityWithMemberAndVoiceChatDataV2 = AggregatedCommunityWithMemberDataV2 & {
+  voiceChatStatus: CommunityVoiceChatStatus | null
+}
+
+export type CommunityWithUserInformationV2 = AggregatedCommunityWithMemberDataV2 & {
+  friends: string[]
+}
+
+export type CommunityWithUserInformationAndVoiceChatV2 = CommunityWithUserInformationV2 & {
+  voiceChatStatus: CommunityVoiceChatStatus | null
+}
+
+export type CommunityPublicInformationV2 = Omit<CommunityWithUserInformationV2, 'role' | 'friends' | 'privacy'> & {
+  privacy: CommunityPrivacyEnum
+}
+
+export type CommunityPublicInformationWithVoiceChatV2 = CommunityPublicInformationV2 & {
   voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
@@ -425,6 +547,13 @@ export type CommunityPlace = {
   communityId: string
   addedBy: string
   addedAt: Date
+}
+
+export type CommunityPlaceWithDetails = Pick<CommunityPlace, 'id'> & {
+  title?: string
+  positions?: string[]
+  world?: boolean
+  world_name?: string
 }
 
 export enum CommunityRequestStatus {
@@ -459,6 +588,13 @@ export type MemberCommunityRequest = WithCommonFriends<{
   membersCount: number
   type: CommunityRequestType
 }>
+
+/**
+ * v2 (address-only) member-community request: same as MemberCommunityRequest but without
+ * the owner's profile name and with mutual friends as plain addresses (`friends: string[]`).
+ */
+export type MemberCommunityRequestV2 = Omit<CommunityWithUserInformationAndVoiceChatV2, 'id' | 'isHostingLiveEvent'> &
+  MemberRequest
 
 export interface ActiveCommunityVoiceChat {
   communityId: string
@@ -528,6 +664,14 @@ export interface ICommunityPostsComponent {
     communityId: string,
     options: GetCommunityPostsOptions
   ): Promise<{ posts: CommunityPostWithProfile[]; total: number }>
+  /**
+   * Same as {@link getPosts} but without fetching post-author profiles.
+   * Returns the author address only.
+   */
+  getPostsWithoutProfiles(
+    communityId: string,
+    options: GetCommunityPostsOptions
+  ): Promise<{ posts: CommunityPostWithLikes[]; total: number }>
   deletePost(postId: string, deleterAddress: EthAddress): Promise<void>
   likePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
@@ -535,6 +679,17 @@ export interface ICommunityPostsComponent {
 
 export interface ICommunityRankingComponent {
   calculateRankingScoreForAllCommunities(): Promise<void>
+}
+
+/**
+ * Minimal community search result containing only id, name, membersCount, and privacy.
+ * Used for lightweight search operations (e.g., autocomplete, quick lookups).
+ */
+export type CommunitySearchResult = {
+  id: string
+  name: string
+  membersCount: number
+  privacy: CommunityPrivacyEnum
 }
 
 export type CommunityRankingMetricsDB = {

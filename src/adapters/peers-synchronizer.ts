@@ -33,7 +33,11 @@ export async function createPeersSynchronizerComponent({
 
   return {
     async syncPeers() {
-      logger.info('Syncing peers')
+      // Guard against being started twice, which would orphan the previous interval.
+      if (intervalId) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
       await syncPeers()
       intervalId = setInterval(syncPeers, syncIntervalMs)
     },

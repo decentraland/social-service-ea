@@ -4,9 +4,10 @@ import {
   UnblockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { parseProfileToBlockedUser } from '../../../logic/friends'
+import { parseAddressToBlockedUser, parseProfileToBlockedUser } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
-import { ProfileNotFoundError } from '../../../logic/friends/errors'
+import { FriendshipRateLimitError, ProfileNotFoundError } from '../../../logic/friends/errors'
+import { normalizeAddress } from '../../../utils/address'
 
 export function unblockUserService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('unblock-user-service')
@@ -16,12 +17,13 @@ export function unblockUserService({ components: { logs, friends } }: RPCService
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
 
-      if (blockerAddress === blockedAddress) {
-        throw new InvalidRequestError('Cannot unblock yourself')
-      }
-
       if (!EthAddress.validate(blockedAddress)) {
         throw new InvalidRequestError('Invalid user address in the request payload')
+      }
+
+      // Compare normalized addresses so a checksummed/mixed-case self-address can't bypass the guard.
+      if (blockerAddress === normalizeAddress(blockedAddress)) {
+        throw new InvalidRequestError('Cannot unblock yourself')
       }
 
       const unblockedUserProfile = await friends.unblockUser(blockerAddress, blockedAddress)
@@ -30,7 +32,9 @@ export function unblockUserService({ components: { logs, friends } }: RPCService
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToBlockedUser(unblockedUserProfile)
+            profile: unblockedUserProfile
+              ? parseProfileToBlockedUser(unblockedUserProfile)
+              : parseAddressToBlockedUser(blockedAddress)
           }
         }
       }
@@ -49,7 +53,7 @@ export function unblockUserService({ components: { logs, friends } }: RPCService
             }
           }
         }
-      } else if (error instanceof InvalidRequestError) {
+      } else if (error instanceof InvalidRequestError || error instanceof FriendshipRateLimitError) {
         return {
           response: {
             $case: 'invalidRequest',

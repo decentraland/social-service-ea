@@ -9,25 +9,23 @@ export function subscribeToBlockUpdatesService({
   const logger = logs.getLogger('subscribe-to-block-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<BlockUpdate> {
-    let cleanup: (() => void) | undefined
-
     // The blocked/unblocked user should know who blocked/unblocked them
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<BlockUpdate, SubscriptionEventsEmitter['blockUpdate']>({
+      yield* updateHandler.handleSubscriptionUpdates<BlockUpdate, SubscriptionEventsEmitter['blockUpdate']>({
         rpcContext: context,
         eventName: 'blockUpdate',
         shouldRetrieveProfile: false,
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockerAddress,
         parser: parseEmittedUpdateToBlockUpdate,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) =>
-          update.blockedAddress === context.address
+          update.blockedAddress === context.address,
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => BlockUpdate.fromPartial({ streamClosed })
       })
     } catch (error: any) {
       logger.error('Error in block updates subscription:', error)
       throw error
-    } finally {
-      logger.info('Closing block updates subscription')
-      cleanup?.()
     }
   }
 }

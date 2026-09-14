@@ -5,6 +5,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getPage } from '../../../utils/pagination'
 import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friends/friendships'
+import { normalizeFriendshipRequestsPagination } from '../../../utils/friendship-pagination'
 
 export function getSentFriendshipRequestsService({
   components: { logs, friends }
@@ -16,8 +17,9 @@ export function getSentFriendshipRequestsService({
     context: RpcServerContext
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
-      const { limit, offset } = request.pagination || {}
-      const { requests, profiles, total } = await friends.getSentFriendshipRequests(context.address, request.pagination)
+      const pagination = normalizeFriendshipRequestsPagination(request.pagination)
+      const { limit, offset } = pagination
+      const { requests, profiles, total } = await friends.getSentFriendshipRequests(context.address, pagination)
 
       const parsedRequests = parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)
 
@@ -30,7 +32,7 @@ export function getSentFriendshipRequestsService({
         },
         paginationData: {
           total,
-          page: getPage(limit ?? total, offset)
+          page: getPage(limit, offset)
         }
       }
     } catch (error: any) {

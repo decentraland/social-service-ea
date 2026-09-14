@@ -53,10 +53,8 @@ export function subscribeToPrivateVoiceChatUpdatesService({
   const logger = logs.getLogger('subscribe-to-private-voice-chat-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<PrivateVoiceChatUpdate> {
-    let cleanup: (() => void) | undefined
-
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<
+      yield* updateHandler.handleSubscriptionUpdates<
         PrivateVoiceChatUpdate,
         SubscriptionEventsEmitter['privateVoiceChatUpdate']
       >({
@@ -66,16 +64,16 @@ export function subscribeToPrivateVoiceChatUpdatesService({
         getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToPrivateVoiceChatUpdate,
         // Only handle updates that are known by the this subscription call
-        shouldHandleUpdate: (update) => Object.values(VoiceChatStatus).includes(update.status)
+        shouldHandleUpdate: (update) => Object.values(VoiceChatStatus).includes(update.status),
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => PrivateVoiceChatUpdate.fromPartial({ streamClosed })
       })
     } catch (error) {
       logger.error(
         `Error in private voice chat updates subscription: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
       )
       throw error
-    } finally {
-      logger.info('Closing private voice chat updates subscription')
-      cleanup?.()
     }
   }
 }

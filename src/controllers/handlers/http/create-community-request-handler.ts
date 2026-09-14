@@ -3,8 +3,8 @@ import { MemberRequest } from '../../../logic/community/types'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { CommunityNotFoundError, InvalidCommunityRequestError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { CreateCommunityRequestRequestBody } from './schemas'
 
 export async function createCommunityRequestHandler(
@@ -55,7 +55,8 @@ export async function createCommunityRequestHandler(
     if (
       error instanceof InvalidCommunityRequestError ||
       error instanceof CommunityNotFoundError ||
-      error instanceof NotAuthorizedError
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
     ) {
       throw error
     }

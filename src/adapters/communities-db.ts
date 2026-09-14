@@ -21,7 +21,8 @@ import {
   GetCommunityPostsOptions,
   CommunityVisibilityEnum,
   CommunityRankingMetrics,
-  CommunityRankingMetricsDB
+  CommunityRankingMetricsDB,
+  CommunityNotFoundError
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -30,6 +31,7 @@ import {
   useCTEs,
   getUserFriendsCTE,
   searchCommunitiesQuery,
+  escapeLikePattern,
   getCommunitiesWithMembersCountCTE,
   withSearchAndPagination,
   getLatestFriendshipActionCTE,
@@ -38,6 +40,28 @@ import {
   CTE
 } from '../logic/queries'
 import { EthAddress } from '@dcl/schemas'
+
+const MAX_INT4 = 2147483647
+
+/**
+ * Largest contribution a single event may make to each ranking counter.
+ *
+ * These are the metric's own scoring ceilings, so a bigger value could not raise the score anyway —
+ * clamping keeps one caller-supplied number from pinning a counter that nothing decrements.
+ */
+const MAX_METRIC_CONTRIBUTION: Record<string, number> = {
+  events_count: 50,
+  events_total_attendees: 1000,
+  photos_count: 100,
+  streams_count: 20,
+  streams_total_participants: 500
+}
+
+function clampMetricContribution(key: string, value: number): number {
+  const max = MAX_METRIC_CONTRIBUTION[key] ?? MAX_INT4
+  if (!Number.isFinite(value) || value < 0) return 0
+  return Math.min(Math.trunc(value), max)
+}
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
@@ -99,6 +123,26 @@ export function createCommunitiesDBComponent(
       return result.rows[0]
     },
 
+    async getCommunityPublicInformation(id: string): Promise<Omit<CommunityPublicInformation, 'ownerName'> | null> {
+      const baseQuery = useCTEs([getCommunitiesWithMembersCountCTE({ onlyPublic: true })]).append(
+        SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as "ownerAddress",
+          CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          c.active,
+          cwmc."membersCount"
+        FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        WHERE c.id = ${id} AND c.active = true`
+      )
+
+      const result = await pg.query<Omit<CommunityPublicInformation, 'ownerName'>>(baseQuery)
+      return result.rows[0] || null
+    },
+
     async getCommunityMembers(
       id: string,
       options: {
@@ -136,7 +180,9 @@ export function createCommunitiesDBComponent(
           excludedAddresses ? SQL` AND cm.member_address <> ANY(${excludedAddresses.map(normalizeAddress)})` : SQL``
         )
         .append(roles ? SQL` AND cm.role = ANY(${roles})` : SQL``)
-        .append(SQL` ORDER BY cm.joined_at ASC`)
+        .append(
+          SQL` ORDER BY CASE cm.role WHEN 'owner' THEN 1 WHEN 'moderator' THEN 2 WHEN 'member' THEN 3 ELSE 4 END ASC, cm.joined_at ASC`
+        )
         .append(SQL` LIMIT ${pagination.limit}`)
         .append(SQL` OFFSET ${pagination.offset}`)
 
@@ -153,11 +199,19 @@ export function createCommunitiesDBComponent(
     async getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>> {
       const normalizedUserAddresses = userAddresses.map(normalizeAddress)
 
+      // Membership rows survive a soft delete, so the active check keeps a deleted community's
+      // former staff from still resolving as owners and moderators. Mirrors getCommunityMembersCount.
       const query = SQL`
         SELECT cm.member_address AS "memberAddress", cm.role AS "role"
         FROM community_members cm
         WHERE cm.community_id = ${id}
           AND cm.member_address = ANY(${normalizedUserAddresses})
+          AND EXISTS (
+            SELECT 1
+            FROM communities c
+            WHERE c.id = cm.community_id
+              AND c.active = true
+          )
       `
       const result = await pg.query<{ memberAddress: string; role: CommunityRole }>(query)
       return result.rows.reduce(
@@ -274,7 +328,10 @@ export function createCommunitiesDBComponent(
       const query = SQL`DELETE FROM community_places WHERE community_id = ${communityId}`
 
       if (exceptPlaceIds.length > 0) {
-        query.append(SQL` AND id <> ANY(${exceptPlaceIds})`)
+        // ALL, not ANY: `id <> ANY(list)` asks whether the id differs from at least one element,
+        // which is true of every row once the list holds two, so the exceptions were deleted along
+        // with everything else.
+        query.append(SQL` AND id <> ALL(${exceptPlaceIds})`)
       }
 
       await pg.query(query)
@@ -324,6 +381,7 @@ export function createCommunitiesDBComponent(
           c.owner_address as "ownerAddress",
           COALESCE(cm.role, ${CommunityRole.None}) as role,
           CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          CASE WHEN c.unlisted THEN 'unlisted' ELSE 'all' END as visibility,
           c.active,
           cwmc."membersCount",
           COALESCE(cf.friends, ARRAY[]::text[]) as friends
@@ -362,9 +420,12 @@ export function createCommunitiesDBComponent(
 
     async getCommunitiesCount(
       memberAddress: EthAddress,
-      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted'>
+      options?: Pick<
+        GetCommunitiesOptions,
+        'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted' | 'onlyPublicVisible'
+      >
     ): Promise<number> {
-      const { search, onlyMemberOf, roles, communityIds, includeUnlisted } = options ?? {}
+      const { search, onlyMemberOf, roles, communityIds, includeUnlisted, onlyPublicVisible } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
@@ -383,6 +444,7 @@ export function createCommunitiesDBComponent(
           // Otherwise, exclude unlisted communities from public listings
           onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
+        .append(onlyPublicVisible ? SQL` AND c.private = false AND c.unlisted = false` : SQL``)
         .append(SQL` AND cb.banned_address IS NULL`)
 
       if (search) {
@@ -447,12 +509,12 @@ export function createCommunitiesDBComponent(
 
     async getMemberCommunities(
       memberAddress: EthAddress,
-      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
     ): Promise<MemberCommunity[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const baseQuery = SQL`
-        SELECT 
+        SELECT
           c.id,
           c.name,
           c.owner_address as "ownerAddress",
@@ -462,6 +524,7 @@ export function createCommunitiesDBComponent(
       `
         .append(options.roles ? SQL` AND cm.role = ANY(${options.roles})` : SQL``)
         .append(SQL` WHERE c.active = true`)
+        .append(options.onlyPublicVisible ? SQL` AND c.private = false AND c.unlisted = false` : SQL``)
 
       const query = withSearchAndPagination(baseQuery, {
         sortBy: 'role',
@@ -510,20 +573,18 @@ export function createCommunitiesDBComponent(
       const normalizedUserAddress = normalizeAddress(userAddress)
 
       const query = SQL`
-        SELECT DISTINCT
+        SELECT
           cm.community_id as "communityId",
           cm.member_address as "memberAddress"
         FROM community_members cm
-        JOIN community_members ucm ON cm.community_id = ucm.community_id
-        WHERE ucm.member_address = ${normalizedUserAddress}
+        WHERE cm.community_id IN (
+          SELECT ucm.community_id
+          FROM community_members ucm
+          JOIN communities c ON c.id = ucm.community_id AND c.active = true
+          WHERE ucm.member_address = ${normalizedUserAddress}
+        )
           AND cm.member_address = ANY(${onlineUsers.map(normalizeAddress)})
           AND cm.member_address != ${normalizedUserAddress}
-          AND EXISTS (
-            SELECT 1 
-            FROM communities c 
-            WHERE c.id = cm.community_id 
-            AND c.active = true
-          )
         ORDER BY cm.community_id, cm.member_address
         LIMIT ${pagination.limit} OFFSET ${pagination.offset}
       `
@@ -613,6 +674,20 @@ export function createCommunitiesDBComponent(
       return pg.exists(query, 'isBanned')
     },
 
+    async getBannedMemberAddresses(communityId: string, memberAddresses: EthAddress[]): Promise<string[]> {
+      const normalizedMemberAddresses = memberAddresses.map(normalizeAddress)
+
+      const query = SQL`
+        SELECT cb.banned_address AS "bannedAddress"
+        FROM community_bans cb
+        WHERE cb.community_id = ${communityId}
+          AND cb.banned_address = ANY(${normalizedMemberAddresses})
+          AND cb.active = true
+      `
+      const result = await pg.query<{ bannedAddress: string }>(query)
+      return result.rows.map((row) => row.bannedAddress)
+    },
+
     async getBannedMembers(
       communityId: string,
       userAddress: EthAddress,
@@ -678,10 +753,14 @@ export function createCommunitiesDBComponent(
           FOR UPDATE
         `)
 
+        if (!lockResult.rows[0]) {
+          throw new CommunityNotFoundError(communityId)
+        }
+
         const oldOwner = lockResult.rows[0].owner_address
 
         await client.query(SQL`
-          UPDATE communities 
+          UPDATE communities
           SET owner_address = ${normalizedNewOwner}, updated_at = now() 
           WHERE id = ${communityId}
         `)
@@ -907,18 +986,43 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
+    async removeMemberRequests(communityId: string, memberAddress: EthAddress): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_requests
+        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
+      `
+      await pg.query(query)
+    },
+
     async acceptAllRequestsToJoin(communityId: string): Promise<string[]> {
       return pg.withTransaction(async (client) => {
         const addMembersQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
-          SELECT community_id, member_address, ${CommunityRole.Member}
-          FROM community_requests
-          WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+          SELECT cr.community_id, cr.member_address, ${CommunityRole.Member}
+          FROM community_requests cr
+          WHERE cr.community_id = ${communityId} AND cr.type = ${CommunityRequestType.RequestToJoin}
+            AND NOT EXISTS (
+              SELECT 1 FROM community_bans cb
+              WHERE cb.community_id = cr.community_id
+                AND cb.banned_address = cr.member_address
+                AND cb.active = true
+            )
+          ON CONFLICT (community_id, member_address) DO NOTHING
         `
         await client.query(addMembersQuery.text, addMembersQuery.values)
 
+        // Only remove (and report as accepted) the requests that were actually accepted above, i.e.
+        // from non-banned users. A banned user's pending request is left untouched; it cannot be
+        // accepted while the ban is active (see updateRequestStatus).
         const removeRequestsToJoinQuery = SQL`
-          DELETE FROM community_requests WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+          DELETE FROM community_requests cr
+          WHERE cr.community_id = ${communityId} AND cr.type = ${CommunityRequestType.RequestToJoin}
+            AND NOT EXISTS (
+              SELECT 1 FROM community_bans cb
+              WHERE cb.community_id = cr.community_id
+                AND cb.banned_address = cr.member_address
+                AND cb.active = true
+            )
           RETURNING id
         `
 
@@ -972,7 +1076,7 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true`
 
       if (search) {
-        query = query.append(SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`)
+        query = query.append(searchCommunitiesQuery(search))
       }
 
       query = query.append(
@@ -1186,7 +1290,11 @@ export function createCommunitiesDBComponent(
         >
       >
     ): Promise<void> {
-      const definedMetrics = Object.fromEntries(Object.entries(metrics).filter(([_, value]) => value !== undefined))
+      const definedMetrics = Object.fromEntries(
+        Object.entries(metrics)
+          .filter(([_, value]) => value !== undefined)
+          .map(([key, value]) => [key, typeof value === 'number' ? clampMetricContribution(key, value) : value])
+      )
 
       if (Object.keys(definedMetrics).length === 0) {
         return
@@ -1209,9 +1317,15 @@ export function createCommunitiesDBComponent(
               .append(SQL`${value}`)
               .append(index === array.length - 1 ? '' : ', ')
           } else {
+            // Saturate rather than overflow: these columns are int4 and nothing ever decrements
+            // them, so a single out-of-range increment would otherwise freeze the metric for good.
+            // The addition is widened to bigint first — Postgres evaluates int + int before LEAST
+            // sees it, so clamping the result cannot rescue a column already close to the maximum,
+            // which is exactly the row this is meant to unstick.
             return acc
-              .append(`${key} = community_ranking_metrics.${key} + `)
+              .append(`${key} = LEAST(community_ranking_metrics.${key}::bigint + `)
               .append(SQL`${value}`)
+              .append(`::bigint, ${MAX_INT4})::integer`)
               .append(index === array.length - 1 ? '' : ', ')
           }
         },
@@ -1259,6 +1373,104 @@ export function createCommunitiesDBComponent(
       `)
 
       await pg.query(query)
+    },
+
+    async getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>> {
+      if (communityIds.length === 0) {
+        return []
+      }
+
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      const query = SQL`
+        SELECT DISTINCT c.id
+        FROM communities c
+        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedUserAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
+        WHERE c.id = ANY(${communityIds})
+          AND c.active = true
+          AND cb.banned_address IS NULL
+          AND (c.unlisted = false OR cm.member_address IS NOT NULL)
+      `
+
+      const result = await pg.query<{ id: string }>(query)
+      return result.rows
+    },
+
+    async searchCommunities(
+      search: string,
+      options: { userAddress: EthAddress; limit: number; offset: number }
+    ): Promise<{
+      results: Array<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>
+      total: number
+    }> {
+      const { userAddress, limit, offset } = options
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      // Optimized prefix matching query:
+      // - Matches names starting with the search term (when provided)
+      // - Also matches words in the middle of the name (after a space)
+      // - Public and Private communities are always searchable
+      // - Unlisted communities are only searchable by their members
+      const mainQuery = useCTEs([getCommunitiesWithMembersCountCTE()]).append(
+        SQL`SELECT c.id, c.name, COALESCE(cwmc."membersCount", 0)::int as "membersCount", CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy`
+      )
+      const countQuery = SQL`SELECT COUNT(*) as count`
+
+      const baseCondition = SQL`
+        FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
+        WHERE c.active = true
+          AND cb.banned_address IS NULL
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+      `
+
+      const countBaseCondition = SQL`
+        FROM communities c
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
+        WHERE c.active = true
+          AND cb.banned_address IS NULL
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+      `
+
+      mainQuery.append(baseCondition)
+      countQuery.append(countBaseCondition)
+
+      if (search) {
+        const escapedSearch = escapeLikePattern(search)
+        const searchCondition = SQL` AND (c.name ILIKE ${escapedSearch + '%'} ESCAPE '\\' OR c.name ILIKE ${'% ' + escapedSearch + '%'} ESCAPE '\\')`
+        mainQuery.append(searchCondition)
+        countQuery.append(searchCondition)
+      }
+
+      mainQuery.append(SQL`
+        ORDER BY c.name ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `)
+
+      const [results, count] = await Promise.all([
+        pg.query<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>(mainQuery),
+        pg.query<{ count: string }>(countQuery)
+      ])
+
+      return {
+        results: results.rows,
+        total: parseInt(count.rows[0]?.count ?? '0', 10)
+      }
     }
   }
 }

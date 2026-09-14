@@ -12,7 +12,8 @@ jest.mock('redis', () => ({
     mGet: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
-    quit: jest.fn()
+    quit: jest.fn(),
+    eval: jest.fn()
   })
 }))
 

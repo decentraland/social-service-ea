@@ -4,13 +4,11 @@ import { ICommunityOwnersComponent } from './types'
 import { CommunityOwnerNotFoundError } from './errors'
 import { getProfileName, getProfileUserId } from '../profiles'
 
-export function createCommunityOwnersComponent(
-  components: Pick<AppComponents, 'catalystClient'>
-): ICommunityOwnersComponent {
-  const { catalystClient } = components
+export function createCommunityOwnersComponent(components: Pick<AppComponents, 'registry'>): ICommunityOwnersComponent {
+  const { registry } = components
 
   async function getOwnerName(ownerAddress: EthAddress, communityId: string = 'N/A'): Promise<string> {
-    const ownerProfile = await catalystClient.getProfile(ownerAddress)
+    const ownerProfile = await registry.getProfile(ownerAddress)
 
     // TODO: Prevent breaking communities retrieval flow when owner profile is not found
     if (!ownerProfile) {
@@ -23,7 +21,7 @@ export function createCommunityOwnersComponent(
   }
 
   async function getOwnersNames(ownerAddresses: EthAddress[]): Promise<Record<EthAddress, string>> {
-    const ownersProfiles = await catalystClient.getProfiles(ownerAddresses)
+    const ownersProfiles = await registry.getProfiles(ownerAddresses)
 
     return ownersProfiles.reduce(
       (acc, profile) => {

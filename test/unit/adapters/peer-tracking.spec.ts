@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
-import { ParcelChangesBatch } from '@dcl/protocol/out-js/decentraland/pulse/pulse_presence.gen'
+import { ParcelChangesBatch } from '@dcl/pulse-protocol/out-js/decentraland/pulse/pulse_presence.gen'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NatsMsg } from '@well-known-components/nats-component/dist/types'
 import {
@@ -292,6 +292,30 @@ describe('PeerTrackingComponent', () => {
         expect(new Set(events.map((event) => event.address))).toEqual(new Set(changes.map((change) => change.address)))
         expect(events.every((event) => event.status === ConnectivityStatus.ONLINE)).toBe(true)
         expect(mockRedis.client.mGet).toHaveBeenCalledTimes(1)
+      })
+
+      it('should apply the other 249 wallets when the seventh status write fails', async () => {
+        const { changes, message } = bigSnapshot()
+        const failedKey = PEER_STATUS_KEY_PREFIX + changes[6].address
+        mockRedis.put.mockImplementation(async (key: string, value: unknown) => {
+          if (key === failedKey) throw new Error('Redis write failed')
+          redisStore.set(key, JSON.stringify(value))
+        })
+        await getParcelChangesHandler()(null, message)
+        expect(mockRedis.put).toHaveBeenCalledTimes(SNAPSHOT_SIZE)
+        expect(redisStore.has(failedKey)).toBe(false)
+        const expected = changes
+          .filter((_, index) => index !== 6)
+          .map(({ address }) => ({ address, status: ConnectivityStatus.ONLINE }))
+        expect(emittedFriendEvents()).toEqual(expected)
+        for (const { address } of expected) {
+          expect(redisStore.get(PEER_STATUS_KEY_PREFIX + address)).toBe(JSON.stringify(ConnectivityStatus.ONLINE))
+        }
+        expect(mockLogs.getLogger('peer-tracking-component').error).toHaveBeenCalledTimes(1)
+        expect(mockLogs.getLogger('peer-tracking-component').error).toHaveBeenCalledWith(
+          'Error applying peer status changes',
+          { failedCount: 1, error: 'Redis write failed' }
+        )
       })
 
       it('should bound the write/publish fan-out to the chunk size', async () => {

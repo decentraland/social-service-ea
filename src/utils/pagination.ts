@@ -5,7 +5,7 @@ export function getPage(limit: number, offset: number = 0) {
 }
 
 export function getPages(total: number, limit: number): number {
-  return Math.ceil(total / limit)
+  return limit > 0 ? Math.ceil(total / limit) : 0
 }
 
 export function getPaginationResultProperties(

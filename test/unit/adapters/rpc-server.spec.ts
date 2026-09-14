@@ -1,7 +1,14 @@
 import { createRpcServerComponent, createSubscribersContext } from '../../../src/adapters/rpc-server'
-import { IRPCServerComponent, ISubscribersContext, IUpdateHandlerComponent, RpcServerContext } from '../../../src/types'
+import {
+  IRPCServerComponent,
+  ISubscribersContext,
+  IUpdateHandlerComponent,
+  RpcServerContext
+} from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
-import { mockConfig, mockFriendsDB, mockLogs, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
+import { mockConfig, mockFriendsDB, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
+import { createLogsMockedComponent } from '../../mocks/components/logs'
+import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 import {
   BLOCK_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
@@ -15,6 +22,7 @@ import {
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { setupRpcRoutes } from '../../../src/controllers/routes/rpc.routes'
 import { createMockUpdateHandlerComponent } from '../../mocks/components/updates'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -31,10 +39,13 @@ describe('createRpcServerComponent', () => {
   let subscribersContext: ISubscribersContext
   let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
+  let mockLogs: jest.Mocked<ILoggerComponent>
 
   beforeEach(async () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
-    subscribersContext = createSubscribersContext()
+    mockLogs = createLogsMockedComponent()
+
+    subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
 
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')
@@ -160,31 +171,33 @@ describe('createRpcServerComponent', () => {
 
   describe('attachUser', () => {
     const address = '0x123'
+    const wsConnectionId = 'conn-1'
 
     it('should attach a user and register transport events', () => {
-      rpcServer.attachUser({ transport: mockTransport, address })
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
 
       expect(attachTransportMock).toHaveBeenCalledWith(mockTransport, {
         subscribersContext: expect.any(Object),
-        address
+        address,
+        wsConnectionId
       })
     })
 
     it('should create and store a new emitter for the user', () => {
-      rpcServer.attachUser({ transport: mockTransport, address })
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
 
-      const subscriber = subscribersContext.getOrAddSubscriber(address)
+      const subscriber = subscribersContext.getSubscriber(address)!
       expect(subscriber).toBeDefined()
       expect(subscriber.all).toBeDefined()
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
     })
 
     it('should not override existing subscriber for the same address', () => {
-      rpcServer.attachUser({ transport: mockTransport, address })
-      const firstSubscriber = subscribersContext.getOrAddSubscriber(address)
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
+      const firstSubscriber = subscribersContext.getSubscriber(address)!
 
-      rpcServer.attachUser({ transport: mockTransport, address })
-      const secondSubscriber = subscribersContext.getOrAddSubscriber(address)
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId: 'conn-2' })
+      const secondSubscriber = subscribersContext.getSubscriber(address)!
 
       expect(secondSubscriber).toBe(firstSubscriber)
     })
@@ -192,39 +205,42 @@ describe('createRpcServerComponent', () => {
     it('should maintain separate subscribers for different addresses', () => {
       const address2 = '0x456'
 
-      rpcServer.attachUser({ transport: mockTransport, address })
-      rpcServer.attachUser({ transport: mockTransport, address: address2 })
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
+      rpcServer.attachUser({ transport: mockTransport, address: address2, wsConnectionId: 'conn-2' })
 
-      const subscriber1 = subscribersContext.getOrAddSubscriber(address)
-      const subscriber2 = subscribersContext.getOrAddSubscriber(address2)
+      const subscriber1 = subscribersContext.getSubscriber(address)!
+      const subscriber2 = subscribersContext.getSubscriber(address2)!
 
       expect(subscriber1).not.toBe(subscriber2)
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address2)
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address2)
     })
   })
 
   describe('detachUser', () => {
     const address = '0x123'
+    const wsConnectionId = 'conn-1'
 
     beforeEach(() => {
-      rpcServer.attachUser({ transport: mockTransport, address })
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
       endIncomingOrOutgoingPrivateVoiceChatForUserMock.mockResolvedValue(undefined)
     })
 
-    it('should remove subscriber when detaching user', () => {
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+    it('should remove subscriber when detaching user', async () => {
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
 
-      rpcServer.detachUser(address)
+      rpcServer.detachUser(address, wsConnectionId)
 
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
+      // detach tears down synchronously; give any fire-and-forget cleanup a tick to settle
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
     })
 
     it('should clear subscriber events when detaching', () => {
-      const subscriber = subscribersContext.getOrAddSubscriber(address)
+      const subscriber = subscribersContext.getSubscriber(address)!
       const clearSpy = jest.spyOn(subscriber.all, 'clear')
 
-      rpcServer.detachUser(address)
+      rpcServer.detachUser(address, wsConnectionId)
 
       expect(clearSpy).toHaveBeenCalled()
     })
@@ -232,20 +248,42 @@ describe('createRpcServerComponent', () => {
     it('should handle detaching non-existent user', () => {
       const nonExistentAddress = '0x456'
 
-      expect(() => rpcServer.detachUser(nonExistentAddress)).not.toThrow()
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(nonExistentAddress)
+      expect(() => rpcServer.detachUser(nonExistentAddress, wsConnectionId)).not.toThrow()
+      expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(nonExistentAddress)
     })
 
     it('should end the incoming or outgoing private voice chat for the user when detaching', () => {
-      rpcServer.detachUser(address)
+      rpcServer.detachUser(address, wsConnectionId)
       expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).toHaveBeenCalledWith(address)
     })
 
-    it('should handle multiple detach calls for same user', () => {
-      rpcServer.detachUser(address)
-      rpcServer.detachUser(address)
+    it('should not end the private voice chat when a non-last connection detaches', () => {
+      // Same address connected from a second place (e.g. website + in-world client).
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId: 'conn-2' })
+      endIncomingOrOutgoingPrivateVoiceChatForUserMock.mockClear()
 
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
+      rpcServer.detachUser(address, wsConnectionId)
+
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).not.toHaveBeenCalled()
+    })
+
+    it('should end the private voice chat only once the last connection detaches', () => {
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId: 'conn-2' })
+
+      rpcServer.detachUser(address, wsConnectionId)
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).not.toHaveBeenCalled()
+
+      rpcServer.detachUser(address, 'conn-2')
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).toHaveBeenCalledWith(address)
+    })
+
+    it('should handle multiple detach calls for same user', async () => {
+      rpcServer.detachUser(address, wsConnectionId)
+      rpcServer.detachUser(address, wsConnectionId)
+
+      // detach tears down synchronously; give any fire-and-forget cleanup a tick to settle
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
     })
   })
 })

@@ -9,7 +9,8 @@ export function createInMemoryCacheComponent(): ICacheComponent {
 
   async function get<T>(key: string): Promise<T | null> {
     const value = cache.get(key)
-    return value || null
+    // Use nullish coalescing so legitimately falsy cached values (false, 0, '') aren't treated as a miss.
+    return value ?? null
   }
 
   async function put<T>(key: string, value: T): Promise<void> {
@@ -17,7 +18,8 @@ export function createInMemoryCacheComponent(): ICacheComponent {
   }
 
   async function mGet<T>(keys: string[]): Promise<T[]> {
-    return keys.map((key) => get(key)).filter((value) => value !== null) as T[]
+    const values = await Promise.all(keys.map((key) => get<T>(key)))
+    return values.filter((value) => value !== null) as T[]
   }
 
   return {

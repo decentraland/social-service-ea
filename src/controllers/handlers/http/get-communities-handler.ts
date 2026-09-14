@@ -1,26 +1,30 @@
-import { getPaginationParams } from '@dcl/platform-server-commons'
-import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { getPaginationParams, InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
+import { parseMembershipFilters } from '../../../utils/membership-filters'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
 import {
   CommunityWithUserInformationAndVoiceChat,
   CommunityPublicInformationWithVoiceChat,
-  CommunityOwnerNotFoundError
+  CommunityOwnerNotFoundError,
+  CommunitySearchResult
 } from '../../../logic/community'
+
+const MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE = 3
+const MAX_LIMIT_FOR_MINIMAL_RESPONSE = 50
+
+type GetCommunitiesResponse = PaginatedResponse<
+  | Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>
+  | Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
+  | CommunitySearchResult
+>
 
 export async function getCommunitiesHandler(
   context: Pick<
     HandlerContextWithPath<'communities' | 'logs', '/v1/communities'>,
     'components' | 'url' | 'verification'
   >
-): Promise<
-  HTTPResponse<
-    PaginatedResponse<
-      | Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>
-      | Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
-    >
-  >
-> {
+): Promise<HTTPResponse<GetCommunitiesResponse>> {
   const {
     components: { communities, logs },
     verification,
@@ -28,26 +32,65 @@ export async function getCommunitiesHandler(
   } = context
   const logger = logs.getLogger('get-communities-handler')
 
-  logger.info(`Getting communities`)
-
-  const userAddress = verification?.auth.toLowerCase()
+  const userAddress = verification?.auth?.toLowerCase()
+  const minimal = url.searchParams.get('minimal')?.toLowerCase() === 'true'
   const pagination = getPaginationParams(url.searchParams)
-  const search = url.searchParams.get('search')
-  const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
-  const onlyWithActiveVoiceChat = url.searchParams.get('onlyWithActiveVoiceChat')?.toLowerCase() === 'true'
-  const roles: CommunityRole[] = url.searchParams
-    .getAll('roles')
-    .filter((role) => Object.values(CommunityRole).includes(role as CommunityRole))
-    .map((role) => role as CommunityRole)
+  const search = url.searchParams.get('search')?.trim()
 
   try {
+    if (minimal) {
+      if (!userAddress) {
+        throw new NotAuthorizedError('Authentication required for minimal community search')
+      }
+
+      // Required, not just bounded: without a term the query returns every community, which turns
+      // name search into a walkable directory.
+      if (!search || search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
+        throw new InvalidRequestError(
+          `Search query must be at least ${MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE} characters when using minimal`
+        )
+      }
+
+      const limit = Math.min(pagination.limit, MAX_LIMIT_FOR_MINIMAL_RESPONSE)
+
+      logger.info('Searching communities with minimal response', {
+        userAddress,
+        search,
+        limit
+      })
+
+      const { communities: communitiesResult, total } = await communities.searchCommunities(search, {
+        userAddress,
+        limit,
+        offset: pagination.offset
+      })
+
+      return {
+        status: 200,
+        body: {
+          data: {
+            results: communitiesResult,
+            total,
+            page: Math.floor(pagination.offset / limit) + 1,
+            pages: Math.ceil(total / limit),
+            limit
+          }
+        }
+      }
+    }
+
+    logger.info(`Getting communities`)
+
+    const onlyWithActiveVoiceChat = url.searchParams.get('onlyWithActiveVoiceChat')?.toLowerCase() === 'true'
+    const { onlyMemberOf, roles } = parseMembershipFilters(url.searchParams, userAddress)
+
     const { communities: communitiesData, total } = userAddress
       ? await communities.getCommunities(userAddress, {
           pagination,
           search,
           onlyMemberOf,
           onlyWithActiveVoiceChat,
-          roles: roles?.length > 0 ? roles : undefined
+          roles
         })
       : await communities.getCommunitiesPublicInformation({ pagination, search, onlyWithActiveVoiceChat })
 
@@ -67,7 +110,11 @@ export async function getCommunitiesHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting communities: ${message}`)
 
-    if (error instanceof CommunityOwnerNotFoundError) {
+    if (
+      error instanceof CommunityOwnerNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

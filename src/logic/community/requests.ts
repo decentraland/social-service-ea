@@ -1,5 +1,5 @@
 import { Events, PaginatedParameters } from '@dcl/schemas'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityRequestNotFoundError, InvalidCommunityRequestError } from './errors'
 import {
@@ -9,6 +9,7 @@ import {
   CommunityRequestType,
   ICommunityRequestsComponent,
   MemberCommunityRequest,
+  MemberCommunityRequestV2,
   ListCommunityRequestsOptions,
   RequestActionOptions
 } from './types'
@@ -25,7 +26,7 @@ export function createCommunityRequestsComponent(
     | 'communityRoles'
     | 'communityThumbnail'
     | 'communityBroadcaster'
-    | 'catalystClient'
+    | 'registry'
     | 'pubsub'
     | 'logs'
     | 'analytics'
@@ -37,7 +38,7 @@ export function createCommunityRequestsComponent(
     communityRoles,
     communityThumbnail,
     communityBroadcaster,
-    catalystClient,
+    registry,
     pubsub,
     logs,
     analytics
@@ -106,25 +107,36 @@ export function createCommunityRequestsComponent(
     callerAddress: string
   ): Promise<MemberRequest> {
     let createdRequest: MemberRequest
-    const community = await communitiesDb.getCommunity(communityId, memberAddress)
+    const community = await communitiesDb.getCommunity(communityId)
     if (!community) {
       throw new CommunityNotFoundError(communityId)
+    }
+
+    // Authorize the caller before reading anything about the target. The outcomes differ — 400 when
+    // the target is already a member or 401 when it is not, and a distinct 401 when it is banned —
+    // so deciding those first let a caller with no standing walk a private roster one address at a
+    // time, the same roster the members endpoint refuses to non-members. kickMember orders it this
+    // way for the same reason.
+    if (type === CommunityRequestType.Invite) {
+      await communityRoles.validatePermissionToInviteUsers(communityId, callerAddress)
+    } else if (memberAddress.toLowerCase() !== callerAddress.toLowerCase()) {
+      throw new InvalidCommunityRequestError(`User trying to impersonate another user`)
     }
 
     if (community.privacy === CommunityPrivacyEnum.Public && type === CommunityRequestType.RequestToJoin) {
       throw new InvalidCommunityRequestError(`Public communities do not accept requests to join`)
     }
 
-    if (community.role !== CommunityRole.None) {
+    const isBanned = await communitiesDb.isMemberBanned(communityId, memberAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(`The user ${memberAddress} is banned from the community ${communityId}`)
+    }
+
+    const memberRole = await communitiesDb.getCommunityMemberRole(communityId, memberAddress)
+    if (memberRole !== CommunityRole.None) {
       throw new InvalidCommunityRequestError(
         `User cannot join since it is already a member of the community: ${community.name} (${community.id})`
       )
-    }
-
-    if (type === CommunityRequestType.Invite) {
-      await communityRoles.validatePermissionToInviteUsers(communityId, callerAddress)
-    } else if (memberAddress.toLowerCase() !== callerAddress.toLowerCase()) {
-      throw new InvalidCommunityRequestError(`User trying to impersonate another user`)
     }
 
     const existingMemberRequests = await communitiesDb.getCommunityRequests(communityId, {
@@ -178,27 +190,8 @@ export function createCommunityRequestsComponent(
       )
     }
 
-    setImmediate(async () => {
-      let memberName: string | undefined
-
-      try {
-        if (
-          createdRequest.type === CommunityRequestType.RequestToJoin &&
-          createdRequest.status === CommunityRequestStatus.Pending
-        ) {
-          const memberProfile = await catalystClient.getProfile(createdRequest.memberAddress)
-          memberName = getProfileName(memberProfile)
-        }
-      } catch (error) {
-        logger.warn(`Failed to fetch profile for member ${createdRequest.memberAddress}: ${error}`)
-      }
-
-      await notifyStakeholdersAboutRequest(createdRequest, {
-        communityId,
-        communityName: community.name,
-        memberAddress,
-        memberName
-      })
+    void notifyAboutNewRequest(createdRequest, communityId, community.name, memberAddress).catch((error: any) => {
+      logger.error('Unhandled error in notifyAboutNewRequest', { error: error.message, communityId })
     })
 
     return createdRequest
@@ -269,6 +262,13 @@ export function createCommunityRequestsComponent(
 
     // User accepts invite or member with privileges accepts request to join
     if (status === CommunityRequestStatus.Accepted) {
+      const isBanned = await communitiesDb.isMemberBanned(request.communityId, request.memberAddress)
+      if (isBanned) {
+        throw new NotAuthorizedError(
+          `The user ${request.memberAddress} is banned from the community ${request.communityId}`
+        )
+      }
+
       await communitiesDb.joinMemberAndRemoveRequests({
         communityId: request.communityId,
         memberAddress: request.memberAddress,
@@ -315,15 +315,18 @@ export function createCommunityRequestsComponent(
       })
     }
 
-    setImmediate(async () => {
-      await notifyStakeholdersAboutRequest(
-        { ...request, status },
-        {
-          communityId: community.id,
-          communityName: community.name,
-          memberAddress: request.memberAddress
-        }
-      )
+    void notifyStakeholdersAboutRequest(
+      { ...request, status },
+      {
+        communityId: community.id,
+        communityName: community.name,
+        memberAddress: request.memberAddress
+      }
+    ).catch((error: any) => {
+      logger.error('Unhandled error in notifyStakeholdersAboutRequest', {
+        error: error.message,
+        communityId: community.id
+      })
     })
   }
 
@@ -402,11 +405,64 @@ export function createCommunityRequestsComponent(
       .filter(Boolean) as MemberCommunityRequest[]
   }
 
+  async function aggregateRequestsWithCommunitiesWithoutProfiles(
+    memberAddress: string,
+    requests: MemberRequest[]
+  ): Promise<MemberCommunityRequestV2[]> {
+    if (requests.length === 0) {
+      return []
+    }
+
+    const communityIds = requests.map((request) => request.communityId)
+    const { communities: communityData } = await communities.getCommunitiesWithoutProfiles(memberAddress, {
+      communityIds,
+      pagination: { limit: communityIds.length, offset: 0 },
+      includeUnlisted: true
+    })
+
+    return requests
+      .map((request) => {
+        const community = communityData.find((community) => community.id === request.communityId)
+        if (!community) {
+          logger.warn(`Community ${request.communityId} not found for request ${request.id}`)
+          return undefined
+        }
+
+        const { id, ...communityWithoutId } = community // prevent id override
+        return {
+          ...communityWithoutId,
+          ...request
+        } as MemberCommunityRequestV2
+      })
+      .filter(Boolean) as MemberCommunityRequestV2[]
+  }
+
+  async function notifyAboutNewRequest(
+    request: MemberRequest,
+    communityId: string,
+    communityName: string,
+    memberAddress: string
+  ) {
+    let memberName: string | undefined
+
+    try {
+      if (request.type === CommunityRequestType.RequestToJoin && request.status === CommunityRequestStatus.Pending) {
+        const memberProfile = await registry.getProfile(request.memberAddress)
+        memberName = getProfileName(memberProfile)
+      }
+    } catch (error) {
+      logger.warn(`Failed to fetch profile for member ${request.memberAddress}: ${error}`)
+    }
+
+    await notifyStakeholdersAboutRequest(request, { communityId, communityName, memberAddress, memberName })
+  }
+
   return {
     createCommunityRequest,
     getMemberRequests,
     getCommunityRequests,
     updateRequestStatus,
-    aggregateRequestsWithCommunities
+    aggregateRequestsWithCommunities,
+    aggregateRequestsWithCommunitiesWithoutProfiles
   }
 }

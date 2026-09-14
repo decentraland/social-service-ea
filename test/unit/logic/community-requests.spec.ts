@@ -18,13 +18,13 @@ import {
   CommunityDB,
   CommunityVisibilityEnum
 } from '../../../src/logic/community'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
 import { createMockedPubSubComponent, mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { CommunityRole, IPubSubComponent } from '../../../src/types'
-import { ICatalystClientComponent } from '../../../src/types'
-import { createMockCatalystClient } from '../../mocks/components/catalyst-client'
+import { IRegistryComponent } from '../../../src/types'
+import { createMockRegistry } from '../../mocks/components/registry'
 import {
   createMockCommunitiesComponent,
   createMockCommunityBroadcasterComponent,
@@ -48,14 +48,14 @@ describe('Community Requests Component', () => {
   let mockCommunityBroadcaster: ICommunityBroadcasterComponent
   let mockCommunityThumbnail: ICommunityThumbnailComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
-  let mockCatalystClient: jest.Mocked<ICatalystClientComponent>
+  let mockRegistry: jest.Mocked<IRegistryComponent>
   let mockPubsub: jest.Mocked<IPubSubComponent>
   let mockAnalytics: ReturnType<typeof createMockedAnalyticsComponent>
 
   beforeEach(() => {
     communitiesComponent = createMockCommunitiesComponent({})
     mockCommunityRoles = createMockCommunityRolesComponent({})
-    mockCatalystClient = createMockCatalystClient()
+    mockRegistry = createMockRegistry()
     mockAnalytics = createMockedAnalyticsComponent({})
     // Ensure logs.getLogger returns a valid logger after mock resets
     mockLogs.getLogger.mockReturnValue({
@@ -74,7 +74,7 @@ describe('Community Requests Component', () => {
       communityRoles: mockCommunityRoles,
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       pubsub: mockPubsub,
       logs: mockLogs,
       analytics: mockAnalytics
@@ -105,6 +105,38 @@ describe('Community Requests Component', () => {
         await expect(
           communityRequestsComponent.createCommunityRequest(communityId, userAddress, type, callerAddress)
         ).rejects.toThrow(CommunityNotFoundError)
+      })
+    })
+
+    describe('when the target user is banned from the community', () => {
+      let community: Community & { role: CommunityRole }
+      let userAddress: string
+      let callerAddress: string
+      let type: CommunityRequestType
+
+      beforeEach(() => {
+        userAddress = '0x1234567890123456789012345678901234567890'
+        callerAddress = userAddress
+        type = CommunityRequestType.RequestToJoin
+        community = {
+          id: randomUUID(),
+          name: 'Mock Community',
+          description: 'Mock Description',
+          ownerAddress: '0x1234567890123456789012345678901234567891',
+          privacy: CommunityPrivacyEnum.Private,
+          active: true,
+          role: CommunityRole.None,
+          visibility: CommunityVisibilityEnum.All
+        }
+        mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+        mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
+      })
+
+      it('should throw a NotAuthorizedError and not create the request', async () => {
+        await expect(
+          communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+        ).rejects.toThrow(NotAuthorizedError)
+        expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
       })
     })
 
@@ -200,7 +232,7 @@ describe('Community Requests Component', () => {
 
           describe('and user does not belong to community', () => {
             beforeEach(() => {
-              community.role = CommunityRole.None
+              mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
             })
 
             describe('and there are no pending requests for the user', () => {
@@ -295,7 +327,7 @@ describe('Community Requests Component', () => {
 
           describe('and user already belongs to community', () => {
             beforeEach(() => {
-              community.role = CommunityRole.Member
+              mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
             })
 
             it('should throw an InvalidCommunityRequestError with correct message', async () => {
@@ -356,7 +388,7 @@ describe('Community Requests Component', () => {
 
         describe('and user does not belong to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.None
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
           })
 
           describe('and there are no pending requests for the user', () => {
@@ -374,7 +406,7 @@ describe('Community Requests Component', () => {
                   }
                 ]
               }
-              mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+              mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
             })
 
             it('should create and return the request as pending', async () => {
@@ -422,14 +454,14 @@ describe('Community Requests Component', () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               // Wait for async broadcast
               await new Promise((resolve) => setImmediate(resolve))
-              expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(userAddress)
+              expect(mockRegistry.getProfile).toHaveBeenCalledWith(userAddress)
             })
           })
 
           describe('and profile fetch fails', () => {
             beforeEach(() => {
               mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
-              mockCatalystClient.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
+              mockRegistry.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
             })
 
             it('should still broadcast the request to join received event with Unknown as member name', async () => {
@@ -560,7 +592,7 @@ describe('Community Requests Component', () => {
 
         describe('and user already belongs to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.Member
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
           })
 
           it('should throw an InvalidCommunityRequestError with correct message', async () => {
@@ -607,11 +639,46 @@ describe('Community Requests Component', () => {
               communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
             ).rejects.toThrow(NotAuthorizedError)
           })
+
+          it('should resolve the community without the target address and read nothing else about the target', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(NotAuthorizedError)
+
+            // Never read for an unauthorized caller: the 400/401 split is what leaked the roster.
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(community.id)
+            expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.getCommunityMemberRole).not.toHaveBeenCalled()
+          })
+
+          describe('and the target already belongs to the community', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
+            })
+
+            it('should throw a NotAuthorizedError instead of the InvalidCommunityRequestError that discloses the membership', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow(NotAuthorizedError)
+            })
+          })
+
+          describe('and the target is banned from the community', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
+            })
+
+            it('should throw a NotAuthorizedError that does not name the ban', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow('User does not have permission')
+            })
+          })
         })
 
         describe('and user does not belong to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.None
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
           })
 
           describe('and there are no pending requests for the user', () => {
@@ -659,7 +726,7 @@ describe('Community Requests Component', () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               // Wait for async broadcast
               await new Promise((resolve) => setImmediate(resolve))
-              expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
+              expect(mockRegistry.getProfile).not.toHaveBeenCalled()
             })
 
             it('should not include member name in invite received event', async () => {
@@ -761,7 +828,7 @@ describe('Community Requests Component', () => {
 
         describe('and user already belongs to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.Member
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
             mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
           })
 
@@ -995,6 +1062,32 @@ describe('Community Requests Component', () => {
           await expect(
             communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
           ).rejects.toThrow(CommunityRequestNotFoundError)
+        })
+      })
+
+      describe('and the invited user is banned from the community', () => {
+        let bannedUserAddress: string
+        let pendingInvite: MemberRequest
+
+        beforeEach(() => {
+          bannedUserAddress = '0x1111111111111111111111111111111111111111'
+          callerAddress = bannedUserAddress
+          pendingInvite = {
+            id: requestId,
+            communityId: community.id,
+            memberAddress: bannedUserAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(pendingInvite)
+          mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
+        })
+
+        it('should throw NotAuthorizedError and not add the banned user as a member when accepting', async () => {
+          await expect(
+            communityRequestsComponent.updateRequestStatus(requestId, CommunityRequestStatus.Accepted, { callerAddress })
+          ).rejects.toThrow(NotAuthorizedError)
+          expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
         })
       })
 

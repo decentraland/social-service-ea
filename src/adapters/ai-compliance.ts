@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import crypto from 'crypto'
 import { generateLazyValidator, JSONSchema, ValidateFunction } from '@dcl/schemas'
+import { SupportedImageMimeType } from '../logic/community/image-signature'
 import { AppComponents } from '../types'
 import { AIComplianceError } from '../logic/community/errors'
 import { errorMessageOrDefault } from '../utils/errors'
@@ -16,12 +17,20 @@ export type ComplianceValidationResult = {
   confidence: number
 }
 
+/**
+ * Content to validate.
+ *
+ * A thumbnail and its media type travel together: the provider is told what the bytes are, and
+ * pairing them in the type keeps a caller from supplying bytes with no label, which would leave the
+ * adapter guessing.
+ */
 export type ComplianceValidationRequest = {
   name?: string
   description?: string
-  thumbnailBuffer?: Buffer
-  thumbnailMime?: 'image/png' | 'image/jpeg' | 'image/gif'
-}
+} & (
+  | { thumbnailBuffer: Buffer; thumbnailMime: SupportedImageMimeType }
+  | { thumbnailBuffer?: undefined; thumbnailMime?: undefined }
+)
 
 export interface IAIComplianceComponent {
   validateCommunityContent(request: ComplianceValidationRequest): Promise<ComplianceValidationResult>
@@ -141,7 +150,7 @@ export async function createAIComplianceComponent(
 
         // Add image if provided
         if (request.thumbnailBuffer) {
-          const imageDataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
+          const imageDataUrl = `data:${request.thumbnailMime};base64,${request.thumbnailBuffer.toString('base64')}`
           input = [
             {
               type: 'message',

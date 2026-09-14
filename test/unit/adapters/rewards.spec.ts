@@ -2,7 +2,7 @@ import { createRewardComponent } from '../../../src/adapters/rewards'
 import { ChainId, Rarity } from '@dcl/schemas'
 import { RewardAttributes, RewardStatus } from '../../../src/logic/referral/types'
 import { IRewardComponent } from '../../../src/types'
-import { mockConfig, mockFetcher } from '../../mocks/components'
+import { mockConfig, mockFetcher, createLogsMockedComponent } from '../../mocks/components'
 
 const mockRewardData = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -39,14 +39,17 @@ const mockRewardTestData = {
 describe('RewardComponent', () => {
   let rewardComponent: IRewardComponent
   let mockRewardUrl: string
+  let mockWarn: jest.Mock
 
   beforeEach(async () => {
     mockRewardUrl = mockRewardTestData.rewardUrl
     mockConfig.requireString.mockResolvedValue(mockRewardUrl)
+    mockWarn = jest.fn()
 
     rewardComponent = await createRewardComponent({
       fetcher: mockFetcher,
-      config: mockConfig
+      config: mockConfig,
+      logs: createLogsMockedComponent({ warn: mockWarn })
     })
   })
 
@@ -122,6 +125,27 @@ describe('RewardComponent', () => {
           })
         )
         expect(result).toEqual([])
+      })
+    })
+
+    describe('when the response is ok but the data field is missing or not an array', () => {
+      beforeEach(() => {
+        mockFetcher.fetch.mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ ok: true }),
+          text: jest.fn().mockResolvedValue('')
+        } as any)
+      })
+
+      it('should return an empty array and log a warning', async () => {
+        const result = await rewardComponent.sendReward(campaignKey, beneficiary)
+
+        expect(result).toEqual([])
+        expect(mockWarn).toHaveBeenCalledWith(
+          'Reward server response did not contain a data array; returning no rewards',
+          { campaignKey, beneficiary }
+        )
       })
     })
 

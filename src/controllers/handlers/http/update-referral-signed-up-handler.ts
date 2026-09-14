@@ -1,5 +1,5 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { InvalidRequestError, NotFoundError } from '@dcl/platform-server-commons'
+import { IHttpServerComponent } from '@dcl/core-commons'
+import { InvalidRequestError, NotFoundError } from '@dcl/http-commons'
 import { ReferralProgressStatus } from '../../../types/referral-db.type'
 import { HandlerContextWithPath } from '../../../types/http'
 import { errorMessageOrDefault } from '../../../utils/errors'

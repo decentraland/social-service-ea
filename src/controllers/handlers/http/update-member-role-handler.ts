@@ -1,5 +1,5 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { EthAddress } from '@dcl/schemas'

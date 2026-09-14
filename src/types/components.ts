@@ -1,5 +1,5 @@
 import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
-import { IPgComponent as IBasePgComponent } from '@well-known-components/pg-component'
+import { IPgComponent as IBasePgComponent } from '@dcl/pg-component'
 import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
 import { Transport } from '@dcl/rpc'
@@ -43,7 +43,8 @@ import {
   CommunityPostWithLikes,
   GetCommunityPostsOptions,
   CommunityRankingMetrics,
-  CommunityRankingMetricsDB
+  CommunityRankingMetricsDB,
+  CommunityPrivacyEnum
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -60,10 +61,20 @@ export interface IRpcClient extends IBaseComponent {
 }
 
 export type IRPCServerComponent = IBaseComponent & {
-  attachUser(user: { transport: Transport; address: string }): void
-  detachUser(address: string): void
+  attachUser(user: { transport: Transport; address: string; wsConnectionId: string }): void
+  detachUser(address: string, wsConnectionId: string): void
   setServiceCreators(creators: RpcServiceCreators): void
 }
+
+export interface IUserMutesDatabaseComponent {
+  addMute(muterAddress: string, mutedAddress: string): Promise<{ muted_at: Date }>
+  removeMute(muterAddress: string, mutedAddress: string): Promise<void>
+  getMutedUsers(
+    muterAddress: string,
+    options?: { pagination?: Pagination; address?: string; addresses?: string[] }
+  ): Promise<{ mutes: { address: string; muted_at: Date }[]; total: number }>
+}
+
 export interface IFriendsDatabaseComponent {
   createFriendship(
     users: [string, string],
@@ -123,7 +134,9 @@ export interface IFriendsDatabaseComponent {
   unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
-  getBlockedUsers(blockerAddress: string): Promise<BlockedUserWithDate[]>
+  /** Returns the complete list unless `pagination` is supplied. See the note on the implementation. */
+  getBlockedUsers(blockerAddress: string, pagination?: Pagination): Promise<BlockedUserWithDate[]>
+  getBlockedUsersCount(blockerAddress: string): Promise<number>
   getBlockedByUsers(blockedAddress: string): Promise<BlockedUserWithDate[]>
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
@@ -132,6 +145,7 @@ export interface IFriendsDatabaseComponent {
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string, options?: Pick<GetCommunitiesOptions, 'onlyPublic'>): Promise<boolean>
   getCommunity(id: string, userAddress?: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
+  getCommunityPublicInformation(id: string): Promise<Omit<CommunityPublicInformation, 'ownerName'> | null>
   getCommunityPlaces(communityId: string, pagination?: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
   communityPlaceExists(communityId: string, placeId: string): Promise<boolean>
@@ -148,7 +162,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds'>
+    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'onlyPublicVisible'>
   ): Promise<number>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
@@ -176,7 +190,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
   ): Promise<MemberCommunity[]>
   getOnlineMembersFromUserCommunities(
     userAddress: EthAddress,
@@ -190,6 +204,14 @@ export interface ICommunitiesDatabaseComponent {
     unbannedMemberAddress: EthAddress
   ): Promise<void>
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
+  /**
+   * Resolves which of the given addresses are actively banned from the community, in one query.
+   *
+   * @param communityId - Community ID
+   * @param memberAddresses - Addresses to look up
+   * @returns The normalized subset of the given addresses that is banned
+   */
+  getBannedMemberAddresses(communityId: string, memberAddresses: EthAddress[]): Promise<string[]>
   getBannedMembers(communityId: string, userAddress: EthAddress, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
   updateCommunity(
@@ -218,6 +240,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<number>
   getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
   removeCommunityRequest(requestId: string): Promise<void>
+  removeMemberRequests(communityId: string, memberAddress: EthAddress): Promise<void>
   joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<string | undefined>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
   acceptAllRequestsToJoin(communityId: string): Promise<string[]>
@@ -245,11 +268,26 @@ export interface ICommunitiesDatabaseComponent {
       >
     >
   ): Promise<void>
+  getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>>
+  /**
+   * Searches communities by name for a specific caller.
+   *
+   * The address is required, not incidental: it is what the query filters unlisted communities and
+   * bans against, so a caller without one would search the whole table.
+   */
+  searchCommunities(
+    search: string,
+    options: { userAddress: EthAddress; limit: number; offset: number }
+  ): Promise<{
+    results: Array<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>
+    total: number
+  }>
 }
 
 export interface IVoiceDatabaseComponent {
   areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
+  /** Returns null when either participant already has a pending call. */
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string | null>
   getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   getPrivateVoiceChatForCalleeAddress(calleeAddress: string): Promise<PrivateVoiceChat | null>
@@ -259,6 +297,11 @@ export interface IVoiceDatabaseComponent {
 
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
+  sAdd: (key: string, member: string) => Promise<number>
+  sRem: (key: string, members: string | string[]) => Promise<number>
+  sMembers: (key: string) => Promise<string[]>
+  sCard: (key: string) => Promise<number>
+  consumeRateLimit: (key: string, limit: number, windowSeconds: number) => Promise<boolean>
 }
 
 export interface ICacheComponent extends IBaseCacheComponent {
@@ -294,8 +337,6 @@ export type ICatalystClientRequestOptions = {
 }
 
 export type ICatalystClientComponent = {
-  getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
-  getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
   getOwnedNames(
     address: EthAddress,
     params?: GetNamesParams,
@@ -303,20 +344,43 @@ export type ICatalystClientComponent = {
   ): Promise<OwnedName[]>
 }
 
+export interface IRegistryComponent {
+  getProfiles(ids: string[]): Promise<Profile[]>
+  getProfile(id: string): Promise<Profile>
+}
+
 export interface ICdnCacheInvalidatorComponent {
   invalidateThumbnail(communityId: string): Promise<void>
 }
 
-export type ISubscribersContext = {
+export type ISubscribersContext = IBaseComponent & {
   getSubscribers: () => Subscribers
-  getSubscribersAddresses: () => string[]
-  getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
-  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => void
-  removeSubscriber: (address: string) => void
+  getLocalSubscribersAddresses: () => string[]
+  /**
+   * Get an existing subscriber without creating one if it doesn't exist.
+   * Use this in update handlers to avoid creating orphaned emitters.
+   */
+  getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
+  /**
+   * Register a live connection for an address, creating the shared emitter on the
+   * first connection. Multiple concurrent connections per address are supported.
+   */
+  addConnection: (address: string, wsConnectionId: string) => void
+  /**
+   * Remove a connection for an address. Tears down only that connection's generators and
+   * active-subscription state. Returns true if it was the last connection for the address
+   * (the shared emitter is cleared).
+   */
+  removeConnection: (address: string, wsConnectionId: string) => boolean
+  registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  unregisterGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  hasActiveSubscription: (wsConnectionId: string, eventName: string) => boolean
+  setActiveSubscription: (wsConnectionId: string, eventName: string) => void
+  clearActiveSubscription: (wsConnectionId: string, eventName: string) => void
 }
 
 export type ITracingComponent = IBaseComponent & {
-  captureException(error: Error, context?: Record<string, any>): void
+  captureException(error: unknown, context?: Record<string, any>): void
 }
 
 export type ICommsGatekeeperComponent = {
@@ -383,6 +447,8 @@ export interface IPgComponent extends IBasePgComponent {
 }
 
 export interface ICommunitiesDbHelperComponent {
+  forceRankingMetricValue(communityId: string, metric: string, value: number): Promise<void>
+  getRankingMetricValue(communityId: string, metric: string): Promise<number | undefined>
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
   forceCommunityRequestRemoval: (requestId: string) => Promise<void>
@@ -390,7 +456,7 @@ export interface ICommunitiesDbHelperComponent {
 }
 
 export interface IStorageComponent {
-  storeFile: (file: Buffer, key: string) => Promise<string>
+  storeFile: (file: Buffer, key: string, contentType?: string) => Promise<string>
   exists: (key: string) => Promise<boolean>
   existsMultiple: (keys: string[]) => Promise<Record<string, boolean>>
 }
@@ -400,7 +466,7 @@ export interface IStorageHelperComponent {
 }
 
 export interface IPlacesApiComponent {
-  getPlaces: (placesIds: string[]) => Promise<PlacesApiResponse['data']>
+  getDestinations: (placeIds: string[], worldNames: string[]) => Promise<PlacesApiResponse['data']>
 }
 
 export interface IUpdateHandlerComponent {

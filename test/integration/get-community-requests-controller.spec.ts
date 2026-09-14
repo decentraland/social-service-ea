@@ -103,7 +103,7 @@ test('Get Community Requests Controller', function ({ components, spyComponents 
             queryParameters = '?limit=10&offset=0'
 
             // Mock profile responses for the requesting members
-            spyComponents.catalystClient.getProfiles.mockResolvedValue(
+            spyComponents.registry.getProfiles.mockResolvedValue(
               createMockProfiles([memberAddress1, memberAddress2])
             )
           })
@@ -317,7 +317,7 @@ test('Get Community Requests Controller', function ({ components, spyComponents 
             )
 
             // Mock profile response
-            spyComponents.catalystClient.getProfiles.mockResolvedValue(
+            spyComponents.registry.getProfiles.mockResolvedValue(
               createMockProfiles([memberAddress1])
             )
           })

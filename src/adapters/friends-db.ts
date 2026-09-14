@@ -4,6 +4,7 @@ import { PoolClient } from 'pg'
 import {
   AppComponents,
   Friendship,
+  Action,
   FriendshipAction,
   FriendshipRequest,
   IFriendsDatabaseComponent,
@@ -14,6 +15,7 @@ import {
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
+import { normalizeFriendshipRequestsPagination } from '../utils/friendship-pagination'
 import {
   getFriendsBaseQuery,
   getFriendsFromListBaseQuery,
@@ -28,7 +30,8 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
 
   function getFriendshipRequests(type: FriendshipRequestType) {
     return async (userAddress: string, pagination?: Pagination) => {
-      const query = getFriendshipRequestsBaseQuery(userAddress, type, { pagination })
+      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
+      const query = getFriendshipRequestsBaseQuery(userAddress, type, { pagination: boundedPagination })
       const result = await pg.query<FriendshipRequest>(query)
       return result.rows
     }
@@ -77,11 +80,32 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const normalizedFriendUser = normalizeAddress(friendUser)
 
       const query = SQL`
-        SELECT fa.*
-        FROM friendships f
-        INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-        WHERE (f.address_requester, f.address_requested) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
-        ORDER BY fa.timestamp DESC LIMIT 1
+        WITH friendship_action AS (
+          SELECT fa.id, fa.friendship_id, fa.action, fa.acting_user, fa.metadata, fa.timestamp
+          FROM friendships f
+          INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
+          WHERE (f.address_requester, f.address_requested) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
+          ORDER BY fa.timestamp DESC
+          LIMIT 1
+        ),
+        block_action AS (
+          SELECT
+            b.id,
+            NULL::uuid as friendship_id,
+            ${Action.BLOCK} as action,
+            b.blocker_address as acting_user,
+            NULL::json as metadata,
+            b.blocked_at as timestamp
+          FROM blocks b
+          WHERE (b.blocker_address, b.blocked_address) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
+            AND NOT EXISTS (SELECT 1 FROM friendship_action)
+          LIMIT 1
+        )
+        SELECT * FROM friendship_action
+        UNION ALL
+        SELECT * FROM block_action
+        ORDER BY timestamp DESC
+        LIMIT 1
       `
 
       const results = await pg.query<FriendshipAction>(query)
@@ -146,37 +170,43 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const normalizedUserAddress = normalizeAddress(userAddress)
       const normalizedOnlinePotentialFriends = onlinePotentialFriends.map(normalizeAddress)
 
+      // The block check has to be correlated with each resolved friend address. Comparing it
+      // against the whole candidate array makes the subquery a constant for the entire query,
+      // so a single block anywhere in the list empties the result.
       const query: SQLStatement = SQL`
-        SELECT DISTINCT
-          CASE
-            WHEN address_requester = ${normalizedUserAddress} THEN address_requested
-            ELSE address_requester
-          END as address
-        FROM friendships
-        WHERE (
-          (address_requester = ${normalizedUserAddress} AND address_requested = ANY(${normalizedOnlinePotentialFriends}))
-          OR
-          (address_requested = ${normalizedUserAddress} AND address_requester = ANY(${normalizedOnlinePotentialFriends}))
+        WITH online_friends AS (
+          SELECT DISTINCT
+            CASE
+              WHEN address_requester = ${normalizedUserAddress} THEN address_requested
+              ELSE address_requester
+            END as address
+          FROM friendships
+          WHERE (
+            (address_requester = ${normalizedUserAddress} AND address_requested = ANY(${normalizedOnlinePotentialFriends}))
+            OR
+            (address_requested = ${normalizedUserAddress} AND address_requester = ANY(${normalizedOnlinePotentialFriends}))
+          )
+          AND is_active = true
         )
-        AND NOT EXISTS (
+        SELECT address FROM online_friends
+        WHERE NOT EXISTS (
           SELECT 1 FROM blocks
-          WHERE (blocker_address = ${normalizedUserAddress} AND blocked_address = ANY(${normalizedOnlinePotentialFriends}))
-          OR (blocker_address = ANY(${normalizedOnlinePotentialFriends}) AND blocked_address = ${normalizedUserAddress})
-        )
-        AND is_active = true`
+          WHERE (blocker_address = ${normalizedUserAddress} AND blocked_address = online_friends.address)
+          OR (blocker_address = online_friends.address AND blocked_address = ${normalizedUserAddress})
+        )`
 
       const results = await pg.query<User>(query)
       return results.rows
     },
     async getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]> {
       const query = SQL`
-        SELECT * FROM social_settings WHERE address = ANY(${userAddresses})
+        SELECT * FROM social_settings WHERE address = ANY(${userAddresses.map(normalizeAddress)})
       `
       const results = await pg.query<{ private_messages_privacy: string }>(query)
       return results.rows as SocialSettings[]
     },
     async deleteSocialSettings(userAddress: string): Promise<void> {
-      const query = SQL`DELETE FROM social_settings WHERE address = ${userAddress}`
+      const query = SQL`DELETE FROM social_settings WHERE address = ${normalizeAddress(userAddress)}`
       await pg.query(query)
     },
     async upsertSocialSettings(
@@ -203,7 +233,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
         .append(values)
         .append(`) ON CONFLICT (address) DO UPDATE SET `)
         .append(update)
-        .append(SQL` WHERE social_settings.address = ${userAddress} RETURNING *`)
+        .append(SQL` WHERE social_settings.address = ${normalizeAddress(userAddress)} RETURNING *`)
       const results = await pg.query<SocialSettings>(query)
       return results.rows[0]
     },
@@ -238,6 +268,10 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       }
     },
     async blockUsers(blockerAddress, blockedAddresses) {
+      if (blockedAddresses.length === 0) {
+        return
+      }
+
       const query = SQL`INSERT INTO blocks (id, blocker_address, blocked_address) VALUES `
 
       blockedAddresses.forEach((blockedAddress, index) => {
@@ -258,12 +292,26 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       `
       await pg.query(query)
     },
-    async getBlockedUsers(blockerAddress) {
+    // Unpaginated by default on purpose: getBlockingStatus needs the complete set to build the
+    // client's blocking cache, and a silently truncated list makes blocked avatars reappear.
+    // Callers that render a page pass pagination explicitly.
+    async getBlockedUsers(blockerAddress, pagination) {
       const query = SQL`
         SELECT blocked_address as address, blocked_at FROM blocks WHERE blocker_address = ${normalizeAddress(blockerAddress)}
       `
+
+      if (pagination) {
+        query.append(SQL` ORDER BY blocked_at DESC, blocked_address ASC`)
+        query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+      }
+
       const result = await pg.query<BlockedUserWithDate>(query)
       return result.rows
+    },
+    async getBlockedUsersCount(blockerAddress) {
+      return pg.getCount(SQL`
+        SELECT COUNT(*) as count FROM blocks WHERE blocker_address = ${normalizeAddress(blockerAddress)}
+      `)
     },
     async getBlockedByUsers(blockedAddress) {
       const query = SQL`

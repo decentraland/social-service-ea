@@ -8,6 +8,7 @@ import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
 import { IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
+import { InvalidRequestError } from '@dcl/http-commons'
 
 describe('CommunityComplianceValidator', () => {
   let aiComplianceMock: jest.Mocked<IAIComplianceComponent>
@@ -128,17 +129,53 @@ describe('CommunityComplianceValidator', () => {
         })
 
         it('should validate only the thumbnail field', async () => {
-          const thumbnail = Buffer.from('fake-image-data')
+          const thumbnail = Buffer.alloc(2048)
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(thumbnail)
 
           const result = await complianceValidator.validateCommunityContent({ thumbnailBuffer: thumbnail })
 
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
             name: undefined,
             description: undefined,
-            thumbnailBuffer: thumbnail
+            thumbnailBuffer: thumbnail,
+            thumbnailMime: 'image/png'
           })
 
           expect(result).toBeUndefined()
+        })
+
+        describe('and the bytes carry no supported signature', () => {
+          let thrown: unknown
+
+          beforeEach(async () => {
+            thrown = await complianceValidator
+              .validateCommunityContent({ thumbnailBuffer: Buffer.from('not-an-image') })
+              .catch((error: unknown) => error)
+          })
+
+          it('should refuse rather than send unlabelled bytes to the provider', () => {
+            expect(thrown).toBeInstanceOf(InvalidRequestError)
+            expect(aiComplianceMock.validateCommunityContent).not.toHaveBeenCalled()
+          })
+        })
+
+        describe('and the thumbnail is not a PNG', () => {
+          let thumbnail: Buffer
+
+          beforeEach(() => {
+            // JPEG signature. The provider used to be told image/png for every
+            // upload, whatever the bytes were.
+            thumbnail = Buffer.alloc(2048)
+            Buffer.from([0xff, 0xd8, 0xff, 0xe0]).copy(thumbnail)
+          })
+
+          it('should tell the provider the media type the bytes announce', async () => {
+            await complianceValidator.validateCommunityContent({ thumbnailBuffer: thumbnail })
+
+            expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith(
+              expect.objectContaining({ thumbnailMime: 'image/jpeg' })
+            )
+          })
         })
       })
 
@@ -245,7 +282,8 @@ describe('CommunityComplianceValidator', () => {
         it('should handle thumbnail validation successfully', async () => {
           const name = 'Test Community'
           const description = 'Test description'
-          const thumbnail = Buffer.from('fake-image-data')
+          const thumbnail = Buffer.alloc(2048)
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(thumbnail)
 
           const result = await complianceValidator.validateCommunityContent({
             name,
@@ -256,6 +294,7 @@ describe('CommunityComplianceValidator', () => {
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
             name,
             description,
+            thumbnailMime: 'image/png',
             thumbnailBuffer: thumbnail
           })
 

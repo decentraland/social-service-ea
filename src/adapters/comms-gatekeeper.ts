@@ -2,6 +2,35 @@ import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy, Commu
 import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 import { CommunityVoiceChatStatus } from '../logic/community/types'
 import { isErrorWithMessage } from '../utils/errors'
+import { discardResponseBody, fetchJson, fetchVoid } from '../utils/fetch'
+import { EthAddress } from '@dcl/schemas'
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Error raised before a privileged Gatekeeper request when an identifier is not canonical. */
+export class InvalidGatekeeperIdentifierError extends Error {
+  constructor(identifier: string) {
+    super(`Invalid Gatekeeper ${identifier}`)
+  }
+}
+
+function requireAddress(address: string): string {
+  if (!EthAddress.validate(address)) {
+    throw new InvalidGatekeeperIdentifierError('user address')
+  }
+  return address.toLowerCase()
+}
+
+function requireUuid(value: string, identifier: string): string {
+  if (!UUID_PATTERN.test(value)) {
+    throw new InvalidGatekeeperIdentifierError(identifier)
+  }
+  return value.toLowerCase()
+}
+
+function pathSegment(value: string): string {
+  return encodeURIComponent(value)
+}
 
 export class PrivateVoiceChatNotFoundError extends Error {
   constructor(callId: string) {
@@ -9,6 +38,16 @@ export class PrivateVoiceChatNotFoundError extends Error {
   }
 }
 
+/**
+ * Creates the Comms Gatekeeper adapter.
+ *
+ * All wallet and resource identifiers are validated and canonicalized before this component
+ * attaches its privileged bearer token to an outbound request.
+ *
+ * @param components - Required logging, configuration and bounded-fetch components
+ * @returns The Comms Gatekeeper component implementation
+ * @throws {InvalidGatekeeperIdentifierError} When a method receives a malformed address or UUID
+ */
 export const createCommsGatekeeperComponent = async ({
   logs,
   config,
@@ -28,21 +67,21 @@ export const createCommsGatekeeperComponent = async ({
     address: string,
     privateMessagesPrivacy: PrivateMessagesPrivacy
   ): Promise<void> {
+    const normalizedAddress = requireAddress(address)
     try {
-      const response = await fetch(`${commsUrl}/users/${address}/private-messages-privacy`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          private_messages_privacy: privateMessagesPrivacy
+      await fetchVoid(() =>
+        fetch(`${commsUrl}/users/${pathSegment(normalizedAddress)}/private-messages-privacy`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          },
+          body: JSON.stringify({
+            private_messages_privacy: privateMessagesPrivacy
+          })
         })
-      })
+      )
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
       logger.info(`Updated user private message privacy metadata for user ${address} to ${privateMessagesPrivacy}`)
     } catch (error) {
       logger.error(
@@ -53,20 +92,17 @@ export const createCommsGatekeeperComponent = async ({
   }
 
   async function isUserInAVoiceChat(address: string): Promise<boolean> {
+    const normalizedAddress = requireAddress(address)
     try {
-      const response = await fetch(`${commsUrl}/users/${address}/voice-chat-status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await fetchJson<{ is_user_in_voice_chat?: boolean }>(() =>
+        fetch(`${commsUrl}/users/${pathSegment(normalizedAddress)}/voice-chat-status`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        })
+      )
       return Boolean(data.is_user_in_voice_chat)
     } catch (error) {
       logger.error(
@@ -81,24 +117,23 @@ export const createCommsGatekeeperComponent = async ({
     calleeAddress: string,
     callerAddress: string
   ): Promise<Record<string, { connectionUrl: string }>> {
+    const normalizedRoomId = requireUuid(roomId, 'private voice room ID')
+    const normalizedCalleeAddress = requireAddress(calleeAddress)
+    const normalizedCallerAddress = requireAddress(callerAddress)
     try {
-      const response = await fetch(`${commsUrl}/private-voice-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          room_id: roomId,
-          user_addresses: [calleeAddress, callerAddress]
+      const body = await fetchJson<Record<string, { connection_url: string }>>(() =>
+        fetch(`${commsUrl}/private-voice-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          },
+          body: JSON.stringify({
+            room_id: normalizedRoomId,
+            user_addresses: [normalizedCalleeAddress, normalizedCallerAddress]
+          })
         })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const body = (await response.json()) as Record<string, { connection_url: string }>
+      )
 
       return Object.entries(body).reduce(
         (acc, [address, { connection_url }]) => {
@@ -123,22 +158,26 @@ export const createCommsGatekeeperComponent = async ({
    * @returns The addresses of the users in the ended voice chat.
    */
   async function endPrivateVoiceChat(callId: string, address: string): Promise<string[]> {
+    const normalizedCallId = requireUuid(callId, 'private voice call ID')
+    const normalizedAddress = requireAddress(address)
     let usersInVoiceChat: string[] = []
     try {
-      const response = await fetch(`${commsUrl}/private-voice-chat/${callId}`, {
+      const response = await fetch(`${commsUrl}/private-voice-chat/${pathSegment(normalizedCallId)}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
         },
         body: JSON.stringify({
-          address
+          address: normalizedAddress
         })
       })
 
       if (response.ok) {
         const data = await response.json()
         usersInVoiceChat = data.users_in_voice_chat
+      } else {
+        await discardResponseBody(response)
       }
     } catch (error) {
       logger.error(
@@ -163,6 +202,8 @@ export const createCommsGatekeeperComponent = async ({
     userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
       const requestBody: {
         community_id: string
@@ -171,8 +212,8 @@ export const createCommsGatekeeperComponent = async ({
         user_role: string
         profile_data?: CommunityVoiceChatProfileData
       } = {
-        community_id: communityId,
-        user_address: userAddress,
+        community_id: normalizedCommunityId,
+        user_address: normalizedUserAddress,
         action: CommunityVoiceChatAction.JOIN,
         user_role: userRole
       }
@@ -181,20 +222,16 @@ export const createCommsGatekeeperComponent = async ({
         requestBody.profile_data = profileData
       }
 
-      const response = await fetch(`${commsUrl}/community-voice-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await fetchJson<{ connection_url: string }>(() =>
+        fetch(`${commsUrl}/community-voice-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          },
+          body: JSON.stringify(requestBody)
+        })
+      )
       return { connectionUrl: data.connection_url }
     } catch (error) {
       logger.error(
@@ -218,6 +255,8 @@ export const createCommsGatekeeperComponent = async ({
     userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedCreatedBy = requireAddress(createdBy)
     try {
       const requestBody: {
         community_id: string
@@ -226,8 +265,8 @@ export const createCommsGatekeeperComponent = async ({
         user_role: string
         profile_data?: CommunityVoiceChatProfileData
       } = {
-        community_id: communityId,
-        user_address: createdBy,
+        community_id: normalizedCommunityId,
+        user_address: normalizedCreatedBy,
         action: CommunityVoiceChatAction.CREATE,
         user_role: userRole
       }
@@ -236,20 +275,16 @@ export const createCommsGatekeeperComponent = async ({
         requestBody.profile_data = profileData
       }
 
-      const response = await fetch(`${commsUrl}/community-voice-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await fetchJson<{ connection_url: string }>(() =>
+        fetch(`${commsUrl}/community-voice-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          },
+          body: JSON.stringify(requestBody)
+        })
+      )
       return { connectionUrl: data.connection_url }
     } catch (error) {
       logger.error(
@@ -265,21 +300,21 @@ export const createCommsGatekeeperComponent = async ({
    * @param userAddress - The address of the user ending the room
    */
   async function endCommunityVoiceChatRoom(communityId: string, userAddress: string): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          user_address: userAddress
+      await fetchVoid(() =>
+        fetch(`${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          },
+          body: JSON.stringify({
+            user_address: normalizedUserAddress
+          })
         })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
+      )
 
       logger.info(`Community voice chat room ended for community ${communityId} by ${userAddress}`)
     } catch (error) {
@@ -301,23 +336,23 @@ export const createCommsGatekeeperComponent = async ({
     userAddress: string,
     isRaisingHand: boolean = true
   ): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
       const method = isRaisingHand ? 'POST' : 'DELETE'
 
-      const response = await fetch(
-        `${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speak-request`,
-        {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${commsGateKeeperToken}`
+      await fetchVoid(() =>
+        fetch(
+          `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speak-request`,
+          {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            }
           }
-        }
+        )
       )
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
     } catch (error) {
       const action = isRaisingHand ? 'request to speak' : 'withdraw speak request'
       logger.error(
@@ -334,21 +369,21 @@ export const createCommsGatekeeperComponent = async ({
    * @param userAddress - The address of the user whose speak request is being rejected
    */
   async function rejectSpeakRequestInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(
-        `${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speak-request`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${commsGateKeeperToken}`
+      await fetchVoid(() =>
+        fetch(
+          `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speak-request`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            }
           }
-        }
+        )
       )
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
     } catch (error) {
       logger.error(
         `Failed to reject speak request for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -363,18 +398,21 @@ export const createCommsGatekeeperComponent = async ({
    * @param userAddress - The address of the user to promote
    */
   async function promoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speaker`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
+      await fetchVoid(() =>
+        fetch(
+          `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speaker`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            }
+          }
+        )
+      )
     } catch (error) {
       logger.error(
         `Failed to promote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -389,18 +427,21 @@ export const createCommsGatekeeperComponent = async ({
    * @param userAddress - The address of the user to demote
    */
   async function demoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speaker`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
+      await fetchVoid(() =>
+        fetch(
+          `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speaker`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            }
+          }
+        )
+      )
     } catch (error) {
       logger.error(
         `Failed to demote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -440,8 +481,9 @@ export const createCommsGatekeeperComponent = async ({
    * @returns The community voice chat status or null if not active
    */
   async function getCommunityVoiceChatStatus(communityId: string): Promise<CommunityVoiceChatStatus | null> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/status`, {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/status`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -450,10 +492,12 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (response.status === 404) {
+        await discardResponseBody(response)
         return null
       }
 
       if (!response.ok) {
+        await discardResponseBody(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -483,23 +527,21 @@ export const createCommsGatekeeperComponent = async ({
       return {}
     }
 
+    const normalizedCommunityIds = communityIds.map((communityId) => requireUuid(communityId, 'community ID'))
+
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          community_ids: communityIds
+      const responseData = await fetchJson<{ data?: any[] }>(() =>
+        fetch(`${commsUrl}/community-voice-chat/status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          },
+          body: JSON.stringify({
+            community_ids: normalizedCommunityIds
+          })
         })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const responseData = await response.json()
+      )
       const statuses = responseData.data || []
 
       // Map the response data to the expected format
@@ -531,19 +573,17 @@ export const createCommsGatekeeperComponent = async ({
     }>
   > {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/active`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await fetchJson<{
+        data?: Array<{ communityId: string; participantCount: number; moderatorCount: number }>
+      }>(() =>
+        fetch(`${commsUrl}/community-voice-chat/active`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        })
+      )
       return data.data || []
     } catch (error) {
       logger.error(
@@ -559,18 +599,21 @@ export const createCommsGatekeeperComponent = async ({
    * @param userAddress - The address of the user to kick
    */
   async function kickUserFromCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
+      await fetchVoid(() =>
+        fetch(
+          `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            }
+          }
+        )
+      )
     } catch (error) {
       logger.error(
         `Failed to kick user from community voice chat for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -585,20 +628,17 @@ export const createCommsGatekeeperComponent = async ({
    * @returns Promise<boolean> - True if user is in a community voice chat, false otherwise.
    */
   async function isUserInCommunityVoiceChat(userAddress: string): Promise<boolean> {
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(`${commsUrl}/users/${userAddress}/community-voice-chat-status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await fetchJson<{ isInCommunityVoiceChat: boolean }>(() =>
+        fetch(`${commsUrl}/users/${pathSegment(normalizedUserAddress)}/community-voice-chat-status`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        })
+      )
       return data.isInCommunityVoiceChat
     } catch (error) {
       logger.error(
@@ -619,21 +659,24 @@ export const createCommsGatekeeperComponent = async ({
     userAddress: string,
     muted: boolean
   ): Promise<void> {
+    const normalizedCommunityId = requireUuid(communityId, 'community ID')
+    const normalizedUserAddress = requireAddress(userAddress)
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/mute`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          muted
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
-      }
+      await fetchVoid(() =>
+        fetch(
+          `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/mute`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            },
+            body: JSON.stringify({
+              muted
+            })
+          }
+        )
+      )
     } catch (error) {
       logger.error(
         `Failed to ${muted ? 'mute' : 'unmute'} user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`

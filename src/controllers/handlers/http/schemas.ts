@@ -44,7 +44,9 @@ export const UpdateMemberRoleSchema: Schema = {
   properties: {
     role: {
       type: 'string',
-      enum: Object.values(CommunityRole)
+      // Not Object.values(CommunityRole): 'none' is the absence of membership, not a role that
+      // can be assigned. Owner stays valid — it routes to an ownership transfer.
+      enum: [CommunityRole.Owner, CommunityRole.Moderator, CommunityRole.Member]
     }
   }
 }
@@ -68,9 +70,11 @@ export const AddCommunityPlacesSchema: Schema = {
     placeIds: {
       type: 'array',
       items: {
-        type: 'string'
+        type: 'string',
+        maxLength: 256
       },
-      minItems: 1
+      minItems: 1,
+      maxItems: 100
     }
   }
 }
@@ -138,6 +142,30 @@ export const UpdateCommunityRequestStatusSchema: Schema = {
     intention: {
       type: 'string',
       enum: [CommunityRequestStatus.Accepted, CommunityRequestStatus.Rejected, CommunityRequestStatus.Cancelled]
+    }
+  }
+}
+
+const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+const MAX_COMMUNITY_IDS = 50
+
+export type GetMemberCommunitiesByIdsRequestBody = {
+  communityIds: string[]
+}
+
+export const GetMemberCommunitiesByIdsSchema: Schema = {
+  type: 'object',
+  required: ['communityIds'],
+  additionalProperties: false,
+  properties: {
+    communityIds: {
+      type: 'array',
+      items: {
+        type: 'string',
+        pattern: UUID_PATTERN
+      },
+      minItems: 1,
+      maxItems: MAX_COMMUNITY_IDS
     }
   }
 }

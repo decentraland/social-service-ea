@@ -1,8 +1,16 @@
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  CommunityVoiceChatUpdate,
+  ConnectivityStatus,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
+import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../utils/address'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from './community'
+import { isErrorWithMessage } from '../utils/errors'
 import { VoiceChatStatus } from './voice/types'
 import { IUpdateHandlerComponent } from '../types/components'
 
@@ -22,12 +30,59 @@ export type SubscriptionHandlerParams<T, U> = {
   shouldHandleUpdate: (update: U) => boolean
   parser: UpdateParser<T, U>
   parseArgs?: any[]
+  // Optional initial snapshot, fetched AFTER the live listener is registered so updates
+  // emitted while it runs are queued rather than lost. Best-effort: a failure is logged and
+  // the subscription continues with live updates only.
+  getInitialUpdates?: () => Promise<T[]>
+  // Builds the FINAL message of the stream from a close notice, so the client learns why
+  // the server is closing it (per the protocol contract, such a message carries no update
+  // data). Used when a duplicate subscription is rejected — the connection is alive there,
+  // so the notice is deliverable. When omitted, the stream ends silently, as before.
+  buildStreamClosedUpdate?: (streamClosed: SubscriptionStreamClosed) => T
+}
+
+/**
+ * Processes an array in batches, yielding the event loop between batches.
+ * This prevents long-running synchronous iterations from blocking the event loop.
+ *
+ * @param items - The array of items to process
+ * @param processor - The function to call for each item
+ * @param batchSize - Number of items to process before yielding (default: 10)
+ */
+async function processInBatches<T>(
+  items: T[],
+  processor: (item: T) => void | Promise<void>,
+  batchSize: number = 10
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize)
+
+    for (const item of batch) {
+      await processor(item)
+    }
+
+    // Yield the event loop if there are more items
+    if (i + batchSize < items.length) {
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+  }
 }
 
 export function createUpdateHandlerComponent(
-  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient'>
+  components: Pick<
+    AppComponents,
+    | 'logs'
+    | 'subscribersContext'
+    | 'friendsDb'
+    | 'communitiesDb'
+    | 'communityMembers'
+    | 'registry'
+    | 'metrics'
+    | 'peersStats'
+  >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient } = components
+  const { logs, subscribersContext, friendsDb, communitiesDb, communityMembers, registry, metrics, peersStats } =
+    components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -35,26 +90,33 @@ export function createUpdateHandlerComponent(
       try {
         const update = JSON.parse(message) as SubscriptionEventsEmitter[T]
         await handler(update)
-      } catch (error: any) {
-        logger.error(`Error handling update: ${error.message}`, {
-          error,
-          message
-        })
+      } catch (error) {
+        const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
+        logger.error(`Error handling update: ${errorMessage}`, { error: errorMessage })
       }
     }
   }
 
   const friendshipUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
-    const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
+    const updateEmitter = subscribersContext.getSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
   })
 
-  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
+  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>(async (update) => {
     if (update.action !== Action.ACCEPT) {
       return
     }
+
+    // Only announce a new friend as ONLINE if they actually are: the request may have been
+    // sent long ago (requester offline by now) and the accept may come from the website
+    // (accepter not in-world). Announcing without checking pushed false presence.
+    // Degraded mode: peersStats swallows stats-source failures and resolves to an empty
+    // list, so during a stats outage these notifications are skipped entirely (preferable
+    // to fabricating presence); the next real connectivity transition corrects the client.
+    const connectedPeers = await peersStats.getConnectedPeers()
+    const onlinePeers = new Set(connectedPeers.map(normalizeAddress))
 
     const notifications = [
       { subscriber: update.to, friend: update.from },
@@ -62,7 +124,11 @@ export function createUpdateHandlerComponent(
     ]
 
     notifications.forEach(({ subscriber, friend }) => {
-      const emitter = subscribersContext.getOrAddSubscriber(subscriber)
+      if (!onlinePeers.has(normalizeAddress(friend))) {
+        return
+      }
+
+      const emitter = subscribersContext.getSubscriber(subscriber)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', {
           address: friend,
@@ -73,33 +139,48 @@ export function createUpdateHandlerComponent(
   })
 
   const friendConnectivityUpdateHandler = handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
-    // Notify friends about connectivity change
-    friends.forEach(({ address: friendAddress }) => {
-      const updateEmitter = subscribersContext.getOrAddSubscriber(friendAddress)
-      if (updateEmitter) {
-        updateEmitter.emit('friendConnectivityUpdate', update)
-      }
-    })
+    // Notify friends about connectivity change, yielding event loop for large friend lists
+    await processInBatches(
+      friends,
+      ({ address: friendAddress }) => {
+        const updateEmitter = subscribersContext.getSubscriber(friendAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('friendConnectivityUpdate', update)
+        }
+      },
+      20
+    )
   })
 
   const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromUserCommunities(update.memberAddress, onlineSubscribers)
 
     for await (const batch of batches) {
-      batch.forEach(({ communityId, memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            communityId,
-            memberAddress: update.memberAddress,
-            status: update.status
-          })
-        }
-      })
+      // Process each batch with event loop yielding
+      await processInBatches(
+        batch,
+        ({ communityId, memberAddress }) => {
+          const updateEmitter = subscribersContext.getSubscriber(memberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', {
+              communityId,
+              memberAddress: update.memberAddress,
+              status: update.status
+            })
+          }
+        },
+        20
+      )
     }
   })
 
@@ -108,14 +189,15 @@ export function createUpdateHandlerComponent(
       update: JSON.stringify(update)
     })
 
-    const updateEmitter = subscribersContext.getOrAddSubscriber(update.blockedAddress)
+    const updateEmitter = subscribersContext.getSubscriber(update.blockedAddress)
     if (updateEmitter) {
       updateEmitter.emit('blockUpdate', update)
     }
   })
 
   const privateVoiceChatUpdateHandler = handleUpdate<'privateVoiceChatUpdate'>((update) => {
-    logger.info('Private voice chat update', { update: JSON.stringify(update) })
+    // Allowlist the loggable fields: this update also carries the LiveKit join credentials.
+    logger.info('Private voice chat update', { callId: update.callId, status: update.status })
 
     const addressesToNotify: string[] = []
 
@@ -161,7 +243,7 @@ export function createUpdateHandlerComponent(
     }
 
     addressesToNotify.forEach((address) => {
-      const updateEmitter = subscribersContext.getOrAddSubscriber(address)
+      const updateEmitter = subscribersContext.getSubscriber(address)
       if (updateEmitter) {
         updateEmitter.emit('privateVoiceChatUpdate', update)
       }
@@ -174,29 +256,40 @@ export function createUpdateHandlerComponent(
 
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(
       communityId,
       onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
     )
 
+    // Pre-create the update payload to avoid repeated object creation
+    const memberUpdate = {
+      communityId,
+      memberAddress: update.memberAddress,
+      status
+    }
+
     for await (const batch of batches) {
-      batch.forEach(({ memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            communityId,
-            memberAddress: update.memberAddress,
-            status
-          })
-        }
-      })
+      // Process each batch with event loop yielding
+      await processInBatches(
+        batch,
+        ({ memberAddress: batchMemberAddress }) => {
+          const updateEmitter = subscribersContext.getSubscriber(batchMemberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', memberUpdate)
+          }
+        },
+        20
+      )
     }
 
     // When a member leaves, is kicked, or banned from a community,
     // we need to notify the affected member about their status change.
     const affectedMember = onlineSubscribers.find((address) => address === normalizedMemberAddress)
-    const updateEmitter = affectedMember ? subscribersContext.getOrAddSubscriber(affectedMember) : null
+    const updateEmitter = affectedMember ? subscribersContext.getSubscriber(affectedMember) : undefined
     if (updateEmitter) {
       logger.debug('Notifying affected member about their status change', {
         update: JSON.stringify(update)
@@ -208,78 +301,134 @@ export function createUpdateHandlerComponent(
   const communityDeletedUpdateHandler = handleUpdate<'communityDeletedUpdate'>(async (update) => {
     const { communityId } = update
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
 
     for await (const batch of batches) {
-      batch.forEach(({ memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            communityId,
-            memberAddress,
-            status: ConnectivityStatus.OFFLINE
-          })
-        }
-      })
+      // Process each batch with event loop yielding
+      await processInBatches(
+        batch,
+        ({ memberAddress }) => {
+          const updateEmitter = subscribersContext.getSubscriber(memberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', {
+              communityId,
+              memberAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
+          }
+        },
+        20
+      )
     }
   })
 
   const communityVoiceChatUpdateHandler = handleUpdate<'communityVoiceChatUpdate'>(async (update) => {
-    logger.info('Community voice chat update', { update: JSON.stringify(update) })
+    // Allowlist the loggable fields: a started update carries the community's name, image, parcel
+    // positions and worlds, and this runs before the audience is decided.
+    logger.info('Community voice chat update', { communityId: update.communityId, status: update.status })
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    // Get all online subscribers, excluding the creator if present (creator already knows about their action)
+    const creatorAddress = update.creatorAddress?.toLowerCase()
+    const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
+    const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
-    try {
-      // Get all online members of this community in a single efficient query
-      const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
-      const communityMemberAddresses = new Set<string>()
+    // STARTED always derives its scope from the authoritative community row. ENDED carries the
+    // start-time fanout class so privacy/visibility changes do not turn a member-only cleanup into a
+    // broadcast (or suppress broad cleanup). This is best-effort rather than a recipient snapshot:
+    // member-scoped ENDED updates are delivered to the members who are online when cleanup runs.
+    const isEnded = update.status === ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
+    let scope =
+      isEnded && (update.notificationScope === 'all' || update.notificationScope === 'members')
+        ? update.notificationScope
+        : undefined
 
-      for await (const batch of batches) {
-        batch.forEach(({ memberAddress }) => {
-          communityMemberAddresses.add(memberAddress)
-        })
+    if (!scope) {
+      // ENDED must not derive a broad audience from mutable current visibility. Missing or invalid
+      // start-time scope fails closed so legacy or malformed updates cannot reveal hidden activity.
+      if (isEnded) {
+        scope = 'members'
+      } else {
+        try {
+          const community = await communitiesDb.getCommunity(update.communityId)
+
+          if (!community) {
+            logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
+            return
+          }
+
+          scope =
+            community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
+              ? 'all'
+              : 'members'
+        } catch (error) {
+          logger.error(`Could not resolve the audience for a voice chat update in ${update.communityId}`, {
+            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+          })
+          return
+        }
       }
-
-      // Notify ALL online users with personalized membership info
-      const notifications = onlineSubscribers.map(async (userAddress) => {
-        const isMember = communityMemberAddresses.has(userAddress)
-
-        // Create personalized update for this user
-        const personalizedUpdate = {
-          ...update,
-          isMember
-        }
-
-        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', personalizedUpdate)
-        }
-      })
-
-      // Wait for all notifications to complete
-      await Promise.all(notifications)
-
-      logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
-    } catch (error) {
-      logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
-
-      // Fallback: send update to all users without membership info
-      const fallbackNotifications = onlineSubscribers.map(async (userAddress) => {
-        const fallbackUpdate = {
-          ...update,
-          isMember: false
-        }
-
-        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
-        }
-      })
-
-      await Promise.all(fallbackNotifications)
-      logger.warn(`Sent fallback community voice chat update to ${onlineSubscribers.length} online users`)
     }
+
+    // A broad-scope update needs no membership lookup at all, so cleanup for the largest audience
+    // cannot be lost to a transient query failure.
+    const communityMemberAddresses = new Set<string>()
+
+    if (scope === 'members' || !isEnded) {
+      try {
+        // An async generator: the query starts when iterated, so there is nothing to parallelize.
+        for await (const batch of communityMembers.getOnlineMembersFromCommunity(
+          update.communityId,
+          onlineSubscribers
+        )) {
+          batch.forEach(({ memberAddress }) => communityMemberAddresses.add(memberAddress))
+        }
+      } catch (error) {
+        logger.error(`Failed to resolve the members for a voice chat update in ${update.communityId}`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
+        // Member-scoped updates cannot be delivered safely without the lookup. For a public/listed
+        // start, membership is only an annotation: clear partial results and announce it to all
+        // eligible subscribers with the safe non-member fallback.
+        if (scope === 'members') return
+        communityMemberAddresses.clear()
+      }
+    }
+
+    const recipients =
+      scope === 'all' ? onlineSubscribers : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
+
+    // Build the protocol payload explicitly at the emitter boundary. Internal routing fields such
+    // as creatorAddress and notificationScope must never rely on a later parser to strip them.
+    const clientSafeUpdate: CommunityVoiceChatUpdate = {
+      communityId: update.communityId,
+      createdAt: update.createdAt ?? Date.now(),
+      status: update.status,
+      endedAt: update.endedAt,
+      positions: update.positions ?? [],
+      isMember: false,
+      communityName: update.communityName ?? '',
+      communityImage: update.communityImage,
+      worlds: update.worlds ?? [],
+      streamClosed: update.streamClosed
+    }
+
+    await processInBatches(
+      recipients,
+      (userAddress) => {
+        const isMember = communityMemberAddresses.has(userAddress)
+        const updateEmitter = subscribersContext.getSubscriber(userAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', { ...clientSafeUpdate, isMember })
+        }
+      },
+      20 // Process 20 users before yielding the event loop
+    )
+
+    logger.info(`Community voice chat update sent to ${recipients.length} online users`)
   })
 
   async function* handleSubscriptionUpdates<T, U>({
@@ -289,15 +438,92 @@ export function createUpdateHandlerComponent(
     getAddressFromUpdate,
     shouldHandleUpdate,
     parser,
-    parseArgs = []
+    parseArgs = [],
+    getInitialUpdates,
+    buildStreamClosedUpdate
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
-    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
     const eventNameString = String(eventName)
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+    // Subscriptions are scoped per CONNECTION: the same address can be connected from
+    // multiple places at once (website + client) and each connection gets its own stream.
+    // wsConnectionId is always set in production (assigned at WS upgrade and threaded through
+    // attachUser/attachTransport); fail loud rather than silently mis-key if it is missing.
+    const connectionId = rpcContext.wsConnectionId
+    if (!connectionId) {
+      logger.error('Cannot handle subscription without a wsConnectionId', {
+        address: normalizedAddress,
+        event: eventNameString
+      })
+      return
+    }
+
+    // Guard against the SAME connection opening the same stream twice — each extra generator
+    // allocates another value queue and doubles that connection's memory.
+    if (rpcContext.subscribersContext.hasActiveSubscription(connectionId, eventNameString)) {
+      // A connection re-subscribing to an event it is already subscribed to is expected and
+      // benign — the guard is the #407 OOM protection (it prevents a second generator/value-queue
+      // for the same connection+event). It can fire hundreds of times per minute for a single
+      // connection stuck in a re-subscribe loop, so we track it ONLY via the
+      // subscription_duplicates_total metric (labelled by event) and do not log per occurrence —
+      // at DEBUG level (production) that line floods the logs. A sustained high rate on the metric
+      // indicates a client stuck re-subscribing.
+      metrics.increment('subscription_duplicates_total', { event: eventNameString })
+      // Tell the client why before ending the stream — this connection is alive by
+      // definition, so the final message is deliverable. Without it the client only sees a
+      // clean close, indistinguishable from any other stream end.
+      if (buildStreamClosedUpdate) {
+        yield buildStreamClosedUpdate({
+          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION,
+          message: `This connection already has an active ${eventNameString} subscription`
+        })
+      }
+      return
+    }
+
+    // The shared per-address emitter is created when the connection attaches (addConnection).
+    // If it's gone, the connection is no longer attached — don't resurrect an orphan emitter
+    // that wouldn't be tracked as a live connection and would be invisible to the local fan-out.
+    const eventEmitter = rpcContext.subscribersContext.getSubscriber(normalizedAddress)
+    if (!eventEmitter) {
+      logger.warn('No subscriber emitter for address; connection no longer attached', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: connectionId
+      })
+      // Throw rather than return: a clean completion here invites the client to immediately
+      // re-open the stream and hit this same path again — a hot loop. Erroring out makes a
+      // (well-behaved) client back off instead. Reaching here means the RPC call is live but the
+      // per-address emitter is gone, which is an abnormal/racy state, not a normal stream end.
+      throw new Error('No subscriber emitter for address; connection no longer attached')
+    }
+
+    rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
+
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () =>
+      metrics.increment('subscription_updates_dropped_total', { event: eventNameString })
+    )
+    rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {
+      // The listener above is already registered, so updates emitted while the snapshot
+      // queries run are queued rather than lost. Best-effort: a DB/registry hiccup here must
+      // NOT tear down the subscription — otherwise the client just reconnects and retries,
+      // churning (and re-running these queries every time).
+      if (getInitialUpdates) {
+        try {
+          const initialUpdates = await getInitialUpdates()
+          for (const initialUpdate of initialUpdates) {
+            yield initialUpdate
+          }
+        } catch (error: any) {
+          logger.warn(`Failed to deliver initial ${eventNameString} snapshot; continuing with live updates`, {
+            address: normalizedAddress,
+            error: error?.message ?? String(error)
+          })
+        }
+      }
+
       for await (const update of updatesGenerator) {
         if (!shouldHandleUpdate(update as U)) {
           continue
@@ -306,7 +532,7 @@ export function createUpdateHandlerComponent(
         let profile: Profile | null = null
 
         try {
-          profile = shouldRetrieveProfile ? await catalystClient.getProfile(getAddressFromUpdate(update as U)) : null
+          profile = shouldRetrieveProfile ? await registry.getProfile(getAddressFromUpdate(update as U)) : null
         } catch (_) {
           // If the profile is not found, skip the update
           logger.warn(`Unable to retrieve profile for ${getAddressFromUpdate(update as U)} in ${eventNameString}`)
@@ -320,21 +546,21 @@ export function createUpdateHandlerComponent(
           logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
         }
       }
-    } catch (error) {
-      logger.error('Error in generator loop', {
-        error: JSON.stringify(error),
-        address: rpcContext.address,
-        event: eventNameString
-      })
-      throw error
+      // Intentionally no catch here: errors propagate to the per-service subscribe handler,
+      // which logs them with service-specific context and re-throws. A central catch would
+      // double-log every subscription error (and only as JSON.stringify(error) === "{}").
     } finally {
+      // Logged here (not in the per-service handler) so it only fires for subscriptions
+      // that were actually established — the duplicate guard above returns before this
+      // try/finally, so rejected duplicates no longer emit a misleading "cleaning up" line.
+      logger.info('Cleaning up subscription', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: connectionId
+      })
       await updatesGenerator.return(undefined)
-    }
-
-    // Return a cleanup function
-    return () => {
-      logger.debug(`Cleaning up subscription for ${eventNameString}`, { address: rpcContext.address })
-      void updatesGenerator.return(undefined)
+      rpcContext.subscribersContext.unregisterGenerator(connectionId, updatesGenerator)
+      rpcContext.subscribersContext.clearActiveSubscription(connectionId, eventNameString)
     }
   }
 

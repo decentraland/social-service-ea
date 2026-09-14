@@ -3,20 +3,20 @@ import { createCommunityRolesComponent, ROLE_ACTION_TRANSITIONS } from '../../..
 import { OWNER_PERMISSIONS, MODERATOR_PERMISSIONS, COMMUNITY_ROLES } from '../../../src/logic/community/roles'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs } from '../../mocks/components/logs'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { ICommunityRolesComponent } from '../../../src/logic/community'
 
 describe('Community Roles Component', () => {
   let roles: ICommunityRolesComponent
 
   const communityId = 'test-community'
-  const ownerAddress = '0xOwner'
-  const moderatorAddress = '0xModerator'
-  const memberAddress = '0xMember'
-  const anotherOwnerAddress = '0xAnotherOwner'
-  const anotherModeratorAddress = '0xAnotherModerator'
-  const anotherMemberAddress = '0xAnotherMember'
-  const nonMemberAddress = '0xNonMember'
+  const ownerAddress = '0xowner'
+  const moderatorAddress = '0xmoderator'
+  const memberAddress = '0xmember'
+  const anotherOwnerAddress = '0xanotherowner'
+  const anotherModeratorAddress = '0xanothermoderator'
+  const anotherMemberAddress = '0xanothermember'
+  const nonMemberAddress = '0xnonmember'
 
   beforeEach(() => {
     roles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
@@ -62,6 +62,32 @@ describe('Community Roles Component', () => {
             `The user ${ownerAddress} doesn't have permission to kick ${anotherOwnerAddress} from community ${communityId}`
           )
         )
+      })
+    })
+
+    describe('and the target is not a member of the community', () => {
+      let nonMemberAddress: string
+
+      beforeEach(() => {
+        nonMemberAddress = '0x1111111111111111111111111111111111111111'
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [moderatorAddress]: CommunityRole.Moderator,
+          [memberAddress]: CommunityRole.Member,
+          [nonMemberAddress]: CommunityRole.None
+        })
+      })
+
+      it('should allow a moderator through, so the kick can be the no-op it is', async () => {
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
+        ).resolves.not.toThrow()
+      })
+
+      it('should refuse a plain member exactly as it would for a member target', async () => {
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
+        ).rejects.toThrow(NotAuthorizedError)
       })
     })
 
@@ -582,9 +608,9 @@ describe('Community Roles Component', () => {
 
   describe('when validating permission to transfer ownership', () => {
     const communityId = 'test-community'
-    const ownerAddress = '0xOwner'
-    const memberAddress = '0xMember'
-    const nonMemberAddress = '0xNonMember'
+    const ownerAddress = '0xowner'
+    const memberAddress = '0xmember'
+    const nonMemberAddress = '0xnonmember'
 
     describe('and the updater is owner and target is member', () => {
       beforeEach(() => {
@@ -968,6 +994,90 @@ describe('Community Roles Component', () => {
 
       it('should allow the action as non-members can leave communities', async () => {
         await expect(roles.validatePermissionToLeaveCommunity(communityId, nonMemberAddress)).resolves.not.toThrow()
+      })
+    })
+  })
+
+  describe('when validating permission to delete a post', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xOwner'
+    const moderatorAddress = '0xModerator'
+    const memberAddress = '0xMember'
+    const postAuthorAddress = '0xPostAuthor'
+
+    const mockPost = {
+      id: 'test-post',
+      communityId,
+      authorAddress: postAuthorAddress,
+      content: 'Test post content',
+      createdAt: '2023-01-01T00:00:00Z'
+    }
+
+    describe('and the user is an owner', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      })
+
+      it('should allow to delete any post', async () => {
+        await expect(roles.validatePermissionToDeletePost(mockPost, ownerAddress)).resolves.not.toThrow()
+      })
+
+      it('should allow to delete post even if owner is not the author', async () => {
+        await expect(roles.validatePermissionToDeletePost(mockPost, ownerAddress)).resolves.not.toThrow()
+      })
+    })
+
+    describe('and the user is a moderator', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      })
+
+      describe('and the moderator is the author of the post', () => {
+        const postByModerator = {
+          ...mockPost,
+          authorAddress: moderatorAddress
+        }
+
+        it('should allow to delete their own post', async () => {
+          await expect(roles.validatePermissionToDeletePost(postByModerator, moderatorAddress)).resolves.not.toThrow()
+        })
+      })
+
+      describe('and the moderator is not the author of the post', () => {
+        it('should throw NotAuthorizedError when trying to delete another user post', async () => {
+          await expect(roles.validatePermissionToDeletePost(mockPost, moderatorAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${moderatorAddress} doesn't have permission to delete posts from the community`
+            )
+          )
+        })
+      })
+    })
+
+    describe('and the user is a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      })
+
+      it('should throw NotAuthorizedError as members cannot delete posts', async () => {
+        await expect(roles.validatePermissionToDeletePost(mockPost, memberAddress)).rejects.toThrow(
+          new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to delete posts from the community`)
+        )
+      })
+    })
+
+    describe('and the user is not a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      })
+
+      it('should throw NotAuthorizedError as non-members cannot delete posts', async () => {
+        const nonMemberAddress = '0xNonMember'
+        await expect(roles.validatePermissionToDeletePost(mockPost, nonMemberAddress)).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${nonMemberAddress} doesn't have permission to delete posts from the community`
+          )
+        )
       })
     })
   })

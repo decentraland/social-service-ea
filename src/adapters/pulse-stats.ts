@@ -1,6 +1,7 @@
 import { AppComponents, IPulseStatsComponent } from '../types'
 import { normalizeAddress } from '../utils/address'
 import { PEERS_CACHE_KEY } from '../utils/peers'
+import { fetchJson } from '../utils/fetch'
 
 /**
  * A2: presence of the key is not enough. `.env.default` ships inside the image and is a live config
@@ -47,13 +48,10 @@ export async function createPulseStatsComponent({
   return {
     async fetchPeers() {
       try {
-        const response = await fetcher.fetch(`${url}/peers?all=true`)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching peers: ${response.statusText}`)
-        }
-
-        const { peers } = await response.json()
+        const { peers } = await fetchJson<{ peers: { id: string }[] }>(
+          () => fetcher.fetch(`${url}/peers?all=true`),
+          (response) => new Error(`Error fetching peers: ${response.statusText}`)
+        )
 
         // Pulse canonicalizes at ingest, but the peer set feeds address comparisons everywhere else
         // in this service, so normalize defensively instead of trusting the wire.

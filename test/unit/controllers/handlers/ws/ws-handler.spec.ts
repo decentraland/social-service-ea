@@ -1,0 +1,621 @@
+import mitt from 'mitt'
+import { verify } from '@dcl/crypto-middleware'
+import { registerWsHandler } from '../../../../../src/controllers/handlers/uws/ws-handler'
+import { mockLogs, mockMetrics, mockFetcher, mockUWs, mockConfig, mockRpcServer } from '../../../../mocks/components'
+import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
+import { mockTracing } from '../../../../mocks/components/tracing'
+import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
+import { IWsPoolComponent } from '../../../../../src/logic/ws-pool'
+
+// Only `verify()` is replaced. `rejectIfSigner` has to stay real: it builds the metadata gate at
+// module load, and the real predicate is exactly what the assertions below check.
+jest.mock('@dcl/crypto-middleware', () => ({
+  ...jest.requireActual('@dcl/crypto-middleware'),
+  verify: jest.fn()
+}))
+
+const WS_AUTH_TIMEOUT_IN_MS = 30000
+
+// Built by hand rather than with the library's RequestError on purpose: `isExpectedAuthRejection`
+// checks the error structurally so it still holds if a second copy of the middleware ends up in the
+// dependency tree, and these tests should exercise that. The shape is what the library throws: an
+// Error named 'RequestError' carrying the status code it assigns to the failure (4xx for anything
+// wrong with the client's credentials, 503 when the catalyst is unreachable).
+const requestError = (message: string, statusCode: number) =>
+  Object.assign(new Error(message), { name: 'RequestError', statusCode })
+
+describe('ws-handler', () => {
+  let wsHandlers: any
+  let mockWs: any
+  let mockData: WsUserData
+  let mockRes: any
+  let mockReq: any
+  let mockContext: any
+  let mockWsPool: jest.Mocked<IWsPoolComponent>
+  let registerConnection: jest.MockedFunction<IWsPoolComponent['registerConnection']>
+  let unregisterConnection: jest.MockedFunction<IWsPoolComponent['unregisterConnection']>
+
+  beforeEach(async () => {
+    mockData = {
+      isConnected: false,
+      auth: false,
+      wsConnectionId: 'test-client-id'
+    } as WsNotAuthenticatedUserData
+    registerConnection = jest.fn()
+    unregisterConnection = jest.fn()
+
+    mockWs = {
+      getUserData: jest.fn().mockReturnValue(mockData),
+      send: jest.fn(),
+      end: jest.fn(),
+      close: jest.fn(),
+      getBufferedAmount: jest.fn()
+    }
+
+    mockWsPool = createWsPoolMockedComponent({
+      registerConnection,
+      unregisterConnection
+    })
+
+    mockRes = { upgrade: jest.fn() }
+    mockReq = {
+      getMethod: jest.fn().mockReturnValue('GET'),
+      getHeader: jest.fn().mockImplementation(
+        (header) =>
+          ({
+            'sec-websocket-key': 'test-key',
+            'sec-websocket-protocol': 'test-protocol',
+            'sec-websocket-extensions': 'test-extensions'
+          })[header]
+      )
+    }
+    mockContext = {}
+
+    mockConfig.getNumber.mockImplementation(
+      async (key) =>
+        ({
+          WS_AUTH_TIMEOUT_IN_MS
+        })[key] || null
+    )
+
+    await registerWsHandler({
+      logs: mockLogs,
+      uwsServer: mockUWs,
+      metrics: mockMetrics,
+      fetcher: mockFetcher,
+      rpcServer: mockRpcServer,
+      config: mockConfig,
+      tracing: mockTracing,
+      wsPool: mockWsPool
+    })
+
+    wsHandlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
+  })
+
+  afterEach(async () => {
+    jest.clearAllMocks()
+    await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+  })
+
+  describe('upgrade handler', () => {
+    it('should upgrade connection with initial state', () => {
+      wsHandlers.upgrade(mockRes, mockReq, mockContext)
+
+      expect(mockRes.upgrade).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isConnected: false,
+          auth: false,
+          wsConnectionId: expect.any(String),
+          transport: null
+        }),
+        'test-key',
+        'test-protocol',
+        'test-extensions',
+        mockContext
+      )
+    })
+  })
+
+  describe('open handler', () => {
+    it('should register the connection and update state', async () => {
+      await wsHandlers.open(mockWs)
+      expect(registerConnection).toHaveBeenCalledWith(mockWs)
+      expect(mockData.isConnected).toBe(true)
+      expect(mockData.connectionStartTime).toBeDefined()
+    })
+
+    it('should set a timeout for non-authenticated connections', async () => {
+      jest.useFakeTimers()
+
+      await wsHandlers.open(mockWs)
+
+      expect(mockWs.getUserData().timeout).toBeDefined()
+
+      jest.advanceTimersByTime(WS_AUTH_TIMEOUT_IN_MS)
+      expect(mockWs.end).toHaveBeenCalled()
+      jest.useRealTimers()
+    })
+  })
+
+  describe('message handler', () => {
+    it('should reject messages when authentication is in progress', async () => {
+      const userData = mockWs.getUserData()
+      userData.authenticating = true
+
+      await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+      expect(mockWs.send).toHaveBeenCalledWith(
+        JSON.stringify({ error: 'Authentication already in progress, please try again later' })
+      )
+      expect(verify).not.toHaveBeenCalled()
+    })
+
+    describe('and notifying the client that authentication is already in progress fails', () => {
+      beforeEach(() => {
+        const userData = mockWs.getUserData()
+        userData.authenticating = true
+        mockWs.send.mockImplementationOnce(() => {
+          throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+        })
+      })
+
+      it('should not propagate the error', async () => {
+        await expect(
+          wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        ).resolves.toBeUndefined()
+      })
+    })
+
+    describe('for authenticated users', () => {
+      let authData: WsAuthenticatedUserData
+
+      beforeEach(() => {
+        authData = {
+          isConnected: true,
+          auth: true,
+          address: '0x123',
+          wsConnectionId: 'test-client-id',
+          eventEmitter: mitt(),
+          transport: { close: jest.fn() } as any,
+          connectionStartTime: Date.now(),
+          authenticating: false
+        }
+        jest.spyOn(authData.eventEmitter, 'emit')
+        mockWs.getUserData.mockReturnValue(authData)
+      })
+
+      it('should process the message', async () => {
+        const testMessage = Buffer.from('test message')
+        await wsHandlers.message(mockWs, testMessage)
+
+        expect(authData.eventEmitter.emit).toHaveBeenCalledWith('message', testMessage)
+      })
+
+      it('should not process message when disconnected', async () => {
+        authData.isConnected = false
+        await wsHandlers.message(mockWs, Buffer.from('test message'))
+
+        expect(authData.eventEmitter.emit).not.toHaveBeenCalled()
+      })
+
+      it('should handle message emission errors', async () => {
+        const error = new Error('Emission failed')
+        jest.spyOn(authData.eventEmitter, 'emit').mockImplementationOnce(() => {
+          throw error
+        })
+
+        await wsHandlers.message(mockWs, Buffer.from('test message'))
+
+        expect(mockWs.send).toHaveBeenCalledWith(
+          JSON.stringify({
+            error: 'Error processing message'
+          })
+        )
+      })
+
+      describe('and notifying the client of the processing failure also fails', () => {
+        beforeEach(() => {
+          jest.spyOn(authData.eventEmitter, 'emit').mockImplementationOnce(() => {
+            throw new Error('Emission failed')
+          })
+          mockWs.send.mockImplementationOnce(() => {
+            throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+          })
+        })
+
+        it('should not propagate the error', async () => {
+          await expect(wsHandlers.message(mockWs, Buffer.from('test message'))).resolves.toBeUndefined()
+        })
+      })
+
+      it('should ignore messages when connection is marked as disconnected', async () => {
+        authData.isConnected = false
+        const testMessage = Buffer.from('test message')
+
+        await wsHandlers.message(mockWs, testMessage)
+
+        expect(authData.eventEmitter.emit).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('for non-authenticated users', () => {
+      beforeEach(() => {
+        mockWs.getUserData.mockReturnValue({
+          isConnected: true,
+          auth: false,
+          wsConnectionId: 'test-client-id'
+        } as WsNotAuthenticatedUserData)
+      })
+
+      it('should handle successful authentication', async () => {
+        ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+
+        await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+        const updatedData = mockWs.getUserData()
+        expect(updatedData.auth).toBe(true)
+        expect(updatedData.address).toBe('0x123')
+        expect(updatedData.transport).toBeDefined()
+        expect(updatedData.authenticating).toBe(false)
+        expect(mockRpcServer.attachUser).toHaveBeenCalledWith({
+          transport: expect.any(Object),
+          address: '0x123',
+          wsConnectionId: 'test-client-id'
+        })
+      })
+
+      it('should handle authentication failure', async () => {
+        ;(verify as jest.Mock).mockRejectedValue(new Error('Invalid auth chain'))
+
+        await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+        const updatedData = mockWs.getUserData()
+        expect(updatedData.authenticating).toBe(false)
+        expect(updatedData.auth).toBe(false)
+        expect(mockWs.end).toHaveBeenCalledWith(3003, 'Unauthorized')
+      })
+
+      it('should not propagate the error when ending an already-closed socket after an authentication failure', async () => {
+        ;(verify as jest.Mock).mockRejectedValue(new Error('Invalid auth chain'))
+        mockWs.end.mockImplementationOnce(() => {
+          throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+        })
+
+        await expect(
+          wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        ).resolves.toBeUndefined()
+      })
+
+      describe('and the middleware rejects the credentials the client presented', () => {
+        beforeEach(() => {
+          ;(verify as jest.Mock).mockRejectedValue(requestError('Expired signature: signature timestamp: 1', 401))
+        })
+
+        it('should still close the socket as unauthorized', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockWs.end).toHaveBeenCalledWith(3003, 'Unauthorized')
+        })
+
+        it('should not report the rejection to Sentry, matching how the HTTP routes answer the same failure', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockTracing.captureException).not.toHaveBeenCalled()
+        })
+
+        it('should count the rejection apart from server-side auth failures', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
+        })
+      })
+
+      describe('and the catalyst cannot be reached while verifying', () => {
+        beforeEach(() => {
+          ;(verify as jest.Mock).mockRejectedValue(
+            requestError('Error connecting to catalyst "https://peer.decentraland.org": fetch failed', 503)
+          )
+        })
+
+        it('should report the failure to Sentry so the outage stays visible', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockTracing.captureException).toHaveBeenCalled()
+        })
+
+        it('should count it as a server-side auth failure', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+        })
+      })
+
+      describe('and the client sends a payload that is not valid JSON', () => {
+        it('should report it to Sentry, since it never reached the middleware', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(''))
+
+          expect(mockTracing.captureException).toHaveBeenCalled()
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+        })
+      })
+
+      describe('and the transport is closed by the RPC layer while the socket is still connected', () => {
+        beforeEach(async () => {
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        })
+
+        it('should detach the user and end the socket so the client reconnects instead of keeping a dead session', () => {
+          const updatedData = mockWs.getUserData()
+
+          updatedData.transport.close()
+
+          expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
+          expect(mockWs.end).toHaveBeenCalledWith(1011, 'RPC transport closed')
+        })
+
+        describe('and detaching the user throws', () => {
+          beforeEach(() => {
+            mockRpcServer.detachUser.mockImplementationOnce(() => {
+              throw new Error('detach failed')
+            })
+          })
+
+          it('should swallow the error and still end the socket', () => {
+            const updatedData = mockWs.getUserData()
+
+            updatedData.transport.close()
+
+            expect(mockWs.end).toHaveBeenCalledWith(1011, 'RPC transport closed')
+          })
+        })
+      })
+
+      describe('and the socket itself closes (normal client-initiated close)', () => {
+        beforeEach(async () => {
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        })
+
+        it('should not try to end the already-closing socket when the transport close fires during cleanup', async () => {
+          // cleanupConnection clears isConnected before closing the transport, so the
+          // transport 'close' listener must not attempt ws.end on the socket that is already
+          // being torn down by uWS.
+          await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+          expect(mockWs.end).not.toHaveBeenCalled()
+          expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
+        })
+      })
+
+      describe('and the connection closes during transport creation (race condition)', () => {
+        let userData: WsNotAuthenticatedUserData
+
+        beforeEach(() => {
+          userData = mockWs.getUserData()
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          // The transport factory reads its config while being created — flipping the flag
+          // there simulates the socket closing in that window.
+          mockConfig.getNumber.mockImplementation(async (key) => {
+            if (key === 'WS_TRANSPORT_MAX_QUEUE_SIZE') {
+              userData.isConnected = false
+            }
+            return { WS_AUTH_TIMEOUT_IN_MS }[key] || null
+          })
+        })
+
+        it('should abort user attachment', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockRpcServer.attachUser).not.toHaveBeenCalled()
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_race_condition_aborted')
+        })
+      })
+
+      it('should clear timeout when user authenticates', async () => {
+        const mockTimeout = setTimeout(() => {}, 1000)
+        const userData = mockWs.getUserData()
+        userData.timeout = mockTimeout
+        ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+
+        await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+        expect(mockWs.getUserData().timeout).toBeUndefined()
+
+        clearTimeout(mockTimeout)
+      })
+
+      describe('and the connection closes during authentication (race condition)', () => {
+        let userData: WsNotAuthenticatedUserData
+
+        beforeEach(() => {
+          userData = mockWs.getUserData()
+
+          // Simulate the race condition: verify takes time and connection closes before it completes
+          ;(verify as jest.Mock).mockImplementation(async () => {
+            // Simulate connection being closed while verify is in progress
+            userData.isConnected = false
+            return { auth: '0x123' }
+          })
+        })
+
+        it('should abort user attachment when connection closes during verify', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockRpcServer.attachUser).not.toHaveBeenCalled()
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_race_condition_aborted')
+          expect(userData.auth).toBe(false)
+        })
+
+        it('should not overwrite isConnected when connection is already closed', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(userData.isConnected).toBe(false)
+        })
+      })
+    })
+  })
+
+  describe('close handler', () => {
+    it('should cleanup authenticated connection', async () => {
+      const authData: WsAuthenticatedUserData = {
+        isConnected: true,
+        auth: true,
+        address: '0x123',
+        eventEmitter: mitt(),
+        wsConnectionId: 'test-client-id',
+        transport: { close: jest.fn() } as any,
+        connectionStartTime: Date.now(),
+        authenticating: false
+      }
+      mockWs.getUserData.mockReturnValue(authData)
+
+      await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+      expect(authData.transport.close).toHaveBeenCalled()
+      expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
+      expect(unregisterConnection).toHaveBeenCalledWith(authData)
+      expect(authData.connectionStartTime).toBeDefined()
+      expect(authData.isConnected).toBe(false)
+      expect(authData.auth).toBe(false)
+      expect(authData.authenticating).toBe(false)
+    })
+
+    it('should cleanup non-authenticated connection', async () => {
+      await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+      expect(unregisterConnection).toHaveBeenCalledWith(mockData)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
+      expect(mockData.isConnected).toBe(false)
+      expect(mockData.auth).toBe(false)
+      expect(mockData.authenticating).toBe(false)
+    })
+
+    it('should handle cleanup errors gracefully', async () => {
+      const authData: WsAuthenticatedUserData = {
+        isConnected: true,
+        auth: true,
+        address: '0x123',
+        eventEmitter: mitt(),
+        wsConnectionId: 'test-client-id',
+        transport: {
+          close: jest.fn().mockImplementationOnce(() => {
+            throw new Error('Cleanup failed')
+          })
+        } as any,
+        connectionStartTime: Date.now(),
+        authenticating: false
+      }
+      mockWs.getUserData.mockReturnValue(authData)
+
+      await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+      expect(unregisterConnection).toHaveBeenCalledWith(authData)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
+      expect(authData.isConnected).toBe(false)
+      expect(authData.auth).toBe(false)
+      expect(authData.authenticating).toBe(false)
+    })
+
+    it('should clear timeout for non-authenticated connections', async () => {
+      const mockTimeout = setTimeout(() => {}, 1000)
+      const userData = mockWs.getUserData()
+      userData.timeout = mockTimeout
+
+      await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+      expect(mockWs.getUserData().timeout).toBeUndefined()
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
+      clearTimeout(mockTimeout)
+    })
+  })
+
+  describe('drain handler', () => {
+    it('should increment drain event', () => {
+      wsHandlers.drain(mockWs)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_drain_events')
+    })
+
+    describe('when the connection is authenticated', () => {
+      let authData: WsAuthenticatedUserData
+
+      beforeEach(() => {
+        authData = {
+          isConnected: true,
+          auth: true,
+          address: '0x123',
+          wsConnectionId: 'test-client-id',
+          eventEmitter: mitt(),
+          transport: { close: jest.fn() } as any,
+          connectionStartTime: Date.now(),
+          authenticating: false
+        }
+        jest.spyOn(authData.eventEmitter, 'emit')
+        mockWs.getUserData.mockReturnValue(authData)
+      })
+
+      it('should forward the drain event to the transport so it retries queued messages', () => {
+        wsHandlers.drain(mockWs)
+
+        expect(authData.eventEmitter.emit).toHaveBeenCalledWith('drain')
+      })
+    })
+  })
+
+  describe('when verifying the auth chain of a connecting socket', () => {
+    let metadataValidator: (metadata: Record<string, any> | undefined) => boolean
+
+    beforeEach(async () => {
+      mockWs.getUserData.mockReturnValue({
+        isConnected: true,
+        auth: false,
+        wsConnectionId: 'test-client-id'
+      } as WsNotAuthenticatedUserData)
+      ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+
+      await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+      metadataValidator = (verify as jest.Mock).mock.calls[0][3].metadataValidator
+    })
+
+    it('should install a metadata validator, matching the HTTP routes', () => {
+      expect(metadataValidator).toEqual(expect.any(Function))
+    })
+
+    it('should reject a chain whose metadata declares the scene signer', () => {
+      expect(metadataValidator({ signer: 'decentraland-kernel-scene' })).toBe(false)
+    })
+
+    // Refused rather than folded: the metadata reaches the validator exactly as signed, so a
+    // re-cased value must not be normalized into a comparison it would then pass.
+    it('should reject a re-cased scene signer instead of reading it as another signer', () => {
+      expect(metadataValidator({ signer: 'Decentraland-Kernel-Scene' })).toBe(false)
+    })
+
+    // The key is re-spelled here, not the value, and that is a different problem: a re-cased value
+    // is refused by the check above, but a re-spelled key presented no `signer` at all, so the gate
+    // read it as absent and answered "allowed" for metadata that names the signer it exists to
+    // refuse. Nor is the signature a backstop — the key is part of the signed payload, so a
+    // scene-driven client signs it under this spelling and the chain verifies cleanly.
+    //
+    // This handshake gates every RPC service on the socket, so the gate answering "allowed" is what
+    // stands between a scene-signed connection and all of them. @dcl/crypto-middleware 6.3.0 treats
+    // a key that case-folds to `signer` without being spelled exactly that as a rejection.
+    it('should reject a scene signer delivered under a re-spelled key rather than reading it as absent', () => {
+      expect(metadataValidator({ Signer: 'decentraland-kernel-scene' })).toBe(false)
+    })
+
+    it('should accept the empty metadata the explorer client sends on this socket', () => {
+      expect(metadataValidator({})).toBe(true)
+    })
+
+    it('should accept a chain signed by any other signer', () => {
+      expect(metadataValidator({ signer: 'dcl:explorer' })).toBe(true)
+    })
+
+    it('should accept absent metadata without throwing', () => {
+      expect(metadataValidator(undefined)).toBe(true)
+    })
+  })
+})

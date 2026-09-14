@@ -8,6 +8,7 @@ export interface ICommunityVoiceComponent {
 
   // Participant management
   joinCommunityVoiceChat(communityId: string, userAddress: string): Promise<{ connectionUrl: string }>
+  requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string, isRaisingHand: boolean): Promise<void>
   muteSpeakerInCommunityVoiceChat(
     communityId: string,
     targetUserAddress: string,

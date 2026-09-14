@@ -4,7 +4,8 @@ import {
   SocialSettings,
   IFriendsDatabaseComponent,
   PrivateMessagesPrivacy,
-  BlockedUsersMessagesVisibilitySetting
+  BlockedUsersMessagesVisibilitySetting,
+  SituationReactionsVisibility
 } from '../../../../src/types'
 
 describe('Settings Component', () => {
@@ -29,12 +30,14 @@ describe('Settings Component', () => {
           {
             address: 'address1',
             private_messages_privacy: PrivateMessagesPrivacy.ALL,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           },
           {
             address: 'address2',
             private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           }
         ]
         dbMock.getSocialSettings.mockResolvedValue(dbSettings)
@@ -57,7 +60,8 @@ describe('Settings Component', () => {
           {
             address: 'address1',
             private_messages_privacy: PrivateMessagesPrivacy.ALL,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           }
         ]
         dbMock.getSocialSettings.mockResolvedValue([])
@@ -81,24 +85,28 @@ describe('Settings Component', () => {
           {
             address: 'address1',
             private_messages_privacy: PrivateMessagesPrivacy.ALL,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           }
         ]
         expectedMixedSettings = [
           {
             address: 'address1',
             private_messages_privacy: PrivateMessagesPrivacy.ALL,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           },
           {
             address: 'address2',
             private_messages_privacy: PrivateMessagesPrivacy.ALL,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           },
           {
             address: 'address3',
             private_messages_privacy: PrivateMessagesPrivacy.ALL,
-            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+            blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+            show_situation_reactions: SituationReactionsVisibility.SHOW
           }
         ]
         dbMock.getSocialSettings.mockResolvedValue(dbSettingsFromDB)
