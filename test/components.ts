@@ -27,10 +27,7 @@ import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
-import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
 import { createPulseStatsComponent } from '../src/adapters/pulse-stats'
-import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
-import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
@@ -96,14 +93,9 @@ export const test = createRunner<TestComponents>({
 })
 
 async function initComponents(): Promise<TestComponents> {
-  const config = await createDotEnvConfigComponent(
-    {
-      path: ['.env.default', '.env.test']
-    },
-    {
-      ARCHIPELAGO_STATS_URL
-    }
-  )
+  const config = await createDotEnvConfigComponent({
+    path: ['.env.default', '.env.test']
+  })
 
   const uwsHttpServerConfig = createConfigComponent({
     HTTP_SERVER_PORT: await config.requireString('UWS_SERVER_PORT'),
@@ -160,9 +152,7 @@ async function initComponents(): Promise<TestComponents> {
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
-  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const pulseStats = await createPulseStatsComponent({ logs, config, redis, fetcher })
-  const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
@@ -341,7 +331,6 @@ async function initComponents(): Promise<TestComponents> {
   return {
     aiCompliance,
     analytics,
-    archipelagoStats,
     catalystClient,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     commsGatekeeper,
@@ -406,7 +395,6 @@ async function initComponents(): Promise<TestComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats,
     wsPool,
     schemaValidator
   }

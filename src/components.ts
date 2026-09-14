@@ -17,13 +17,11 @@ import { createSubscribersContext, createRpcServerComponent } from './adapters/r
 import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
-import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
 import { createPulseStatsComponent } from './adapters/pulse-stats'
 import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
-import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createVoiceComponent } from './logic/voice'
@@ -150,9 +148,7 @@ export async function initComponents(): Promise<AppComponents> {
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
-  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const pulseStats = await createPulseStatsComponent({ logs, config, fetcher, redis })
-  const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
@@ -345,7 +341,6 @@ export async function initComponents(): Promise<AppComponents> {
   return {
     aiCompliance,
     analytics,
-    archipelagoStats,
     catalystClient,
     cdnCacheInvalidator,
     commsGatekeeper,
@@ -408,7 +403,6 @@ export async function initComponents(): Promise<AppComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats,
     wsPool,
     schemaValidator
   }
