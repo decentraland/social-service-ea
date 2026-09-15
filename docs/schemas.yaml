@@ -956,12 +956,20 @@ components:
                 type: object
                 required:
                   - id
+                  - role
                 properties:
                   id:
                     type: string
                     format: uuid
-                    description: 'Unique identifier of a valid and visible community'
-              description: 'List of communities that exist and are visible to the user'
+                    description: 'Unique identifier of an active community the address is a member of'
+                  role:
+                    type: string
+                    enum:
+                      - owner
+                      - moderator
+                      - member
+                    description: 'Role the address holds in the community'
+              description: 'List of active communities the address is a member of'
 
     # ---- v2 (address-only) responses ----
     # Same shapes as their v1 counterparts but WITHOUT any Catalyst profile information

@@ -105,6 +105,12 @@ export enum CommunityRole {
   None = 'none'
 }
 
+/**
+ * A role an address actually holds in a community. `CommunityRole.None` is excluded because it
+ * denotes the absence of a membership and is never stored in `community_members`.
+ */
+export type CommunityMemberRole = Exclude<CommunityRole, CommunityRole.None>
+
 export type OwnedName = {
   id: string
   name: string

@@ -786,21 +786,21 @@ paths:
       operationId: getMemberCommunitiesByIds
       summary: Get member communities by IDs
       description: |
-        Validates a batch of community IDs and returns only those that exist and are visible to a user.
-        This endpoint is used by other services (like worlds-content-server) to validate community IDs
-        when storing access settings.
+        Filters a batch of community IDs down to the ones the given address is a member of.
+        This endpoint is used by other services (like worlds-content-server) to authorize users
+        based on community membership and to validate community IDs when storing access settings.
 
         **Authentication:**
         This endpoint requires Bearer token authentication (admin token).
 
-        **Visibility Rules:**
-        - Public communities are always visible
-        - Private communities are only visible to their members
-        - Banned users cannot see communities they are banned from
+        **Membership Rules:**
+        - A community is returned only if it is active and the address has a membership in it
+        - Listing and privacy are not considered: a listed community the address never joined is not returned
+        - Communities the address is banned from are never returned
 
         **Usage:**
-        - Caller provides a list of community IDs to validate
-        - Response contains only the valid and visible communities
+        - Caller provides a list of community IDs to check
+        - Response contains only the communities the address is a member of, with the role held in each
         - Caller should check that all requested IDs are present in the response
 
         **Limits:**
@@ -813,7 +813,7 @@ paths:
           required: true
           schema:
             type: string
-          description: ETH address of the member to check visibility for.
+          description: ETH address whose memberships are checked.
       requestBody:
         required: true
         content:
@@ -822,7 +822,7 @@ paths:
               $ref: './schemas.yaml#/components/schemas/GetMemberCommunitiesByIdsRequest'
       responses:
         '200':
-          description: Valid and visible communities
+          description: Communities the address is a member of
           content:
             application/json:
               schema:
