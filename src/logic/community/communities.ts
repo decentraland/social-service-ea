@@ -22,7 +22,9 @@ import {
   CommunitySearchResult,
   AggregatedCommunityWithMemberAndVoiceChatDataV2,
   CommunityWithUserInformationAndVoiceChatV2,
-  CommunityPublicInformationWithVoiceChatV2
+  CommunityPublicInformationWithVoiceChatV2,
+  CommunityRequestType,
+  CommunityRequestStatus
 } from './types'
 import {
   isOwner,
@@ -261,6 +263,32 @@ export function createCommunityComponent(
     return { communities, total, voiceChatStatusesFromFilter }
   }
 
+  /**
+   * Whether a caller may read a private community's details.
+   *
+   * A member obviously may. So may someone holding a pending invite: the invite notification names
+   * the community, and refusing the read would leave them deciding on an invitation they cannot see.
+   * Everyone else is told the community does not exist, which is what the posts and places reads
+   * already do for the same case.
+   */
+  async function mayReadPrivateCommunity(communityId: string, role: CommunityRole, address?: EthAddress) {
+    if (role !== CommunityRole.None) {
+      return true
+    }
+
+    if (!address) {
+      return false
+    }
+
+    const invites = await communitiesDb.getCommunityRequests(communityId, {
+      targetAddress: address,
+      type: CommunityRequestType.Invite,
+      status: CommunityRequestStatus.Pending
+    })
+
+    return invites.length > 0
+  }
+
   return {
     getCommunity: async (
       id: string,
@@ -271,6 +299,13 @@ export function createCommunityComponent(
       const community = await communitiesDb.getCommunity(id, options?.as)
 
       if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      if (
+        community.privacy === CommunityPrivacyEnum.Private &&
+        !(await mayReadPrivateCommunity(id, community.role, options?.as))
+      ) {
         throw new CommunityNotFoundError(id)
       }
 
@@ -293,6 +328,13 @@ export function createCommunityComponent(
       const community = await communitiesDb.getCommunity(id, options?.as)
 
       if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      if (
+        community.privacy === CommunityPrivacyEnum.Private &&
+        !(await mayReadPrivateCommunity(id, community.role, options?.as))
+      ) {
         throw new CommunityNotFoundError(id)
       }
 
