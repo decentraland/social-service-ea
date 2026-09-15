@@ -424,7 +424,6 @@ describe('Friends Component', () => {
         senderError = undefined
         recipientError = undefined
 
-        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
         mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: new Date() })
         mockRegistry.getProfiles.mockResolvedValue([
@@ -722,6 +721,7 @@ describe('Friends Component', () => {
         mockMutualFriends = [{ address: '0xmutual1' }, { address: '0xmutual2' }, { address: '0xmutual3' }]
         mockProfiles = [createMockProfile('0xmutual1'), createMockProfile('0xmutual2'), createMockProfile('0xmutual3')]
 
+        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
         mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
         mockFriendsDB.getMutualFriendsCount.mockResolvedValue(3)
         mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
