@@ -77,8 +77,14 @@ test('Get Community Controller', function ({ components, spyComponents }) {
               )
             })
 
-            it('should let them read it, so they can act on the invitation', async () => {
+            it('should let them read it on v1, so they can act on the invitation', async () => {
               const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+
+              expect(response.status).toBe(200)
+            })
+
+            it('should let them read it on v2 as well', async () => {
+              const response = await makeRequest(identity, `/v2/communities/${communityId}`)
 
               expect(response.status).toBe(200)
             })
