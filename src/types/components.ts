@@ -14,6 +14,7 @@ import { SQLStatement } from 'sql-template-strings'
 import {
   Action,
   BlockedUserWithDate,
+  CommunityMemberRole,
   CommunityRole,
   Friendship,
   FriendshipAction,
@@ -278,7 +279,7 @@ export interface ICommunitiesDatabaseComponent {
   getMemberCommunitiesByIds(
     communityIds: string[],
     memberAddress: EthAddress
-  ): Promise<Array<{ id: string; role: CommunityRole }>>
+  ): Promise<Array<{ id: string; role: CommunityMemberRole }>>
   /**
    * Searches communities by name for a specific caller.
    *

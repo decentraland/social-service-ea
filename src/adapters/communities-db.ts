@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings'
-import { AppComponents, ICommunitiesDatabaseComponent, CommunityRole, Pagination } from '../types'
+import { AppComponents, ICommunitiesDatabaseComponent, CommunityMemberRole, CommunityRole, Pagination } from '../types'
 import {
   Community,
   CommunityDB,
@@ -1378,7 +1378,7 @@ export function createCommunitiesDBComponent(
     async getMemberCommunitiesByIds(
       communityIds: string[],
       memberAddress: EthAddress
-    ): Promise<Array<{ id: string; role: CommunityRole }>> {
+    ): Promise<Array<{ id: string; role: CommunityMemberRole }>> {
       if (communityIds.length === 0) {
         return []
       }
@@ -1398,7 +1398,7 @@ export function createCommunitiesDBComponent(
           AND cb.banned_address IS NULL
       `
 
-      const result = await pg.query<{ id: string; role: CommunityRole }>(query)
+      const result = await pg.query<{ id: string; role: CommunityMemberRole }>(query)
       return result.rows
     },
 

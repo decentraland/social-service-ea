@@ -3,7 +3,7 @@ import {
   GetMemberCommunitiesByIdsResponse
 } from '../../../../../src/controllers/handlers/http/get-member-communities-by-ids-handler'
 import { createLogsMockedComponent, mockCommunitiesDB } from '../../../../mocks/components'
-import { CommunityRole, HTTPResponse } from '../../../../../src/types'
+import { CommunityMemberRole, CommunityRole, HTTPResponse } from '../../../../../src/types'
 
 describe('getMemberCommunitiesByIdsHandler', () => {
   let mockLogs: ReturnType<typeof createLogsMockedComponent>
@@ -34,7 +34,7 @@ describe('getMemberCommunitiesByIdsHandler', () => {
       })
 
       describe('and the address is a member of all the requested communities', () => {
-        let memberCommunities: Array<{ id: string; role: CommunityRole }>
+        let memberCommunities: Array<{ id: string; role: CommunityMemberRole }>
 
         beforeEach(() => {
           memberCommunities = [
@@ -71,7 +71,7 @@ describe('getMemberCommunitiesByIdsHandler', () => {
       })
 
       describe('and the address is a member of only some of the requested communities', () => {
-        let memberCommunities: Array<{ id: string; role: CommunityRole }>
+        let memberCommunities: Array<{ id: string; role: CommunityMemberRole }>
 
         beforeEach(() => {
           memberCommunities = [{ id: communityIds[0], role: CommunityRole.Member }]
