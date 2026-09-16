@@ -61,7 +61,6 @@ import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createCommunityVoiceComponent } from '../src/logic/community-voice'
 import { createCommunityVoiceChatCacheComponent } from '../src/logic/community-voice/community-voice-cache'
-import { createCommunityVoiceChatPollingComponent } from '../src/logic/community-voice/community-voice-polling'
 import { createSettingsComponent } from '../src/logic/settings'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
 import { createReferralComponent } from '../src/logic/referral/referral'
@@ -193,14 +192,7 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail
   })
 
-  // Community voice chat cache and polling components
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
-  const communityVoiceChatPolling = createCommunityVoiceChatPollingComponent({
-    logs,
-    commsGatekeeper,
-    pubsub,
-    communityVoiceChatCache
-  })
   const communityMembers = await createCommunityMembersComponent({
     communitiesDb,
     communityRoles,
@@ -326,7 +318,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const queue = createMemoryQueueComponent()
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
-  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
+  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor, pubsub, communityVoiceChatCache })
 
   const storageHelper = await createStorageHelper({ config })
 
@@ -359,7 +351,6 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityVoice,
     communityVoiceChatCache,
-    communityVoiceChatPolling,
     config,
     email,
     featureFlags,

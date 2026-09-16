@@ -62,7 +62,6 @@ import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalid
 import { createEmailComponent } from './adapters/email'
 import { createFriendsComponent } from './logic/friends'
 import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/community-voice-cache'
-import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createAIComplianceComponent } from './adapters/ai-compliance'
 import { createFeaturesComponent } from '@dcl/features-component'
@@ -125,7 +124,6 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
-  const communityVoiceChatPollingJobInterval = await config.requireNumber('COMMUNITY_VOICE_CHAT_POLLING_JOB_INTERVAL')
 
   const pg = await createPgComponent(
     { logs, config, metrics },
@@ -175,14 +173,9 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     analytics
   })
-  // Community voice chat cache and polling
+  // Tracks the rooms this service announced, so the comms-gatekeeper ended event knows the audience
+  // to clean up and cannot be acted on twice.
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
-  const communityVoiceChatPolling = createCommunityVoiceChatPollingComponent({
-    logs,
-    commsGatekeeper,
-    pubsub,
-    communityVoiceChatCache
-  })
 
   const storage = await createS3Adapter({ config })
   const wsPool = await createWsPoolComponent({ logs, metrics, config })
@@ -331,14 +324,6 @@ export async function initComponents(): Promise<AppComponents> {
     { repeat: true }
   )
 
-  // Community voice chat polling job (every 45 seconds)
-  const communityVoiceChatPollingJob = createJobComponent(
-    { logs },
-    // wrap function itself since it is executed in different context (setImmediate)
-    () => withoutTracing(() => communityVoiceChatPolling.checkAllVoiceChats()),
-    communityVoiceChatPollingJobInterval,
-    { repeat: true }
-  )
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueComponent()
 
@@ -348,7 +333,7 @@ export async function initComponents(): Promise<AppComponents> {
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
-  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
+  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor, pubsub, communityVoiceChatCache })
 
   // NOTE: components are started sequentially by @well-known-components in this object's key
   // order (for...in), awaiting each. `rpcServer.start()` subscribes on `pubsub`'s Redis
@@ -378,8 +363,6 @@ export async function initComponents(): Promise<AppComponents> {
     communityThumbnail,
     communityVoice,
     communityVoiceChatCache,
-    communityVoiceChatPolling,
-    communityVoiceChatPollingJob,
     communityRankingCalculationJob,
     config,
     email,
