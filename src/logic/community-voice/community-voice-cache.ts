@@ -49,9 +49,11 @@ export interface ICommunityVoiceChatCacheComponent {
    * Atomically reads and removes a community voice chat from the cache, so that of several
    * concurrent callers exactly one gets it
    * @param communityId - The community ID
-   * @returns The cached voice chat or null if nothing was cached
+   * @param endedAt - When given, only a room created at or before this time is taken, so the end of
+   * an earlier room cannot remove the entry of the one that replaced it
+   * @returns The cached voice chat, or null if nothing was cached or the cached room is newer
    */
-  takeCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null>
+  takeCommunityVoiceChat(communityId: string, endedAt?: number): Promise<CachedCommunityVoiceChat | null>
 }
 
 /**
@@ -67,6 +69,15 @@ export function createCommunityVoiceChatCacheComponent({
   // Long enough to outlive any room. Every end path removes the entry and a start overwrites it,
   // so a stale one left behind by a lost event is harmless.
   const CACHE_TTL = 7 * 24 * 60 * 60 // 7 days in seconds
+  // Read, compare and delete server-side so no write can slip in between the three.
+  const TAKE_SCRIPT = [
+    "local chat = redis.call('GET', KEYS[1])",
+    'if not chat then return nil end',
+    'local endedAt = tonumber(ARGV[1])',
+    'if endedAt ~= nil and cjson.decode(chat).createdAt > endedAt then return {0, chat} end',
+    "redis.call('DEL', KEYS[1])",
+    'return {1, chat}'
+  ].join('; ')
 
   function getCacheKey(communityId: string): string {
     return `${CACHE_PREFIX}${communityId}`
@@ -112,10 +123,32 @@ export function createCommunityVoiceChatCacheComponent({
     }
   }
 
-  async function takeCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null> {
+  async function takeCommunityVoiceChat(
+    communityId: string,
+    endedAt?: number
+  ): Promise<CachedCommunityVoiceChat | null> {
     try {
-      const serializedChat = await redis.client.getDel(getCacheKey(communityId))
-      return serializedChat ? (JSON.parse(serializedChat) as CachedCommunityVoiceChat) : null
+      const reply = (await redis.client.eval(TAKE_SCRIPT, {
+        keys: [getCacheKey(communityId)],
+        arguments: [endedAt?.toString() ?? '']
+      })) as [number, string] | null
+
+      if (!reply) {
+        return null
+      }
+
+      const [taken, serializedChat] = reply
+      const cachedChat = JSON.parse(serializedChat) as CachedCommunityVoiceChat
+
+      if (taken !== 1) {
+        logger.info(`Kept the cached community voice chat for community ${communityId}: it started after the end`, {
+          createdAt: cachedChat.createdAt,
+          endedAt: endedAt ?? 0
+        })
+        return null
+      }
+
+      return cachedChat
     } catch (error) {
       logger.warn(`Error taking community voice chat ${communityId} from cache`, {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'

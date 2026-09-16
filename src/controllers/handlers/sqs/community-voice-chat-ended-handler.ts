@@ -4,8 +4,11 @@ import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@d
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 import { ICommunityVoiceChatCacheComponent } from '../../../logic/community-voice/community-voice-cache'
 import { AppComponents } from '../../../types/system'
-import { errorMessageOrDefault } from '../../../utils/errors'
+import { sleep } from '../../../utils/timer'
 import { EventHandler } from './types'
+
+const PUBLISH_ATTEMPTS = 3
+const PUBLISH_RETRY_DELAY_MS = 250
 
 /**
  * Propagates a community voice chat teardown reported by comms-gatekeeper to the subscribed clients.
@@ -39,53 +42,47 @@ export function createCommunityVoiceChatEndedHandler({
         return
       }
 
-      const cachedChat = await communityVoiceChatCache.getCommunityVoiceChat(communityId)
-
-      if (!cachedChat) {
-        logger.debug(`No active community voice chat cached for community ${communityId}, nothing to end`)
-        return
-      }
-
-      // A community can open a new room right after the previous one ended. Without this guard a
-      // late or redelivered event for the old room would tear the new one down for every client.
-      if (timestamp && cachedChat.createdAt > timestamp) {
-        logger.info(`Ignoring a community voice chat ended event older than the cached room`, {
-          communityId,
-          eventTimestamp: timestamp,
-          roomCreatedAt: cachedChat.createdAt
-        })
-        return
-      }
-
-      // Take the entry atomically: of several consumers handling the same end, only the one that
-      // gets it announces.
-      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId)
+      // Take the entry in one atomic step, and only if the cached room started before this end: a
+      // community can open a new room right after the previous one ended, and a late or redelivered
+      // event for the old room must not tear the new one down. Of several consumers handling the
+      // same end, only the one that gets the entry announces it.
+      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId, timestamp || undefined)
 
       if (!endedChat) {
-        logger.debug(`The end of the community voice chat for community ${communityId} was already announced`)
+        logger.debug(`Nothing to end for community ${communityId}: no room is cached or the cached one is newer`)
         return
       }
 
       const endedAt = Date.now()
+      const update = {
+        communityId,
+        status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+        endedAt,
+        // An ended update carries no community details: the client already has the context.
+        positions: [],
+        worlds: [],
+        communityName: '',
+        communityImage: undefined,
+        // Preserve the start-time fanout class for best-effort cleanup by the update handler.
+        notificationScope: endedChat.notificationScope
+      }
 
-      try {
-        await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+      let published = false
+      for (let attempt = 1; attempt <= PUBLISH_ATTEMPTS && !published; attempt++) {
+        if (attempt > 1) {
+          await sleep(PUBLISH_RETRY_DELAY_MS)
+        }
+        published = await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, update)
+      }
+
+      if (!published) {
+        // Give the entry back so a redelivery of this message can still announce the end.
+        logger.error(`Failed to publish the ended update for community ${communityId}, keeping the room cached`)
+        await communityVoiceChatCache.setCommunityVoiceChat(
           communityId,
-          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
-          endedAt,
-          // An ended update carries no community details: the client already has the context.
-          positions: [],
-          worlds: [],
-          communityName: '',
-          communityImage: undefined,
-          // Preserve the start-time fanout class for best-effort cleanup by the update handler.
-          notificationScope: endedChat.notificationScope
-        })
-      } catch (error) {
-        // The consumer deletes the message whatever happens here, so there is nothing to retry.
-        logger.error(`Failed to publish the ended update for community ${communityId}`, {
-          error: errorMessageOrDefault(error)
-        })
+          endedChat.createdAt,
+          endedChat.notificationScope
+        )
         return
       }
 

@@ -64,8 +64,8 @@ describe('CommunityVoiceChatEndedHandler', () => {
         notificationScope: 'all'
       }
 
-      communityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue(cachedChat)
       communityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue(cachedChat)
+      pubsub.publishInChannel.mockResolvedValue(true)
     })
 
     it('should publish an ended update on the community voice chat updates channel', async () => {
@@ -89,72 +89,60 @@ describe('CommunityVoiceChatEndedHandler', () => {
       )
     })
 
-    it('should take the cached room so a redelivered event is not announced twice', async () => {
+    // A room started after this end must survive it, and a redelivered event must be announced once.
+    it('should take the cached room bounded by the time the end happened', async () => {
       await handler.handle(event)
 
-      expect(communityVoiceChatCache.takeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
+      expect(communityVoiceChatCache.takeCommunityVoiceChat).toHaveBeenCalledWith(communityId, event.timestamp)
     })
 
-    describe('and another consumer took the cached room first', () => {
+    describe('and publishing the update fails once', () => {
       beforeEach(() => {
-        communityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue(null)
+        pubsub.publishInChannel.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
       })
 
-      it('should publish no update', async () => {
+      it('should publish it again', async () => {
         await handler.handle(event)
 
-        expect(pubsub.publishInChannel).not.toHaveBeenCalled()
+        expect(pubsub.publishInChannel).toHaveBeenCalledTimes(2)
+      })
+
+      it('should not put the room back in the cache', async () => {
+        await handler.handle(event)
+
+        expect(communityVoiceChatCache.setCommunityVoiceChat).not.toHaveBeenCalled()
       })
     })
 
-    describe('and publishing the update fails', () => {
+    describe('and publishing the update keeps failing', () => {
       beforeEach(() => {
-        pubsub.publishInChannel.mockRejectedValueOnce(new Error('Redis error'))
+        pubsub.publishInChannel.mockResolvedValue(false)
+        communityVoiceChatCache.setCommunityVoiceChat.mockResolvedValue(undefined)
       })
 
-      it('should not throw, since the message is not redelivered anyway', async () => {
-        await expect(handler.handle(event)).resolves.toBeUndefined()
+      it('should stop after three attempts', async () => {
+        await handler.handle(event)
+
+        expect(pubsub.publishInChannel).toHaveBeenCalledTimes(3)
+      })
+
+      it('should put the room back in the cache so a redelivery can announce it', async () => {
+        await handler.handle(event)
+
+        expect(communityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(communityId, roomCreatedAt, 'all')
       })
     })
   })
 
-  describe('when no room is cached for the community', () => {
+  describe('when no room is cached for the community, or the cached one started after the event', () => {
     beforeEach(() => {
-      communityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue(null)
+      communityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue(null)
     })
 
     it('should publish no update', async () => {
       await handler.handle(event)
 
       expect(pubsub.publishInChannel).not.toHaveBeenCalled()
-    })
-
-    it('should not touch the cache', async () => {
-      await handler.handle(event)
-
-      expect(communityVoiceChatCache.takeCommunityVoiceChat).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('when the event is older than the room currently cached', () => {
-    beforeEach(() => {
-      communityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue({
-        communityId,
-        createdAt: event.timestamp + 1000,
-        notificationScope: 'members'
-      })
-    })
-
-    it('should publish no update, so a room started after the event survives', async () => {
-      await handler.handle(event)
-
-      expect(pubsub.publishInChannel).not.toHaveBeenCalled()
-    })
-
-    it('should keep the cached room', async () => {
-      await handler.handle(event)
-
-      expect(communityVoiceChatCache.takeCommunityVoiceChat).not.toHaveBeenCalled()
     })
   })
 
@@ -167,6 +155,12 @@ describe('CommunityVoiceChatEndedHandler', () => {
       await handler.handle(event)
 
       expect(pubsub.publishInChannel).not.toHaveBeenCalled()
+    })
+
+    it('should not touch the cache', async () => {
+      await handler.handle(event)
+
+      expect(communityVoiceChatCache.takeCommunityVoiceChat).not.toHaveBeenCalled()
     })
   })
 })

@@ -542,6 +542,7 @@ describe('Community Voice Logic', () => {
           moderatorCount: 1
         })
         mockCommsGatekeeper.endCommunityVoiceChatRoom.mockResolvedValue(undefined)
+        mockPubsub.publishInChannel.mockResolvedValue(true)
       })
 
       describe('when user is an owner', () => {
@@ -600,6 +601,22 @@ describe('Community Voice Logic', () => {
           expect(mockCommunityVoiceChatCache.takeCommunityVoiceChat.mock.invocationCallOrder[0]).toBeLessThan(
             mockCommsGatekeeper.endCommunityVoiceChatRoom.mock.invocationCallOrder[0]
           )
+        })
+
+        describe('and announcing the end fails', () => {
+          beforeEach(async () => {
+            mockPubsub.publishInChannel.mockResolvedValue(false)
+            mockCommunityVoiceChatCache.setCommunityVoiceChat.mockResolvedValue(undefined)
+            await communityVoice.endCommunityVoiceChat(communityId, userAddress)
+          })
+
+          it('should give the cached room back so the gatekeeper event can announce it', () => {
+            expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              roomCreatedAt,
+              'all'
+            )
+          })
         })
 
         describe('and the gatekeeper fails to end the room', () => {

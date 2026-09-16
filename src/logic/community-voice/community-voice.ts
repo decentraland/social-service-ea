@@ -334,7 +334,7 @@ export async function createCommunityVoiceComponent({
       const endedAt = Date.now()
 
       // Publish end event - we don't need community details for ENDED status
-      await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+      const published = await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
         endedAt,
@@ -345,6 +345,16 @@ export async function createCommunityVoiceComponent({
         // Preserve the start-time fanout class for best-effort cleanup by the update handler.
         notificationScope: endedChat?.notificationScope
       })
+
+      if (!published && endedChat) {
+        // Give the entry back so the ended event the gatekeeper just published can announce it instead.
+        logger.warn(
+          `Could not announce the end of the community voice chat for community ${communityId}, keeping it cached`
+        )
+        await communityVoiceChatCache
+          .setCommunityVoiceChat(communityId, endedChat.createdAt, endedChat.notificationScope)
+          .catch(() => logger.warn(`Could not restore the cached community voice chat for community ${communityId}`))
+      }
 
       // Analytics event
       analytics.fireEvent(AnalyticsEvent.END_COMMUNITY_CALL, {

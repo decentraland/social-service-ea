@@ -7,7 +7,7 @@ describe('Community Voice Chat Cache Component', () => {
   let mockRedisGet: jest.MockedFunction<any>
   let mockRedisPut: jest.MockedFunction<any>
   let mockRedisDel: jest.MockedFunction<any>
-  let mockRedisGetDel: jest.MockedFunction<any>
+  let mockRedisEval: jest.MockedFunction<any>
 
   // Fixed timestamps to avoid test flakiness
   const FIXED_NOW = 1640995200000 // Jan 1, 2022 00:00:00 UTC
@@ -20,11 +20,11 @@ describe('Community Voice Chat Cache Component', () => {
     mockRedisGet = jest.fn()
     mockRedisPut = jest.fn()
     mockRedisDel = jest.fn()
-    mockRedisGetDel = jest.fn()
+    mockRedisEval = jest.fn()
 
     const mockRedisClient = {
       del: mockRedisDel,
-      getDel: mockRedisGetDel
+      eval: mockRedisEval
     }
 
     mockComponents = {
@@ -207,39 +207,61 @@ describe('Community Voice Chat Cache Component', () => {
   })
 
   describe('when taking community voice chat data', () => {
-    describe('when a community voice chat is cached', () => {
-      const communityId = 'test-community-123'
-      const cachedChat = {
-        communityId,
-        createdAt: FIXED_CREATED_AT,
-        notificationScope: 'members' as const
-      }
+    const communityId = 'test-community-123'
+    const cacheKey = 'community-voice-chat:test-community-123'
+    const cachedChat = {
+      communityId,
+      createdAt: FIXED_CREATED_AT,
+      notificationScope: 'members' as const
+    }
 
+    describe('when a community voice chat is cached', () => {
       beforeEach(() => {
-        mockRedisGetDel.mockResolvedValue(JSON.stringify(cachedChat))
+        mockRedisEval.mockResolvedValue([1, JSON.stringify(cachedChat)])
       })
 
       it('should return the cached community voice chat', async () => {
-        const result = await cache.takeCommunityVoiceChat(communityId)
+        const result = await cache.takeCommunityVoiceChat(communityId, FIXED_NOW)
 
         expect(result).toEqual(cachedChat)
       })
 
-      it('should remove it from the cache in the same operation', async () => {
+      it('should read, compare and delete it in a single server-side step bounded by the end time', async () => {
+        await cache.takeCommunityVoiceChat(communityId, FIXED_NOW)
+
+        expect(mockRedisEval).toHaveBeenCalledWith(expect.stringContaining("redis.call('DEL', KEYS[1])"), {
+          keys: [cacheKey],
+          arguments: [FIXED_NOW.toString()]
+        })
+        expect(mockRedisDel).not.toHaveBeenCalled()
+      })
+
+      it('should take it unconditionally when no end time is given', async () => {
         await cache.takeCommunityVoiceChat(communityId)
 
-        expect(mockRedisGetDel).toHaveBeenCalledWith('community-voice-chat:test-community-123')
-        expect(mockRedisDel).not.toHaveBeenCalled()
+        expect(mockRedisEval).toHaveBeenCalledWith(expect.any(String), { keys: [cacheKey], arguments: [''] })
+      })
+    })
+
+    describe('when the cached community voice chat started after the given end', () => {
+      beforeEach(() => {
+        mockRedisEval.mockResolvedValue([0, JSON.stringify(cachedChat)])
+      })
+
+      it('should return null', async () => {
+        const result = await cache.takeCommunityVoiceChat(communityId, FIXED_CREATED_AT - 1)
+
+        expect(result).toBeNull()
       })
     })
 
     describe('when nothing is cached for the community', () => {
       beforeEach(() => {
-        mockRedisGetDel.mockResolvedValue(null)
+        mockRedisEval.mockResolvedValue(null)
       })
 
       it('should return null', async () => {
-        const result = await cache.takeCommunityVoiceChat('non-existent')
+        const result = await cache.takeCommunityVoiceChat('non-existent', FIXED_NOW)
 
         expect(result).toBeNull()
       })
@@ -247,11 +269,11 @@ describe('Community Voice Chat Cache Component', () => {
 
     describe('when Redis throws an error', () => {
       beforeEach(() => {
-        mockRedisGetDel.mockRejectedValue(new Error('Redis error'))
+        mockRedisEval.mockRejectedValue(new Error('Redis error'))
       })
 
       it('should return null instead of throwing', async () => {
-        await expect(cache.takeCommunityVoiceChat('test-community')).resolves.toBeNull()
+        await expect(cache.takeCommunityVoiceChat(communityId, FIXED_NOW)).resolves.toBeNull()
       })
     })
   })
