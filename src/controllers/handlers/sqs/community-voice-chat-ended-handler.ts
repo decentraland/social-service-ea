@@ -15,8 +15,8 @@ import { EventHandler } from './types'
  * this event, which is what lets this service report the end as it happens instead of sampling the
  * gatekeeper's status on a timer.
  *
- * The cache entry is the idempotency token: the update is published only for the call that removes
- * it, so redeliveries of the same at-least-once message are silent.
+ * The cache entry is the idempotency token: the update is published only by the call that takes
+ * it, so redeliveries of the same at-least-once message and concurrent consumers are silent.
  */
 export function createCommunityVoiceChatEndedHandler({
   logs,
@@ -57,7 +57,14 @@ export function createCommunityVoiceChatEndedHandler({
         return
       }
 
-      await communityVoiceChatCache.removeCommunityVoiceChat(communityId)
+      // Take the entry atomically: of several consumers handling the same end, only the one that
+      // gets it announces.
+      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId)
+
+      if (!endedChat) {
+        logger.debug(`The end of the community voice chat for community ${communityId} was already announced`)
+        return
+      }
 
       const endedAt = Date.now()
 
@@ -72,20 +79,21 @@ export function createCommunityVoiceChatEndedHandler({
           communityName: '',
           communityImage: undefined,
           // Preserve the start-time fanout class for best-effort cleanup by the update handler.
-          notificationScope: cachedChat.notificationScope
+          notificationScope: endedChat.notificationScope
         })
       } catch (error) {
+        // The consumer deletes the message whatever happens here, so there is nothing to retry.
         logger.error(`Failed to publish the ended update for community ${communityId}`, {
           error: errorMessageOrDefault(error)
         })
-        throw error
+        return
       }
 
       logger.info(`Community voice chat ended for community ${communityId}`, {
         communityId,
-        startedAt: cachedChat.createdAt,
+        startedAt: endedChat.createdAt,
         endedAt,
-        duration: endedAt - cachedChat.createdAt
+        duration: endedAt - endedChat.createdAt
       })
     }
   }

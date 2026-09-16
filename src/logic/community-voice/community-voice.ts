@@ -313,15 +313,23 @@ export async function createCommunityVoiceComponent({
     }
 
     try {
-      // End the room in comms-gatekeeper (force end regardless of participants)
-      await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
+      // Take the recorded audience before the gatekeeper publishes its ended event, so the queue
+      // handler finds nothing and this is the only announcement.
+      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId)
+
+      try {
+        // End the room in comms-gatekeeper (force end regardless of participants)
+        await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
+      } catch (error) {
+        // The room is still live: give the entry back so a later end can still be announced.
+        if (endedChat) {
+          await communityVoiceChatCache
+            .setCommunityVoiceChat(communityId, endedChat.createdAt, endedChat.notificationScope)
+            .catch(() => logger.warn(`Could not restore the cached community voice chat for community ${communityId}`))
+        }
+        throw error
+      }
       logger.info(`Community voice chat room ended for community ${communityId}`)
-
-      // Read the recorded audience before dropping the entry that holds it.
-      const cachedChatOnEnd = await communityVoiceChatCache.getCommunityVoiceChat(communityId)
-
-      // Remove from cache
-      await communityVoiceChatCache.removeCommunityVoiceChat(communityId)
 
       const endedAt = Date.now()
 
@@ -335,7 +343,7 @@ export async function createCommunityVoiceComponent({
         communityName: undefined,
         communityImage: undefined,
         // Preserve the start-time fanout class for best-effort cleanup by the update handler.
-        notificationScope: cachedChatOnEnd?.notificationScope
+        notificationScope: endedChat?.notificationScope
       })
 
       // Analytics event

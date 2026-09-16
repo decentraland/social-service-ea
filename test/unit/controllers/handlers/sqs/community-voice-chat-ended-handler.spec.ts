@@ -27,7 +27,8 @@ describe('CommunityVoiceChatEndedHandler', () => {
     communityVoiceChatCache = {
       setCommunityVoiceChat: jest.fn(),
       getCommunityVoiceChat: jest.fn(),
-      removeCommunityVoiceChat: jest.fn()
+      removeCommunityVoiceChat: jest.fn(),
+      takeCommunityVoiceChat: jest.fn()
     }
 
     event = {
@@ -59,13 +60,12 @@ describe('CommunityVoiceChatEndedHandler', () => {
     beforeEach(() => {
       cachedChat = {
         communityId,
-        isActive: true,
-        lastChecked: roomCreatedAt,
         createdAt: roomCreatedAt,
         notificationScope: 'all'
       }
 
       communityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue(cachedChat)
+      communityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue(cachedChat)
     })
 
     it('should publish an ended update on the community voice chat updates channel', async () => {
@@ -89,10 +89,32 @@ describe('CommunityVoiceChatEndedHandler', () => {
       )
     })
 
-    it('should drop the cached room so a redelivered event is not announced twice', async () => {
+    it('should take the cached room so a redelivered event is not announced twice', async () => {
       await handler.handle(event)
 
-      expect(communityVoiceChatCache.removeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
+      expect(communityVoiceChatCache.takeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
+    })
+
+    describe('and another consumer took the cached room first', () => {
+      beforeEach(() => {
+        communityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue(null)
+      })
+
+      it('should publish no update', async () => {
+        await handler.handle(event)
+
+        expect(pubsub.publishInChannel).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and publishing the update fails', () => {
+      beforeEach(() => {
+        pubsub.publishInChannel.mockRejectedValueOnce(new Error('Redis error'))
+      })
+
+      it('should not throw, since the message is not redelivered anyway', async () => {
+        await expect(handler.handle(event)).resolves.toBeUndefined()
+      })
     })
   })
 
@@ -106,14 +128,18 @@ describe('CommunityVoiceChatEndedHandler', () => {
 
       expect(pubsub.publishInChannel).not.toHaveBeenCalled()
     })
+
+    it('should not touch the cache', async () => {
+      await handler.handle(event)
+
+      expect(communityVoiceChatCache.takeCommunityVoiceChat).not.toHaveBeenCalled()
+    })
   })
 
   describe('when the event is older than the room currently cached', () => {
     beforeEach(() => {
       communityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue({
         communityId,
-        isActive: true,
-        lastChecked: event.timestamp + 1000,
         createdAt: event.timestamp + 1000,
         notificationScope: 'members'
       })
@@ -128,7 +154,7 @@ describe('CommunityVoiceChatEndedHandler', () => {
     it('should keep the cached room', async () => {
       await handler.handle(event)
 
-      expect(communityVoiceChatCache.removeCommunityVoiceChat).not.toHaveBeenCalled()
+      expect(communityVoiceChatCache.takeCommunityVoiceChat).not.toHaveBeenCalled()
     })
   })
 
@@ -141,23 +167,6 @@ describe('CommunityVoiceChatEndedHandler', () => {
       await handler.handle(event)
 
       expect(pubsub.publishInChannel).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('when publishing the update fails', () => {
-    beforeEach(() => {
-      communityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue({
-        communityId,
-        isActive: true,
-        lastChecked: roomCreatedAt,
-        createdAt: roomCreatedAt,
-        notificationScope: 'members'
-      })
-      pubsub.publishInChannel.mockRejectedValueOnce(new Error('Redis error'))
-    })
-
-    it('should throw the error', async () => {
-      await expect(handler.handle(event)).rejects.toThrow('Redis error')
     })
   })
 })

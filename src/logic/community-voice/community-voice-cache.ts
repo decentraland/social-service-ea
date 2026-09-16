@@ -6,8 +6,6 @@ import { AppComponents, CommunityVoiceChatNotificationScope } from '../../types'
  */
 export interface CachedCommunityVoiceChat {
   communityId: string
-  isActive: boolean
-  lastChecked: number
   createdAt: number
   /** Who the room was announced to at start; absent for rooms cached before this was recorded. */
   notificationScope?: CommunityVoiceChatNotificationScope
@@ -46,6 +44,14 @@ export interface ICommunityVoiceChatCacheComponent {
    * @param communityId - The community ID
    */
   removeCommunityVoiceChat(communityId: string): Promise<void>
+
+  /**
+   * Atomically reads and removes a community voice chat from the cache, so that of several
+   * concurrent callers exactly one gets it
+   * @param communityId - The community ID
+   * @returns The cached voice chat or null if nothing was cached
+   */
+  takeCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null>
 }
 
 /**
@@ -58,7 +64,9 @@ export function createCommunityVoiceChatCacheComponent({
   const logger = logs.getLogger('community-voice-chat-cache')
 
   const CACHE_PREFIX = 'community-voice-chat:'
-  const CACHE_TTL = 24 * 60 * 60 // 24 hours in seconds
+  // Long enough to outlive any room. Every end path removes the entry and a start overwrites it,
+  // so a stale one left behind by a lost event is harmless.
+  const CACHE_TTL = 7 * 24 * 60 * 60 // 7 days in seconds
 
   function getCacheKey(communityId: string): string {
     return `${CACHE_PREFIX}${communityId}`
@@ -69,12 +77,8 @@ export function createCommunityVoiceChatCacheComponent({
     createdAt: number = Date.now(),
     notificationScope?: CommunityVoiceChatNotificationScope
   ): Promise<void> {
-    const now = Date.now()
-
     const cachedChat: CachedCommunityVoiceChat = {
       communityId,
-      isActive: true, // Always true for active chats
-      lastChecked: now,
       createdAt,
       notificationScope
     }
@@ -108,9 +112,22 @@ export function createCommunityVoiceChatCacheComponent({
     }
   }
 
+  async function takeCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null> {
+    try {
+      const serializedChat = await redis.client.getDel(getCacheKey(communityId))
+      return serializedChat ? (JSON.parse(serializedChat) as CachedCommunityVoiceChat) : null
+    } catch (error) {
+      logger.warn(`Error taking community voice chat ${communityId} from cache`, {
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return null
+    }
+  }
+
   return {
     setCommunityVoiceChat,
     getCommunityVoiceChat,
-    removeCommunityVoiceChat
+    removeCommunityVoiceChat,
+    takeCommunityVoiceChat
   }
 }
