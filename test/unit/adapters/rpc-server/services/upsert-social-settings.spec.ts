@@ -255,8 +255,12 @@ describe('upsertSocialSettingsService', () => {
       result = await upsertSocialSettings(payload, context)
     })
 
-    it('should return an internal server error', () => {
-      expect(result.response.$case).toEqual('internalServerError')
+    it('should return ok since the DB write succeeded and the Gatekeeper failure is fail-closed', () => {
+      expect(result.response.$case).toEqual('ok')
+      if (result.response.$case === 'ok') {
+        const expectedSettings = convertDBSettingsToRPCSettings(expectedDBSettings)
+        expect(result.response.ok).toEqual(expectedSettings)
+      }
     })
 
     it('should write the permissive database value before Gatekeeper retains its restrictive value', () => {

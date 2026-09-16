@@ -67,7 +67,14 @@ export function upsertSocialSettingsService({
         // restrictive value, which is inconsistent but fail-closed and visible to the client.
         settings = await friendsDb.upsertSocialSettings(context.address, dbSettings)
         if (privacyUpdate !== undefined) {
-          await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(context.address, privacyUpdate)
+          try {
+            await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(context.address, privacyUpdate)
+          } catch (gatekeeperError) {
+            // The DB (source of truth) already has the loosened value. The Gatekeeper retains
+            // the more restrictive setting until the next successful sync — fail-closed by design.
+            const msg = isErrorWithMessage(gatekeeperError) ? gatekeeperError.message : 'Unknown error'
+            logger.warn(`Gatekeeper sync failed after loosening DB write for ${context.address}: ${msg}`)
+          }
         }
       }
 
