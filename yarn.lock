@@ -1146,6 +1146,13 @@
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
 
+"@dcl/pulse-protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-34523473551.commit-3ef4c52.tgz":
+  version "1.0.0-34523473551.commit-3ef4c52"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-34523473551.commit-3ef4c52.tgz#3d625a19ca99e0293b0611ddb6861b7eb8a32911"
+  dependencies:
+    "@dcl/ts-proto" "1.154.0"
+    protobufjs "7.2.4"
+
 "@dcl/queue-consumer-component@^3.0.5":
   version "3.0.5"
   resolved "https://registry.yarnpkg.com/@dcl/queue-consumer-component/-/queue-consumer-component-3.0.5.tgz#a58bf6993b93449e03b38ed09baefa5e4e5bbe89"

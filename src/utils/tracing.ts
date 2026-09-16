@@ -10,7 +10,7 @@ import * as Sentry from '@sentry/node'
  * @example
  * // At component instantiation (components.ts)
  * const peerTracking = withSuppressedTracing(
- *   await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+ *   await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
  * )
  *
  * @example

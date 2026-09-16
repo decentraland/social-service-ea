@@ -1,0 +1,85 @@
+{
+  "request": "GET /peers?all=true",
+  "note": "unfiltered all-realms list for trusted internal callers (social-service peers-synchronizer, gatekeeper presence-map prime); each peer carries realm",
+  "status": 200,
+  "body": {
+    "ok": true,
+    "peers": [
+      {
+        "id": "0x0000000000000000000000000000000000000001",
+        "address": "0x0000000000000000000000000000000000000001",
+        "lastPing": 1788515567804,
+        "parcel": [
+          -1,
+          0
+        ],
+        "position": [
+          -0.31,
+          1.73,
+          4.62
+        ],
+        "realm": "main"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000002",
+        "address": "0x0000000000000000000000000000000000000002",
+        "lastPing": 1788515567810,
+        "parcel": [
+          147,
+          -3
+        ],
+        "position": [
+          2360.5,
+          1.5,
+          -40.2
+        ],
+        "realm": "main"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000003",
+        "address": "0x0000000000000000000000000000000000000003",
+        "lastPing": 1788515567790,
+        "parcel": [
+          0,
+          0
+        ],
+        "position": [
+          8,
+          0,
+          8
+        ],
+        "realm": "cozyfarm.dcl.eth"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000004",
+        "address": "0x0000000000000000000000000000000000000004",
+        "lastPing": 1788515567814,
+        "parcel": [
+          -1,
+          0
+        ],
+        "position": [
+          -5,
+          0.5,
+          10
+        ],
+        "realm": "main"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000005",
+        "address": "0x0000000000000000000000000000000000000005",
+        "lastPing": 1788515567824,
+        "parcel": [
+          147,
+          -3
+        ],
+        "position": [
+          2355,
+          0,
+          -35
+        ],
+        "realm": "main"
+      }
+    ]
+  }
+}

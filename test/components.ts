@@ -26,9 +26,7 @@ import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
-import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
-import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
-import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
+import { createPulseStatsComponent } from '../src/adapters/pulse-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createUserMutesDBComponent } from '../src/adapters/user-mutes-db'
@@ -100,7 +98,6 @@ async function initComponents(): Promise<TestComponents> {
       path: ['.env.default', '.env.test']
     },
     {
-      ARCHIPELAGO_STATS_URL,
       REGISTRY_URL: 'https://registry.test.com'
     }
   )
@@ -161,8 +158,7 @@ async function initComponents(): Promise<TestComponents> {
   const storage = await createS3Adapter({ config })
   const wsPool = await createWsPoolComponent({ logs, metrics, config })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
-  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
-  const worldsStats = await createWorldsStatsComponent({ logs, redis })
+  const pulseStats = await createPulseStatsComponent({ logs, config, redis, fetcher })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
@@ -176,7 +172,7 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     analytics
   })
-  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+  const peersStats = createPeersStatsComponent({ pulseStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
@@ -300,7 +296,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     updateHandler
   })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
   const localHttpFetch = await createLocalFetchComponent(apiSeverConfig)
@@ -336,7 +332,7 @@ async function initComponents(): Promise<TestComponents> {
   return {
     aiCompliance,
     analytics,
-    archipelagoStats,
+    pulseStats,
     registry,
     catalystClient,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
@@ -402,7 +398,6 @@ async function initComponents(): Promise<TestComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats,
     wsPool,
     schemaValidator
   }
