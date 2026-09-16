@@ -315,7 +315,12 @@ export async function createCommunityVoiceComponent({
     try {
       // Take the recorded audience before the gatekeeper publishes its ended event, so the queue
       // handler finds nothing and this is the only announcement.
-      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId)
+      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId).catch((error) => {
+        logger.warn(`Could not read the cached community voice chat for community ${communityId}, ending it anyway`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
+        return null
+      })
 
       try {
         // End the room in comms-gatekeeper (force end regardless of participants)
@@ -324,7 +329,7 @@ export async function createCommunityVoiceComponent({
         // The room is still live: give the entry back so a later end can still be announced.
         if (endedChat) {
           await communityVoiceChatCache
-            .setCommunityVoiceChat(communityId, endedChat.createdAt, endedChat.notificationScope)
+            .restoreCommunityVoiceChat(endedChat)
             .catch(() => logger.warn(`Could not restore the cached community voice chat for community ${communityId}`))
         }
         throw error
@@ -352,7 +357,7 @@ export async function createCommunityVoiceComponent({
           `Could not announce the end of the community voice chat for community ${communityId}, keeping it cached`
         )
         await communityVoiceChatCache
-          .setCommunityVoiceChat(communityId, endedChat.createdAt, endedChat.notificationScope)
+          .restoreCommunityVoiceChat(endedChat)
           .catch(() => logger.warn(`Could not restore the cached community voice chat for community ${communityId}`))
       }
 

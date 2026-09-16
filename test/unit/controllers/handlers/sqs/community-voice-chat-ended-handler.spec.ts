@@ -28,7 +28,8 @@ describe('CommunityVoiceChatEndedHandler', () => {
       setCommunityVoiceChat: jest.fn(),
       getCommunityVoiceChat: jest.fn(),
       removeCommunityVoiceChat: jest.fn(),
-      takeCommunityVoiceChat: jest.fn()
+      takeCommunityVoiceChat: jest.fn(),
+      restoreCommunityVoiceChat: jest.fn()
     }
 
     event = {
@@ -110,14 +111,14 @@ describe('CommunityVoiceChatEndedHandler', () => {
       it('should not put the room back in the cache', async () => {
         await handler.handle(event)
 
-        expect(communityVoiceChatCache.setCommunityVoiceChat).not.toHaveBeenCalled()
+        expect(communityVoiceChatCache.restoreCommunityVoiceChat).not.toHaveBeenCalled()
       })
     })
 
     describe('and publishing the update keeps failing', () => {
       beforeEach(() => {
         pubsub.publishInChannel.mockResolvedValue(false)
-        communityVoiceChatCache.setCommunityVoiceChat.mockResolvedValue(undefined)
+        communityVoiceChatCache.restoreCommunityVoiceChat.mockResolvedValue(true)
       })
 
       it('should stop after three attempts', async () => {
@@ -126,11 +127,23 @@ describe('CommunityVoiceChatEndedHandler', () => {
         expect(pubsub.publishInChannel).toHaveBeenCalledTimes(3)
       })
 
-      it('should put the room back in the cache so a redelivery can announce it', async () => {
+      it('should put the room back in the cache, unless a newer room replaced it meanwhile', async () => {
         await handler.handle(event)
 
-        expect(communityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(communityId, roomCreatedAt, 'all')
+        expect(communityVoiceChatCache.restoreCommunityVoiceChat).toHaveBeenCalledWith(cachedChat)
       })
+    })
+  })
+
+  describe('when the cache cannot be reached', () => {
+    beforeEach(() => {
+      communityVoiceChatCache.takeCommunityVoiceChat.mockRejectedValue(new Error('Redis error'))
+    })
+
+    it('should fail the message instead of treating the end as already handled', async () => {
+      await expect(handler.handle(event)).rejects.toThrow('Redis error')
+
+      expect(pubsub.publishInChannel).not.toHaveBeenCalled()
     })
   })
 

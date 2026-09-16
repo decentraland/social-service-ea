@@ -52,8 +52,17 @@ export interface ICommunityVoiceChatCacheComponent {
    * @param endedAt - When given, only a room created at or before this time is taken, so the end of
    * an earlier room cannot remove the entry of the one that replaced it
    * @returns The cached voice chat, or null if nothing was cached or the cached room is newer
+   * @throws When the cache cannot be reached, so a failure is told apart from an absent entry
    */
   takeCommunityVoiceChat(communityId: string, endedAt?: number): Promise<CachedCommunityVoiceChat | null>
+
+  /**
+   * Puts a taken community voice chat back, unless something is cached for the community by now:
+   * a room started in the meantime keeps its own entry
+   * @param cachedChat - The entry to put back
+   * @returns Whether the entry was put back
+   */
+  restoreCommunityVoiceChat(cachedChat: CachedCommunityVoiceChat): Promise<boolean>
 }
 
 /**
@@ -127,40 +136,42 @@ export function createCommunityVoiceChatCacheComponent({
     communityId: string,
     endedAt?: number
   ): Promise<CachedCommunityVoiceChat | null> {
-    try {
-      const reply = (await redis.client.eval(TAKE_SCRIPT, {
-        keys: [getCacheKey(communityId)],
-        arguments: [endedAt?.toString() ?? '']
-      })) as [number, string] | null
+    const reply = (await redis.client.eval(TAKE_SCRIPT, {
+      keys: [getCacheKey(communityId)],
+      arguments: [endedAt?.toString() ?? '']
+    })) as [number, string] | null
 
-      if (!reply) {
-        return null
-      }
+    if (!reply) {
+      return null
+    }
 
-      const [taken, serializedChat] = reply
-      const cachedChat = JSON.parse(serializedChat) as CachedCommunityVoiceChat
+    const [taken, serializedChat] = reply
+    const cachedChat = JSON.parse(serializedChat) as CachedCommunityVoiceChat
 
-      if (taken !== 1) {
-        logger.info(`Kept the cached community voice chat for community ${communityId}: it started after the end`, {
-          createdAt: cachedChat.createdAt,
-          endedAt: endedAt ?? 0
-        })
-        return null
-      }
-
-      return cachedChat
-    } catch (error) {
-      logger.warn(`Error taking community voice chat ${communityId} from cache`, {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+    if (taken !== 1) {
+      logger.info(`Kept the cached community voice chat for community ${communityId}: it started after the end`, {
+        createdAt: cachedChat.createdAt,
+        endedAt: endedAt ?? 0
       })
       return null
     }
+
+    return cachedChat
+  }
+
+  async function restoreCommunityVoiceChat(cachedChat: CachedCommunityVoiceChat): Promise<boolean> {
+    const result = await redis.client.set(getCacheKey(cachedChat.communityId), JSON.stringify(cachedChat), {
+      NX: true,
+      EX: CACHE_TTL
+    })
+    return result === 'OK'
   }
 
   return {
     setCommunityVoiceChat,
     getCommunityVoiceChat,
     removeCommunityVoiceChat,
-    takeCommunityVoiceChat
+    takeCommunityVoiceChat,
+    restoreCommunityVoiceChat
   }
 }

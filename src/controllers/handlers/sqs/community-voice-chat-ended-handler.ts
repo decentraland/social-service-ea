@@ -45,7 +45,8 @@ export function createCommunityVoiceChatEndedHandler({
       // Take the entry in one atomic step, and only if the cached room started before this end: a
       // community can open a new room right after the previous one ended, and a late or redelivered
       // event for the old room must not tear the new one down. Of several consumers handling the
-      // same end, only the one that gets the entry announces it.
+      // same end, only the one that gets the entry announces it. A cache failure throws, so it is
+      // logged as a failed message rather than as nothing to end.
       const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId, timestamp || undefined)
 
       if (!endedChat) {
@@ -76,13 +77,11 @@ export function createCommunityVoiceChatEndedHandler({
       }
 
       if (!published) {
-        // Give the entry back so a redelivery of this message can still announce the end.
+        // Put the entry back unless a newer room already replaced it. The consumer drops the message
+        // either way, so this only helps a redelivery after a crash; otherwise the entry ages out and
+        // clients recover by listing the active voice chats.
         logger.error(`Failed to publish the ended update for community ${communityId}, keeping the room cached`)
-        await communityVoiceChatCache.setCommunityVoiceChat(
-          communityId,
-          endedChat.createdAt,
-          endedChat.notificationScope
-        )
+        await communityVoiceChatCache.restoreCommunityVoiceChat(endedChat)
         return
       }
 

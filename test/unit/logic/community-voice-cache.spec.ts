@@ -8,6 +8,7 @@ describe('Community Voice Chat Cache Component', () => {
   let mockRedisPut: jest.MockedFunction<any>
   let mockRedisDel: jest.MockedFunction<any>
   let mockRedisEval: jest.MockedFunction<any>
+  let mockRedisSet: jest.MockedFunction<any>
 
   // Fixed timestamps to avoid test flakiness
   const FIXED_NOW = 1640995200000 // Jan 1, 2022 00:00:00 UTC
@@ -21,10 +22,12 @@ describe('Community Voice Chat Cache Component', () => {
     mockRedisPut = jest.fn()
     mockRedisDel = jest.fn()
     mockRedisEval = jest.fn()
+    mockRedisSet = jest.fn()
 
     const mockRedisClient = {
       del: mockRedisDel,
-      eval: mockRedisEval
+      eval: mockRedisEval,
+      set: mockRedisSet
     }
 
     mockComponents = {
@@ -272,8 +275,44 @@ describe('Community Voice Chat Cache Component', () => {
         mockRedisEval.mockRejectedValue(new Error('Redis error'))
       })
 
-      it('should return null instead of throwing', async () => {
-        await expect(cache.takeCommunityVoiceChat(communityId, FIXED_NOW)).resolves.toBeNull()
+      it('should throw so a failure is told apart from an absent entry', async () => {
+        await expect(cache.takeCommunityVoiceChat(communityId, FIXED_NOW)).rejects.toThrow('Redis error')
+      })
+    })
+  })
+
+  describe('when restoring community voice chat data', () => {
+    const cachedChat = {
+      communityId: 'test-community-123',
+      createdAt: FIXED_CREATED_AT,
+      notificationScope: 'all' as const
+    }
+
+    describe('when nothing is cached for the community', () => {
+      beforeEach(() => {
+        mockRedisSet.mockResolvedValue('OK')
+      })
+
+      it('should put the entry back only if the key is still free and report it', async () => {
+        const restored = await cache.restoreCommunityVoiceChat(cachedChat)
+
+        expect(restored).toBe(true)
+        expect(mockRedisSet).toHaveBeenCalledWith('community-voice-chat:test-community-123', JSON.stringify(cachedChat), {
+          NX: true,
+          EX: CACHE_TTL
+        })
+      })
+    })
+
+    describe('when a room is already cached for the community', () => {
+      beforeEach(() => {
+        mockRedisSet.mockResolvedValue(null)
+      })
+
+      it('should keep the cached room and report the entry was not put back', async () => {
+        const restored = await cache.restoreCommunityVoiceChat(cachedChat)
+
+        expect(restored).toBe(false)
       })
     })
   })
