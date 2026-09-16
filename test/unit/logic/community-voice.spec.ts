@@ -88,6 +88,7 @@ describe('Community Voice Logic', () => {
 
     mockCommunityVoiceChatCache = {
       setCommunityVoiceChat: jest.fn(),
+      getCommunityVoiceChat: jest.fn(),
       takeCommunityVoiceChat: jest.fn(),
       restoreCommunityVoiceChat: jest.fn()
     } as jest.Mocked<ICommunityVoiceChatCacheComponent>
@@ -143,6 +144,11 @@ describe('Community Voice Logic', () => {
         mockCommsGatekeeper.createCommunityVoiceChatRoom.mockResolvedValue({
           connectionUrl: 'test-connection-url'
         })
+        mockCommunityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue({
+          communityId,
+          createdAt: Date.now(),
+          notificationScope: 'all'
+        })
       })
 
       describe('when user is an owner', () => {
@@ -164,6 +170,30 @@ describe('Community Voice Logic', () => {
             { id: 'place-1', title: 'Place 1', positions: ['1,1', '1,2'], owner: '0x123' },
             { id: 'place-2', title: 'Place 2', positions: ['2,1', '2,2'], owner: '0x123' }
           ])
+        })
+
+        describe('when the voice chat ended while its start was being enriched', () => {
+          beforeEach(() => {
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockCommunityVoiceChatCache.getCommunityVoiceChat.mockResolvedValue(null)
+          })
+
+          it('should not announce a start for a room that already ended', async () => {
+            await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
+
+            expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
+            expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
+          })
+
+          it('should still hand the credentials back and record the start', async () => {
+            const result = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
+
+            expect(result).toEqual({ connectionUrl: 'test-connection-url' })
+            expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
+              call_id: communityId,
+              user_id: creatorAddress
+            })
+          })
         })
 
         describe('when profile data is available', () => {

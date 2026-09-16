@@ -147,8 +147,8 @@ export async function createCommunityVoiceComponent({
 
       const createdAt = Date.now()
 
-      // Persist the room and its fanout class before optional enrichment. The poller and ENDED
-      // propagation must not lose track of an active room if enrichment is slow or interrupted.
+      // Persist the room and its fanout class before optional enrichment, so an end reported while
+      // enrichment is slow or interrupted still finds the room.
       await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt, notificationScope)
 
       let communityPositions: string[] = []
@@ -200,6 +200,29 @@ export async function createCommunityVoiceComponent({
         )
       }
 
+      analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {
+        call_id: communityId,
+        user_id: creatorAddress
+      })
+
+      // The room may already have ended while the optional data was being fetched: a fast creator
+      // can connect and leave before the places or thumbnail lookups return. The ended event handler
+      // takes the cached entry when that happens, so announce the start only while the entry is still
+      // there, or clients would learn about a dead room after being told it ended.
+      let stillActive = true
+      try {
+        stillActive = (await communityVoiceChatCache.getCommunityVoiceChat(communityId)) !== null
+      } catch (error) {
+        logger.warn(`Could not check whether the community voice chat for community ${communityId} is still active`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
+      }
+
+      if (!stillActive) {
+        logger.info(`Community voice chat for community ${communityId} ended before its start was announced`)
+        return credentials
+      }
+
       await Promise.all([
         // Publish start event with community information using protocol enum
         pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -225,11 +248,7 @@ export async function createCommunityVoiceComponent({
             }
           },
           { excludeAddresses: [creatorAddress] }
-        ),
-        analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {
-          call_id: communityId,
-          user_id: creatorAddress
-        })
+        )
       ])
 
       return credentials

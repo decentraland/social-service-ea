@@ -5,6 +5,7 @@ describe('Community Voice Chat Cache Component', () => {
   let cache: ReturnType<typeof createCommunityVoiceChatCacheComponent>
   let mockComponents: Pick<AppComponents, 'logs' | 'redis'>
   let mockRedisPut: jest.MockedFunction<any>
+  let mockRedisGet: jest.MockedFunction<any>
   let mockRedisEval: jest.MockedFunction<any>
   let mockRedisSet: jest.MockedFunction<any>
 
@@ -19,6 +20,7 @@ describe('Community Voice Chat Cache Component', () => {
     jest.spyOn(Date, 'now').mockReturnValue(FIXED_NOW)
 
     mockRedisPut = jest.fn()
+    mockRedisGet = jest.fn()
     mockRedisEval = jest.fn()
     mockRedisSet = jest.fn()
 
@@ -33,6 +35,7 @@ describe('Community Voice Chat Cache Component', () => {
       },
       redis: {
         put: mockRedisPut,
+        get: mockRedisGet,
         client: {
           eval: mockRedisEval,
           set: mockRedisSet
@@ -80,6 +83,35 @@ describe('Community Voice Chat Cache Component', () => {
         expect.objectContaining({ createdAt: FIXED_NOW + 10000, notificationScope: 'all' }),
         { EX: CACHE_TTL }
       )
+    })
+  })
+
+  describe('when retrieving community voice chat data', () => {
+    describe('when a community voice chat is cached', () => {
+      const cachedChat = { communityId, createdAt: FIXED_CREATED_AT, notificationScope: 'all' as const }
+
+      beforeEach(() => {
+        mockRedisGet.mockResolvedValue(cachedChat)
+      })
+
+      it('should return the cached community voice chat', async () => {
+        const result = await cache.getCommunityVoiceChat(communityId)
+
+        expect(result).toEqual(cachedChat)
+        expect(mockRedisGet).toHaveBeenCalledWith(cacheKey)
+      })
+    })
+
+    describe('when nothing is cached for the community', () => {
+      beforeEach(() => {
+        mockRedisGet.mockResolvedValue(null)
+      })
+
+      it('should return null', async () => {
+        const result = await cache.getCommunityVoiceChat('non-existent')
+
+        expect(result).toBeNull()
+      })
     })
   })
 

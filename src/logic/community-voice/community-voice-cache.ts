@@ -32,6 +32,14 @@ export interface ICommunityVoiceChatCacheComponent {
   ): Promise<void>
 
   /**
+   * Gets a community voice chat from the cache
+   * @param communityId - The community ID
+   * @returns The cached voice chat or null if nothing is cached
+   * @throws When the cache cannot be reached
+   */
+  getCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null>
+
+  /**
    * Atomically reads and removes a community voice chat from the cache, so that of several
    * concurrent callers exactly one gets it
    * @param communityId - The community ID
@@ -96,6 +104,10 @@ export function createCommunityVoiceChatCacheComponent({
     })
   }
 
+  async function getCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null> {
+    return redis.get<CachedCommunityVoiceChat>(getCacheKey(communityId))
+  }
+
   async function takeCommunityVoiceChat(
     communityId: string,
     endedAt?: number
@@ -133,6 +145,7 @@ export function createCommunityVoiceChatCacheComponent({
 
   return {
     setCommunityVoiceChat,
+    getCommunityVoiceChat,
     takeCommunityVoiceChat,
     restoreCommunityVoiceChat
   }
