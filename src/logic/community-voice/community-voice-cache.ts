@@ -1,4 +1,3 @@
-import { isErrorWithMessage } from '../../utils/errors'
 import { AppComponents, CommunityVoiceChatNotificationScope } from '../../types'
 
 /**
@@ -31,19 +30,6 @@ export interface ICommunityVoiceChatCacheComponent {
     createdAt?: number,
     notificationScope?: CommunityVoiceChatNotificationScope
   ): Promise<void>
-
-  /**
-   * Gets a community voice chat from the cache
-   * @param communityId - The community ID
-   * @returns The cached voice chat or null if not found
-   */
-  getCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null>
-
-  /**
-   * Removes a community voice chat from the cache
-   * @param communityId - The community ID
-   */
-  removeCommunityVoiceChat(communityId: string): Promise<void>
 
   /**
    * Atomically reads and removes a community voice chat from the cache, so that of several
@@ -110,28 +96,6 @@ export function createCommunityVoiceChatCacheComponent({
     })
   }
 
-  async function getCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null> {
-    try {
-      return await redis.get<CachedCommunityVoiceChat>(getCacheKey(communityId))
-    } catch (error) {
-      logger.warn(`Error getting community voice chat ${communityId} from cache`, {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-      return null
-    }
-  }
-
-  async function removeCommunityVoiceChat(communityId: string): Promise<void> {
-    try {
-      await redis.client.del(getCacheKey(communityId))
-      logger.debug(`Removed community voice chat ${communityId} from cache`)
-    } catch (error) {
-      logger.warn(`Error removing community voice chat ${communityId} from cache`, {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-    }
-  }
-
   async function takeCommunityVoiceChat(
     communityId: string,
     endedAt?: number
@@ -169,8 +133,6 @@ export function createCommunityVoiceChatCacheComponent({
 
   return {
     setCommunityVoiceChat,
-    getCommunityVoiceChat,
-    removeCommunityVoiceChat,
     takeCommunityVoiceChat,
     restoreCommunityVoiceChat
   }

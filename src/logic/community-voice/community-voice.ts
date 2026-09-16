@@ -313,53 +313,11 @@ export async function createCommunityVoiceComponent({
     }
 
     try {
-      // Take the recorded audience before the gatekeeper publishes its ended event, so the queue
-      // handler finds nothing and this is the only announcement.
-      const endedChat = await communityVoiceChatCache.takeCommunityVoiceChat(communityId).catch((error) => {
-        logger.warn(`Could not read the cached community voice chat for community ${communityId}, ending it anyway`, {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-        })
-        return null
-      })
-
-      try {
-        // End the room in comms-gatekeeper (force end regardless of participants)
-        await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
-      } catch (error) {
-        // The room is still live: give the entry back so a later end can still be announced.
-        if (endedChat) {
-          await communityVoiceChatCache
-            .restoreCommunityVoiceChat(endedChat)
-            .catch(() => logger.warn(`Could not restore the cached community voice chat for community ${communityId}`))
-        }
-        throw error
-      }
+      // End the room in comms-gatekeeper (force end regardless of participants). It publishes the
+      // ended event inside this call and the queue handler announces it like any other end, so this
+      // path must not announce it too: two announcers would race over the cached room.
+      await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
       logger.info(`Community voice chat room ended for community ${communityId}`)
-
-      const endedAt = Date.now()
-
-      // Publish end event - we don't need community details for ENDED status
-      const published = await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
-        communityId,
-        status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
-        endedAt,
-        positions: undefined,
-        worlds: undefined,
-        communityName: undefined,
-        communityImage: undefined,
-        // Preserve the start-time fanout class for best-effort cleanup by the update handler.
-        notificationScope: endedChat?.notificationScope
-      })
-
-      if (!published && endedChat) {
-        // Give the entry back so the ended event the gatekeeper just published can announce it instead.
-        logger.warn(
-          `Could not announce the end of the community voice chat for community ${communityId}, keeping it cached`
-        )
-        await communityVoiceChatCache
-          .restoreCommunityVoiceChat(endedChat)
-          .catch(() => logger.warn(`Could not restore the cached community voice chat for community ${communityId}`))
-      }
 
       // Analytics event
       analytics.fireEvent(AnalyticsEvent.END_COMMUNITY_CALL, {

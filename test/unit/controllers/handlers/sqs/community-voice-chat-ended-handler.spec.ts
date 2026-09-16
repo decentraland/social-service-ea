@@ -26,8 +26,6 @@ describe('CommunityVoiceChatEndedHandler', () => {
     pubsub = createMockedPubSubComponent({})
     communityVoiceChatCache = {
       setCommunityVoiceChat: jest.fn(),
-      getCommunityVoiceChat: jest.fn(),
-      removeCommunityVoiceChat: jest.fn(),
       takeCommunityVoiceChat: jest.fn(),
       restoreCommunityVoiceChat: jest.fn()
     }

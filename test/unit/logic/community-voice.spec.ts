@@ -87,9 +87,7 @@ describe('Community Voice Logic', () => {
     } as jest.Mocked<IRegistryComponent>
 
     mockCommunityVoiceChatCache = {
-      getCommunityVoiceChat: jest.fn(),
       setCommunityVoiceChat: jest.fn(),
-      removeCommunityVoiceChat: jest.fn(),
       takeCommunityVoiceChat: jest.fn(),
       restoreCommunityVoiceChat: jest.fn()
     } as jest.Mocked<ICommunityVoiceChatCacheComponent>
@@ -543,8 +541,6 @@ describe('Community Voice Logic', () => {
           moderatorCount: 1
         })
         mockCommsGatekeeper.endCommunityVoiceChatRoom.mockResolvedValue(undefined)
-        mockCommunityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue(null)
-        mockPubsub.publishInChannel.mockResolvedValue(true)
       })
 
       describe('when user is an owner', () => {
@@ -558,110 +554,33 @@ describe('Community Voice Logic', () => {
           expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
           expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, userAddress)
-          expect(mockCommunityVoiceChatCache.takeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
-          expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
-            communityId,
-            status: 1, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
-            endedAt: expect.any(Number),
-            positions: undefined,
-            worlds: undefined,
-            communityName: undefined,
-            communityImage: undefined
-          })
           expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.END_COMMUNITY_CALL, {
             call_id: communityId,
             user_id: userAddress
           })
         })
-      })
 
-      describe('and a room is cached for the community', () => {
-        const roomCreatedAt = 1640995200000
-
-        beforeEach(() => {
-          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
-          mockCommunityVoiceChatCache.takeCommunityVoiceChat.mockResolvedValue({
-            communityId,
-            createdAt: roomCreatedAt,
-            notificationScope: 'all'
-          })
-        })
-
-        it('should announce the end to the audience the start was announced to', async () => {
+        // The gatekeeper publishes the ended event inside the end call and the queue handler announces
+        // it; a second announcer here would race it over the cached room.
+        it('should leave the announcement to the ended event handler', async () => {
           await communityVoice.endCommunityVoiceChat(communityId, userAddress)
 
-          expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(
-            COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
-            expect.objectContaining({ notificationScope: 'all' })
-          )
-        })
-
-        // The gatekeeper publishes its ended event inside the end call; the entry must be gone by then.
-        it('should take the cached room before asking the gatekeeper to end it', async () => {
-          await communityVoice.endCommunityVoiceChat(communityId, userAddress)
-
-          expect(mockCommunityVoiceChatCache.takeCommunityVoiceChat.mock.invocationCallOrder[0]).toBeLessThan(
-            mockCommsGatekeeper.endCommunityVoiceChatRoom.mock.invocationCallOrder[0]
-          )
-        })
-
-        describe('and announcing the end fails', () => {
-          beforeEach(async () => {
-            mockPubsub.publishInChannel.mockResolvedValue(false)
-            mockCommunityVoiceChatCache.restoreCommunityVoiceChat.mockResolvedValue(true)
-            await communityVoice.endCommunityVoiceChat(communityId, userAddress)
-          })
-
-          it('should give the cached room back so the gatekeeper event can announce it', () => {
-            expect(mockCommunityVoiceChatCache.restoreCommunityVoiceChat).toHaveBeenCalledWith({
-              communityId,
-              createdAt: roomCreatedAt,
-              notificationScope: 'all'
-            })
-          })
+          expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
+          expect(mockCommunityVoiceChatCache.takeCommunityVoiceChat).not.toHaveBeenCalled()
         })
 
         describe('and the gatekeeper fails to end the room', () => {
-          let endError: unknown
-
-          beforeEach(async () => {
+          beforeEach(() => {
             mockCommsGatekeeper.endCommunityVoiceChatRoom.mockRejectedValue(new Error('Gatekeeper unavailable'))
-            mockCommunityVoiceChatCache.restoreCommunityVoiceChat.mockResolvedValue(true)
-            endError = await communityVoice.endCommunityVoiceChat(communityId, userAddress).catch((error) => error)
           })
 
-          it('should reject', () => {
-            expect(endError).toBeInstanceOf(Error)
+          it('should reject and not report the end', async () => {
+            await expect(communityVoice.endCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
+              'Gatekeeper unavailable'
+            )
+
+            expect(mockAnalytics.fireEvent).not.toHaveBeenCalledWith(AnalyticsEvent.END_COMMUNITY_CALL, expect.anything())
           })
-
-          it('should give the cached room back so a later end can still be announced', () => {
-            expect(mockCommunityVoiceChatCache.restoreCommunityVoiceChat).toHaveBeenCalledWith({
-              communityId,
-              createdAt: roomCreatedAt,
-              notificationScope: 'all'
-            })
-          })
-
-          it('should not announce the end', () => {
-            expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
-          })
-        })
-      })
-
-      describe('and the cache cannot be reached', () => {
-        beforeEach(() => {
-          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
-          mockCommunityVoiceChatCache.takeCommunityVoiceChat.mockRejectedValue(new Error('Redis error'))
-        })
-
-        it('should still end the room and announce it', async () => {
-          await communityVoice.endCommunityVoiceChat(communityId, userAddress)
-
-          expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, userAddress)
-          expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(
-            COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
-            expect.objectContaining({ status: 1 })
-          )
         })
       })
 
@@ -676,7 +595,6 @@ describe('Community Voice Logic', () => {
           expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
           expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, userAddress)
-          expect(mockCommunityVoiceChatCache.takeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
           expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.END_COMMUNITY_CALL, {
             call_id: communityId,
             user_id: userAddress
