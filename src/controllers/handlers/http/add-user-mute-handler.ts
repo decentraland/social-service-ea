@@ -18,7 +18,12 @@ export async function addUserMuteHandler(
   const muterAddress = normalizeAddress(verification!.auth)
 
   try {
-    const body: { muted_address: string } = await request.json()
+    const body: { muted_address?: unknown } = await request.json()
+
+    if (typeof body.muted_address !== 'string' || body.muted_address.length === 0) {
+      throw new InvalidRequestError('muted_address is required')
+    }
+
     const mutedAddress = normalizeAddress(body.muted_address)
 
     if (!EthAddress.validate(mutedAddress)) {
