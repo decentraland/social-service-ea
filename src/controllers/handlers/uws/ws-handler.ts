@@ -135,7 +135,7 @@ export async function registerWsHandler(
       throw new RequestError('Invalid auth chain payload: expected an object', 400)
     }
 
-    // Only the auth headers `verify()` reads are checked; any other field is left alone, as before.
+    // Every `x-identity-*` key (case-insensitive) must carry a string or string[]; any other field is left alone, as before.
     for (const [key, value] of Object.entries(parsed)) {
       if (!key.toLowerCase().startsWith(AUTH_HEADER_PREFIX)) continue
       const isHeaderValue =
