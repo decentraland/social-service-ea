@@ -335,7 +335,16 @@ describe('ws-handler', () => {
         ['a frame that is not valid JSON', 'garbage-not-json'],
         ['JSON null', 'null'],
         ['a JSON number', '123'],
-        ['a JSON string', '"x"']
+        ['a JSON string', '"x"'],
+        ['a JSON array', '[]'],
+        [
+          'a numeric timestamp header',
+          JSON.stringify({
+            'x-identity-auth-chain-0': '{"type":"SIGNER","payload":"0x1","signature":""}',
+            'x-identity-timestamp': 1790748000000
+          })
+        ],
+        ['an object header value', JSON.stringify({ 'x-identity-auth-chain-0': { type: 'SIGNER' } })]
       ])('and the client sends %s instead of the auth chain', (_case, frame) => {
         it('should close the socket as unauthorized without calling the middleware', async () => {
           await wsHandlers.message(mockWs, Buffer.from(frame))
@@ -356,15 +365,31 @@ describe('ws-handler', () => {
           expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
         })
 
-        it('should log it at warn without echoing the frame', async () => {
+        it('should log it at warn with a fixed message that does not echo the frame', async () => {
+          const logger = mockLogs.getLogger('ws-handler')
+          ;(logger.warn as jest.Mock).mockClear()
+          ;(logger.error as jest.Mock).mockClear()
+
           await wsHandlers.message(mockWs, Buffer.from(frame))
 
-          const logger = mockLogs.getLogger('ws-handler')
           expect(logger.warn).toHaveBeenCalledWith(
-            expect.stringMatching(/^Rejected auth chain: Invalid auth chain payload/),
-            expect.objectContaining({ statusCode: 400 })
+            expect.stringMatching(
+              /^Rejected auth chain: Invalid auth chain payload: (not valid JSON|expected an object|header values must be strings)$/
+            ),
+            { statusCode: 400, wsConnectionId: 'test-client-id' }
           )
           expect(logger.error).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the frame carries a non-string field that is not an auth header', () => {
+        it('should leave it to the middleware, as before', async () => {
+          ;(verify as jest.Mock).mockRejectedValue(requestError('Invalid Auth Chain', 400))
+          const frame = { 'x-identity-auth-chain-0': 'link', version: 2 }
+
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify(frame)))
+
+          expect(verify).toHaveBeenCalledWith('get', '/', frame, expect.anything())
         })
       })
 

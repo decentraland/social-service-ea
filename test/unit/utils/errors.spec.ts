@@ -43,7 +43,7 @@ describe('isExpectedAuthRejection', () => {
   })
 
   describe('when the failure did not come from the middleware', () => {
-    it('should not classify a malformed payload as expected', () => {
+    it('should not classify a raw SyntaxError the handler did not wrap as expected', () => {
       expect(isExpectedAuthRejection(new SyntaxError(`Unexpected token '', "" is not valid JSON`))).toBe(false)
     })
 
