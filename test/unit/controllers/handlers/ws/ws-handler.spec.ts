@@ -330,12 +330,41 @@ describe('ws-handler', () => {
         })
       })
 
-      describe('and the client sends a payload that is not valid JSON', () => {
-        it('should report it to Sentry, since it never reached the middleware', async () => {
-          await wsHandlers.message(mockWs, Buffer.from(''))
+      describe.each([
+        ['an empty frame', ''],
+        ['a frame that is not valid JSON', 'garbage-not-json'],
+        ['JSON null', 'null'],
+        ['a JSON number', '123'],
+        ['a JSON string', '"x"']
+      ])('and the client sends %s instead of the auth chain', (_case, frame) => {
+        it('should close the socket as unauthorized without calling the middleware', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(frame))
 
-          expect(mockTracing.captureException).toHaveBeenCalled()
-          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+          expect(verify).not.toHaveBeenCalled()
+          expect(mockWs.end).toHaveBeenCalledWith(3003, 'Unauthorized')
+        })
+
+        it('should not report it to Sentry, since the fault is the client payload', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(frame))
+
+          expect(mockTracing.captureException).not.toHaveBeenCalled()
+        })
+
+        it('should count it as a client rejection', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(frame))
+
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
+        })
+
+        it('should log it at warn without echoing the frame', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(frame))
+
+          const logger = mockLogs.getLogger('ws-handler')
+          expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringMatching(/^Rejected auth chain: Invalid auth chain payload/),
+            expect.objectContaining({ statusCode: 400 })
+          )
+          expect(logger.error).not.toHaveBeenCalled()
         })
       })
 

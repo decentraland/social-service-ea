@@ -2,7 +2,7 @@ import mitt from 'mitt'
 import { randomUUID } from 'crypto'
 import { WebSocket } from 'uWebSockets.js'
 import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
-import { verify } from '@dcl/crypto-middleware'
+import { RequestError, verify } from '@dcl/crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
@@ -109,13 +109,37 @@ export async function registerWsHandler(
     })
   }
 
+  /**
+   * Parses the client's first frame into the auth chain headers `verify()` expects. A frame that is
+   * not JSON, or is JSON but not an object, is the client's fault, like any other malformed chain.
+   * So it is raised as the same 400 `RequestError` the middleware uses for a malformed chain, and it
+   * leaves through the catch below as an expected rejection instead of a Sentry report. The message
+   * is fixed and never echoes the frame back into the logs.
+   */
+  function parseAuthChainHeaders(authChainMessage: string): Parameters<typeof verify>[2] {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(authChainMessage)
+    } catch {
+      throw new RequestError('Invalid auth chain payload: not valid JSON', 400)
+    }
+
+    if (parsed === null || typeof parsed !== 'object') {
+      throw new RequestError('Invalid auth chain payload: expected an object', 400)
+    }
+
+    // Only the outer shape is checked here. `verify()` validates each header value itself and
+    // rejects a malformed one with a 400.
+    return parsed as Parameters<typeof verify>[2]
+  }
+
   async function authenticateUser(ws: WebSocket<WsUserData>, data: WsNotAuthenticatedUserData, message: ArrayBuffer) {
     try {
       changeStage(data, { authenticating: true })
 
       const authChainMessage = textDecoder.decode(message)
 
-      const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
+      const verifyResult = await verify('get', '/', parseAuthChainHeaders(authChainMessage), {
         fetcher,
         expiration: authSignatureExpirationInMs,
         // Scene signers are not accepted on this surface, matching the HTTP routes. Runs before
