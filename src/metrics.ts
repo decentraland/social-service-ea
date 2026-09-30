@@ -41,9 +41,10 @@ export const metricDeclarations = {
   ws_auth_errors: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket authentication errors',
-    // 'client_rejected' for credentials the middleware turned down (4xx), 'server_error' for
-    // anything on our side — an unreachable catalyst or an unexpected throw. Only the latter
-    // is worth alerting on.
+    // 'client_rejected' for anything the client sent that was rejected with a 4xx (credentials the
+    // middleware turned down, or a first frame the handler could not parse), 'server_error' for
+    // anything on our side — an unreachable catalyst or an unexpected throw. Only the latter is
+    // worth alerting on.
     labelNames: ['type']
   },
   ws_auth_race_condition_aborted: {
