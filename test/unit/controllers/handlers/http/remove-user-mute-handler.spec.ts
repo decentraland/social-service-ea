@@ -33,6 +33,28 @@ describe('when the request is valid', () => {
   })
 })
 
+describe('when muted_address is missing from the body', () => {
+  it('should throw InvalidRequestError', async () => {
+    await expect(
+      removeUserMuteHandler({
+        components: { userMutes: mockUserMutes, logs: mockLogs },
+        request: { json: jest.fn().mockResolvedValue({}) } as any,
+        verification: { auth: '0x1234567890123456789012345678901234567890' } as any
+      })
+    ).rejects.toThrow(InvalidRequestError)
+  })
+
+  it('should throw InvalidRequestError when muted_address is null', async () => {
+    await expect(
+      removeUserMuteHandler({
+        components: { userMutes: mockUserMutes, logs: mockLogs },
+        request: { json: jest.fn().mockResolvedValue({ muted_address: null }) } as any,
+        verification: { auth: '0x1234567890123456789012345678901234567890' } as any
+      })
+    ).rejects.toThrow(InvalidRequestError)
+  })
+})
+
 describe('when the muted_address is invalid', () => {
   it('should throw InvalidRequestError', async () => {
     await expect(
