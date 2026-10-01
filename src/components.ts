@@ -17,12 +17,11 @@ import { createSubscribersContext, createRpcServerComponent } from './adapters/r
 import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
 import { createUWsComponent } from '@dcl/uws-http-server'
-import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
+import { createPulseStatsComponent } from './adapters/pulse-stats'
 import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
-import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { resolveMaxRequestBodyBytes } from './utils/requestBodyLimit'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
@@ -156,8 +155,7 @@ export async function initComponents(): Promise<AppComponents> {
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
-  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
-  const worldsStats = withSuppressedTracing(await createWorldsStatsComponent({ logs, redis }))
+  const pulseStats = await createPulseStatsComponent({ logs, config, fetcher, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const registry = await createRegistryComponent({ fetcher, config, redis, logs })
@@ -187,7 +185,7 @@ export async function initComponents(): Promise<AppComponents> {
   const storage = await createS3Adapter({ config })
   const wsPool = await createWsPoolComponent({ logs, metrics, config })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
-  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+  const peersStats = createPeersStatsComponent({ pulseStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb, peersStats, logs })
@@ -318,11 +316,9 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const peersSynchronizer = withSuppressedTracing(
-    await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
+    await createPeersSynchronizerComponent({ logs, pulseStats, redis, config })
   )
-  const peerTracking = withSuppressedTracing(
-    await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
-  )
+  const peerTracking = withSuppressedTracing(await createPeerTrackingComponent({ logs, pubsub, nats, redis, config }))
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },
     // wrap function itself since it is executed in different context (setImmediate)
@@ -357,7 +353,7 @@ export async function initComponents(): Promise<AppComponents> {
   return {
     aiCompliance,
     analytics,
-    archipelagoStats,
+    pulseStats,
     registry,
     catalystClient,
     cdnCacheInvalidator,
@@ -419,7 +415,6 @@ export async function initComponents(): Promise<AppComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats,
     wsPool,
     schemaValidator,
     userMutesDb,

@@ -7,6 +7,7 @@ jest.mock('redis', () => {
     connect: jest.fn(),
     disconnect: jest.fn(),
     get: jest.fn(),
+    mGet: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
     quit: jest.fn(),

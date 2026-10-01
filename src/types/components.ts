@@ -326,17 +326,10 @@ export type IPubSubComponent = IBaseComponent & {
   publishInChannel<T>(channel: string, update: T): Promise<void>
 }
 
-export interface IStatsComponent {
+/** Pulse's all-realms peer list (`GET ${PULSE_URL}/peers?all=true`), the one presence source. */
+export type IPulseStatsComponent = {
   getPeers(): Promise<string[]>
-}
-
-export type IArchipelagoStatsComponent = IStatsComponent & {
   fetchPeers(): Promise<string[]>
-}
-
-export type IWorldsStatsComponent = IStatsComponent & {
-  onPeerConnect(address: string): Promise<void>
-  onPeerDisconnect(address: string): Promise<void>
 }
 
 export type IPeersSynchronizer = IBaseComponent & {

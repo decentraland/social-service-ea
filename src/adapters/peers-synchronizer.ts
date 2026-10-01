@@ -4,12 +4,16 @@ import { PEERS_CACHE_KEY } from '../utils/peers'
 export const FIVE_SECS_IN_MS = 5000
 export const TEN_SECS_IN_MS = 10000
 
+/**
+ * Reconciles the all-realms peer set every `PEER_SYNC_INTERVAL_MS` from Pulse's
+ * `GET /peers?all=true` — the one reconciliation source — into `PEERS_CACHE_KEY`.
+ */
 export async function createPeersSynchronizerComponent({
   logs,
-  archipelagoStats,
+  pulseStats,
   redis,
   config
-}: Pick<AppComponents, 'logs' | 'archipelagoStats' | 'redis' | 'config'>): Promise<IPeersSynchronizer> {
+}: Pick<AppComponents, 'logs' | 'pulseStats' | 'redis' | 'config'>): Promise<IPeersSynchronizer> {
   const logger = logs.getLogger('peers-synchronizer-component')
   let intervalId: NodeJS.Timeout | null = null
   const syncIntervalMs = (await config.getNumber('PEER_SYNC_INTERVAL_MS')) || FIVE_SECS_IN_MS
@@ -17,13 +21,13 @@ export async function createPeersSynchronizerComponent({
 
   async function syncPeers() {
     try {
-      const currentPeers = await archipelagoStats.fetchPeers()
+      const currentPeers = await pulseStats.fetchPeers()
 
       await redis.put(PEERS_CACHE_KEY, currentPeers, {
         EX: cacheTTLInSeconds
       })
     } catch (error: any) {
-      logger.error('Error syncing peers:', error)
+      logger.error('Error syncing peers:', { error: error.message })
     }
   }
 

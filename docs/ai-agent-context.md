@@ -44,7 +44,7 @@
 - **Catalyst**: Content server for user profiles and avatar data
 - **Places API**: Scene and place information
 - **Comms Gatekeeper**: Voice chat token generation
-- **Archipelago Stats**: User presence and online status
+- **Pulse**: User presence and online status; see [Presence](presence.md) for configuration and rollout
 
 **Key Concepts:**
 
