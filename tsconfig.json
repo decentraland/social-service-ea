@@ -2,9 +2,9 @@
   "compilerOptions": {
     "strict": true,
     "outDir": "dist",
+    "rootDir": "src",
     "target": "es2020",
     "module": "commonjs",
-    "moduleResolution": "node",
     "sourceMap": true,
     "experimentalDecorators": true,
     "pretty": true,
