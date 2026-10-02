@@ -319,6 +319,42 @@ describe('friendsDb', () => {
       )
       expect(result).toEqual({ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' })
     })
+
+    it('should yield to a pair that already exists rather than inserting a second row', async () => {
+      // Two people requesting each other at the same moment both reach this insert, because the
+      // last-action read that chooses insert-or-update happens outside the transaction.
+      const { query: queryToAssert, mockClient } = await mockQuery(false, {
+        rows: [{ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' }],
+        rowCount: 1
+      })
+
+      await dbComponent.createFriendship(['0x123', '0x456'], true, mockClient)
+
+      expect(queryToAssert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            'ON CONFLICT (LEAST(address_requester, address_requested), GREATEST(address_requester, address_requested))'
+          )
+        })
+      )
+    })
+
+    it('should return the surviving row untouched on that conflict', async () => {
+      // A no-op update rather than a real one: the row that won the race keeps its own state, and
+      // RETURNING still yields it so the loser records its action against the same relationship.
+      const { query: queryToAssert, mockClient } = await mockQuery(false, {
+        rows: [{ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' }],
+        rowCount: 1
+      })
+
+      await dbComponent.createFriendship(['0x123', '0x456'], true, mockClient)
+
+      expect(queryToAssert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('DO UPDATE SET id = friendships.id')
+        })
+      )
+    })
   })
 
   describe('updateFriendshipStatus', () => {
