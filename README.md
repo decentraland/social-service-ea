@@ -39,7 +39,7 @@ This server interacts with PostgreSQL for data persistence, Redis for caching, N
 - **[Catalyst](https://github.com/decentraland/catalyst)**: Content server for user profiles and avatar data
 - **[Places API](https://github.com/decentraland/places-api)**: Scene and place information
 - **[Comms Gatekeeper](https://github.com/decentraland/comms-gatekeeper)**: Voice chat token generation
-- **[Archipelago Stats](https://github.com/decentraland/archipelago-workers)**: User presence and online status
+- **[Pulse](https://github.com/decentraland/Pulse)**: User presence and online status
 - **PostgreSQL**: Database for communities, members, posts, friendships, and social settings
 - **Redis**: Caching layer for performance optimization
 - **NATS**: Message broker for real-time updates and event distribution
@@ -232,6 +232,12 @@ yarn test:integration:watch
 - **Integration Tests** (`test/integration/`): Test the complete request/response cycle
 
 For detailed testing guidelines and standards, refer to our [Testing Standards](https://github.com/decentraland/docs/tree/main/development-standards/testing-standards) documentation.
+
+## Presence
+
+Pulse is the only presence source: `engine.parcel_changes` supplies connectivity updates and
+`GET ${PULSE_URL}/peers?all=true` reconciles the online set across all realms. `PULSE_URL` is required
+at boot. See [Presence](docs/presence.md) for configuration and deployment order.
 
 ## AI Agent Context
 

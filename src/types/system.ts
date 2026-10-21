@@ -10,8 +10,7 @@ import {
   IRPCServerComponent,
   IRedisComponent,
   IPubSubComponent,
-  IArchipelagoStatsComponent,
-  IWorldsStatsComponent,
+  IPulseStatsComponent,
   IPeersSynchronizer,
   IPeerTrackingComponent,
   ICatalystClientComponent,
@@ -82,7 +81,6 @@ export type MetricsDeclaration = keyof typeof metricDeclarations
 export type BaseComponents = {
   aiCompliance: IAIComplianceComponent
   analytics: IAnalyticsComponent<AnalyticsEventPayload>
-  archipelagoStats: IArchipelagoStatsComponent
   registry: IRegistryComponent
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
@@ -117,6 +115,7 @@ export type BaseComponents = {
   peerTracking: IPeerTrackingComponent
   peersStats: IPeersStatsComponent
   peersSynchronizer: IPeersSynchronizer
+  pulseStats: IPulseStatsComponent
   pg: IPgComponent
   placesApi: IPlacesApiComponent
   pubsub: IPubSubComponent
@@ -136,7 +135,6 @@ export type BaseComponents = {
   uwsServer: IUWsComponent
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
-  worldsStats: IWorldsStatsComponent
   wsPool: IWsPoolComponent
   cdnCacheInvalidator: ICdnCacheInvalidatorComponent
   friends: IFriendsComponent

@@ -1,0 +1,435 @@
+{
+  "description": "Feed the batches in this order to a consumer. \"map\" is the seq-aware presence map (comms-gatekeeper); \"statusEvents\" is what the per-entry ONLINE/OFFLINE consumer (social-service) emits. 07-invalid-mixed-case-realm is deliberately excluded.",
+  "mapRules": [
+    "key state by wallet; remember lastSeq[serverName] and which serverName owns each wallet entry",
+    "delta with seq == lastSeq+1: apply; parcel present => upsert (realm, parcel); parcel absent => remove wallet",
+    "delta with a seq gap (or the first batch seen for a serverName not being a snapshot): apply nothing, mark serverName frozen, keep serving the current state",
+    "snapshot: remove every entry owned by serverName, insert the batch, lastSeq = seq, clear frozen",
+    "lookups compare realm case-insensitively; a mixed-case realm/address on the wire is a contract violation to log, never a crash"
+  ],
+  "statusRules": [
+    "for every change: parcel present => ONLINE(address); parcel absent => OFFLINE(address)",
+    "seq and snapshot are ignored (the 5 s /peers?all=true poll reconciles); a peer missing from a snapshot is NOT flipped OFFLINE"
+  ],
+  "steps": [
+    {
+      "apply": "01-snapshot.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000001": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            0,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000001",
+          "status": "ONLINE"
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000002",
+          "status": "ONLINE"
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000003",
+          "status": "ONLINE"
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000004",
+          "status": "ONLINE"
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000005",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "02-delta-move.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000001": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "main",
+          "parcel": [
+            148,
+            -3
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            0,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000002",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "03-exit.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "main",
+          "parcel": [
+            148,
+            -3
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            0,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000001",
+          "status": "OFFLINE"
+        }
+      ]
+    },
+    {
+      "apply": "04-realm-change.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            1,
+            2
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            0,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000002",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "05-coalesced.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            1,
+            2
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            3,
+            4
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000003",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "06-mixed-case.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            1,
+            2
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            3,
+            4
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        },
+        "0x00000000000000000000000000000000000000ab": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            5,
+            6
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x00000000000000000000000000000000000000ab",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "08-gap.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            1,
+            2
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            3,
+            4
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        },
+        "0x00000000000000000000000000000000000000ab": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            5,
+            6
+          ]
+        }
+      },
+      "frozen": [
+        "pulse-1"
+      ],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000005",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "09-second-server.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            1,
+            2
+          ]
+        },
+        "0x0000000000000000000000000000000000000003": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            3,
+            4
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000005": {
+          "realm": "main",
+          "parcel": [
+            147,
+            -3
+          ]
+        },
+        "0x00000000000000000000000000000000000000ab": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            5,
+            6
+          ]
+        },
+        "0x0000000000000000000000000000000000000007": {
+          "realm": "main",
+          "parcel": [
+            0,
+            0
+          ]
+        }
+      },
+      "frozen": [
+        "pulse-1"
+      ],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000007",
+          "status": "ONLINE"
+        }
+      ]
+    },
+    {
+      "apply": "10-snapshot-restart.bin",
+      "map": {
+        "0x0000000000000000000000000000000000000007": {
+          "realm": "main",
+          "parcel": [
+            0,
+            0
+          ]
+        },
+        "0x0000000000000000000000000000000000000002": {
+          "realm": "cozyfarm.dcl.eth",
+          "parcel": [
+            1,
+            2
+          ]
+        },
+        "0x0000000000000000000000000000000000000004": {
+          "realm": "main",
+          "parcel": [
+            -1,
+            0
+          ]
+        }
+      },
+      "frozen": [],
+      "statusEvents": [
+        {
+          "address": "0x0000000000000000000000000000000000000002",
+          "status": "ONLINE"
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000004",
+          "status": "ONLINE"
+        }
+      ]
+    }
+  ]
+}

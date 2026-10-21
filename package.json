@@ -62,6 +62,7 @@
     "@dcl/metrics": "^1.0.1",
     "@dcl/pg-component": "^0.2.0",
     "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-29103578374.commit-3c4b54e.tgz",
+    "@dcl/pulse-protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-34523473551.commit-3ef4c52.tgz",
     "@dcl/queue-consumer-component": "^3.0.5",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schema-validator-component": "^1.0.1",

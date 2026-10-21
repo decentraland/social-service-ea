@@ -1,0 +1,4 @@
+# Fixture bytes must survive every checkout unchanged.
+# Order matters: the generic rule first, the binary override last (a later line wins).
+* text=auto eol=lf
+*.bin -text -diff -merge

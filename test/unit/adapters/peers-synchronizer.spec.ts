@@ -3,35 +3,45 @@ import {
   FIVE_SECS_IN_MS,
   TEN_SECS_IN_MS
 } from '../../../src/adapters/peers-synchronizer'
-import { mockLogs, mockRedis, mockArchipelagoStats, mockConfig } from '../../mocks/components'
+import { createMockConfigComponent, mockLogs, mockRedis, mockPulseStats } from '../../mocks/components'
 import { IPeersSynchronizer } from '../../../src/types'
 import { PEERS_CACHE_KEY } from '../../../src/utils/peers'
 
 describe('peers-synchronizer', () => {
   let scheduler: IPeersSynchronizer
 
-  beforeEach(async () => {
-    scheduler = await createPeersSynchronizerComponent({
-      logs: mockLogs,
-      archipelagoStats: mockArchipelagoStats,
-      redis: mockRedis,
-      config: mockConfig
+  function buildConfig() {
+    return createMockConfigComponent({
+      getNumber: jest.fn(async (_key: string) => undefined)
     })
+  }
 
+  async function createScheduler() {
+    return createPeersSynchronizerComponent({
+      logs: mockLogs,
+      pulseStats: mockPulseStats,
+      redis: mockRedis,
+      config: buildConfig()
+    })
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks()
     jest.useFakeTimers()
+    scheduler = await createScheduler()
   })
 
   afterEach(() => {
     jest.useRealTimers()
   })
 
-  it('should sync peers correctly', async () => {
+  it('should fill the shared peers cache key from Pulse', async () => {
     const mockPeers = ['0x123', '0x456']
-    mockArchipelagoStats.fetchPeers.mockResolvedValueOnce(mockPeers)
+    mockPulseStats.fetchPeers.mockResolvedValueOnce(mockPeers)
 
     await scheduler.syncPeers()
 
-    expect(mockArchipelagoStats.fetchPeers).toHaveBeenCalled()
+    expect(mockPulseStats.fetchPeers).toHaveBeenCalled()
     expect(mockRedis.put).toHaveBeenCalledWith(
       PEERS_CACHE_KEY,
       mockPeers,
@@ -41,21 +51,21 @@ describe('peers-synchronizer', () => {
 
   it('should sync peers periodically', async () => {
     const mockPeers = ['0x123']
-    mockArchipelagoStats.fetchPeers.mockResolvedValue(mockPeers)
+    mockPulseStats.fetchPeers.mockResolvedValue(mockPeers)
 
     await scheduler.syncPeers()
 
     // Advance timer to trigger next sync
-    jest.advanceTimersByTime(FIVE_SECS_IN_MS)
+    await jest.advanceTimersByTimeAsync(FIVE_SECS_IN_MS)
 
     await scheduler.stop()
 
-    expect(mockArchipelagoStats.fetchPeers).toHaveBeenCalledTimes(2)
+    expect(mockPulseStats.fetchPeers).toHaveBeenCalledTimes(2)
     expect(mockRedis.put).toHaveBeenCalledTimes(2)
   })
 
   it('should stop syncing when stopped', async () => {
-    mockArchipelagoStats.fetchPeers.mockResolvedValue([])
+    mockPulseStats.fetchPeers.mockResolvedValue([])
 
     await scheduler.syncPeers()
     await scheduler.stop()
@@ -63,15 +73,16 @@ describe('peers-synchronizer', () => {
     jest.advanceTimersByTime(FIVE_SECS_IN_MS)
 
     // Should only have the initial sync
-    expect(mockArchipelagoStats.fetchPeers).toHaveBeenCalledTimes(1)
+    expect(mockPulseStats.fetchPeers).toHaveBeenCalledTimes(1)
   })
 
-  it('should handle errors gracefully', async () => {
-    mockArchipelagoStats.fetchPeers.mockRejectedValue(new Error('Network error'))
+  it('should preserve the cached peers when fetching Pulse fails', async () => {
+    mockPulseStats.fetchPeers.mockRejectedValue(new Error('Network error'))
 
     await scheduler.syncPeers()
     await scheduler.stop()
 
-    expect(mockLogs.getLogger('scheduler-component').error).toHaveBeenCalled()
+    expect(mockRedis.put).not.toHaveBeenCalled()
+    expect(mockLogs.getLogger('peers-synchronizer-component').error).toHaveBeenCalled()
   })
 })
