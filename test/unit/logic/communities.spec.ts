@@ -1259,7 +1259,7 @@ describe('Community Component', () => {
       mockCommunitiesDB.deleteCommunity.mockResolvedValue()
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
       mockCommunityBroadcaster.broadcast.mockResolvedValue()
-      mockPubSub.publishInChannel.mockResolvedValue()
+      mockPubSub.publishInChannel.mockResolvedValue(true)
     })
 
     describe('and the community exists', () => {

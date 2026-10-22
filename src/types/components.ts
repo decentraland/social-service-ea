@@ -323,7 +323,8 @@ export interface ICacheComponent extends IBaseCacheComponent {
 
 export type IPubSubComponent = IBaseComponent & {
   subscribeToChannel(channel: string, cb: (message: string) => void): Promise<void>
-  publishInChannel<T>(channel: string, update: T): Promise<void>
+  /** Resolves to false when the update could not be published; the error is logged, not thrown. */
+  publishInChannel<T>(channel: string, update: T): Promise<boolean>
 }
 
 export interface IStatsComponent {

@@ -28,9 +28,10 @@ describe('PubSubComponent', () => {
         status: ConnectivityStatus.ONLINE
       }
 
-      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, update)
+      const published = await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, update)
 
       expect(mockPubClient.publish).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, JSON.stringify(update))
+      expect(published).toBe(true)
     })
 
     it('should publish friendship updates', async () => {
@@ -54,11 +55,12 @@ describe('PubSubComponent', () => {
         status: ConnectivityStatus.ONLINE
       }
 
-      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, update)
+      const published = await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, update)
 
       expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
         `Error while publishing update to channel ${FRIEND_STATUS_UPDATES_CHANNEL}: ${error.message}`
       )
+      expect(published).toBe(false)
     })
   })
 

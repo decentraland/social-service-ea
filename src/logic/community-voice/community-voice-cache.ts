@@ -1,4 +1,3 @@
-import { isErrorWithMessage } from '../../utils/errors'
 import { AppComponents, CommunityVoiceChatNotificationScope } from '../../types'
 
 /**
@@ -6,8 +5,6 @@ import { AppComponents, CommunityVoiceChatNotificationScope } from '../../types'
  */
 export interface CachedCommunityVoiceChat {
   communityId: string
-  isActive: boolean
-  lastChecked: number
   createdAt: number
   /** Who the room was announced to at start; absent for rooms cached before this was recorded. */
   notificationScope?: CommunityVoiceChatNotificationScope
@@ -15,12 +12,18 @@ export interface CachedCommunityVoiceChat {
 
 /**
  * Interface for the community voice chat cache component
+ *
+ * Records the rooms this service announced. comms-gatekeeper owns the room lifecycle and reports
+ * the end of one over the queue; this cache holds what that report does not carry — who the start
+ * was announced to — and its entry doubles as the token that keeps a redelivered end silent.
  */
+
 export interface ICommunityVoiceChatCacheComponent {
   /**
    * Adds or updates a community voice chat in the cache as active
    * @param communityId - The community ID
    * @param createdAt - When the voice chat was created (optional, defaults to now)
+   * @param notificationScope - Who the room start was announced to
    */
   setCommunityVoiceChat(
     communityId: string,
@@ -31,29 +34,29 @@ export interface ICommunityVoiceChatCacheComponent {
   /**
    * Gets a community voice chat from the cache
    * @param communityId - The community ID
-   * @returns The cached voice chat or null if not found
+   * @returns The cached voice chat or null if nothing is cached
+   * @throws When the cache cannot be reached
    */
   getCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null>
 
   /**
-   * Removes a community voice chat from the cache
+   * Atomically reads and removes a community voice chat from the cache, so that of several
+   * concurrent callers exactly one gets it
    * @param communityId - The community ID
+   * @param endedAt - When given, only a room created at or before this time is taken, so the end of
+   * an earlier room cannot remove the entry of the one that replaced it
+   * @returns The cached voice chat, or null if nothing was cached or the cached room is newer
+   * @throws When the cache cannot be reached, so a failure is told apart from an absent entry
    */
-  removeCommunityVoiceChat(communityId: string): Promise<void>
+  takeCommunityVoiceChat(communityId: string, endedAt?: number): Promise<CachedCommunityVoiceChat | null>
 
   /**
-   * Gets all active community voice chats in the cache
-   * @returns Array of active community voice chats
+   * Puts a taken community voice chat back, unless something is cached for the community by now:
+   * a room started in the meantime keeps its own entry
+   * @param cachedChat - The entry to put back
+   * @returns Whether the entry was put back
    */
-  getActiveCommunityVoiceChats(): Promise<CachedCommunityVoiceChat[]>
-
-  /**
-   * Updates the status of a community voice chat and detects if it changed from active to inactive
-   * @param communityId - The community ID
-   * @param isActive - The new active status (null means not found/error)
-   * @returns Whether the voice chat just ended
-   */
-  updateAndDetectChange(communityId: string, isActive: boolean | null): Promise<boolean>
+  restoreCommunityVoiceChat(cachedChat: CachedCommunityVoiceChat): Promise<boolean>
 }
 
 /**
@@ -66,7 +69,18 @@ export function createCommunityVoiceChatCacheComponent({
   const logger = logs.getLogger('community-voice-chat-cache')
 
   const CACHE_PREFIX = 'community-voice-chat:'
-  const CACHE_TTL = 24 * 60 * 60 // 24 hours in seconds
+  // Long enough to outlive any room. Every end path removes the entry and a start overwrites it,
+  // so a stale one left behind by a lost event is harmless.
+  const CACHE_TTL = 7 * 24 * 60 * 60 // 7 days in seconds
+  // Read, compare and delete server-side so no write can slip in between the three.
+  const TAKE_SCRIPT = [
+    "local chat = redis.call('GET', KEYS[1])",
+    'if not chat then return nil end',
+    'local endedAt = tonumber(ARGV[1])',
+    'if endedAt ~= nil and cjson.decode(chat).createdAt > endedAt then return {0, chat} end',
+    "redis.call('DEL', KEYS[1])",
+    'return {1, chat}'
+  ].join('; ')
 
   function getCacheKey(communityId: string): string {
     return `${CACHE_PREFIX}${communityId}`
@@ -77,18 +91,10 @@ export function createCommunityVoiceChatCacheComponent({
     createdAt: number = Date.now(),
     notificationScope?: CommunityVoiceChatNotificationScope
   ): Promise<void> {
-    const now = Date.now()
-    const existing = await getCommunityVoiceChat(communityId)
-    const isNewRoom = notificationScope !== undefined
-
     const cachedChat: CachedCommunityVoiceChat = {
       communityId,
-      isActive: true, // Always true for active chats
-      lastChecked: now,
-      // An explicit scope comes only from the start path and identifies a new room. Poller
-      // refreshes omit it and preserve the room metadata already in the cache.
-      createdAt: isNewRoom ? createdAt : (existing?.createdAt ?? createdAt),
-      notificationScope: notificationScope ?? existing?.notificationScope
+      createdAt,
+      notificationScope
     }
 
     await redis.put(getCacheKey(communityId), cachedChat, { EX: CACHE_TTL })
@@ -99,82 +105,48 @@ export function createCommunityVoiceChatCacheComponent({
   }
 
   async function getCommunityVoiceChat(communityId: string): Promise<CachedCommunityVoiceChat | null> {
-    try {
-      return await redis.get<CachedCommunityVoiceChat>(getCacheKey(communityId))
-    } catch (error) {
-      logger.warn(`Error getting community voice chat ${communityId} from cache`, {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+    return redis.get<CachedCommunityVoiceChat>(getCacheKey(communityId))
+  }
+
+  async function takeCommunityVoiceChat(
+    communityId: string,
+    endedAt?: number
+  ): Promise<CachedCommunityVoiceChat | null> {
+    const reply = (await redis.client.eval(TAKE_SCRIPT, {
+      keys: [getCacheKey(communityId)],
+      arguments: [endedAt?.toString() ?? '']
+    })) as [number, string] | null
+
+    if (!reply) {
+      return null
+    }
+
+    const [taken, serializedChat] = reply
+    const cachedChat = JSON.parse(serializedChat) as CachedCommunityVoiceChat
+
+    if (taken !== 1) {
+      logger.info(`Kept the cached community voice chat for community ${communityId}: it started after the end`, {
+        createdAt: cachedChat.createdAt,
+        endedAt: endedAt ?? 0
       })
       return null
     }
+
+    return cachedChat
   }
 
-  async function removeCommunityVoiceChat(communityId: string): Promise<void> {
-    try {
-      await redis.client.del(getCacheKey(communityId))
-      logger.debug(`Removed community voice chat ${communityId} from cache`)
-    } catch (error) {
-      logger.warn(`Error removing community voice chat ${communityId} from cache`, {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-    }
-  }
-
-  async function getActiveCommunityVoiceChats(): Promise<CachedCommunityVoiceChat[]> {
-    try {
-      // Use SCAN instead of KEYS to avoid blocking Redis and loading all keys at once
-      const keys: string[] = []
-      for await (const key of redis.client.scanIterator({ MATCH: `${CACHE_PREFIX}*`, COUNT: 100 })) {
-        keys.push(key)
-      }
-
-      if (keys.length === 0) {
-        return []
-      }
-
-      const chats = await redis.mGet<CachedCommunityVoiceChat>(keys)
-      return chats.filter((chat) => chat.isActive)
-    } catch (error) {
-      logger.error(`Error getting active community voice chats from cache`, {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-      return []
-    }
-  }
-
-  async function updateAndDetectChange(communityId: string, isActive: boolean | null): Promise<boolean> {
-    const existing = await getCommunityVoiceChat(communityId)
-    const wasActive = existing?.isActive ?? false
-    const isNowActive = isActive ?? false
-    const justEnded = wasActive && !isNowActive
-
-    logger.info(`Updating community voice chat ${communityId}`, {
-      isActive: isActive ? 'true' : 'false'
+  async function restoreCommunityVoiceChat(cachedChat: CachedCommunityVoiceChat): Promise<boolean> {
+    const result = await redis.client.set(getCacheKey(cachedChat.communityId), JSON.stringify(cachedChat), {
+      NX: true,
+      EX: CACHE_TTL
     })
-
-    if (isActive === true) {
-      // Update the cache as active
-      await setCommunityVoiceChat(communityId, existing?.createdAt)
-    } else if (isActive === false || (isActive === null && existing && wasActive)) {
-      // Remove from cache when inactive or when we got null but it was active
-      await removeCommunityVoiceChat(communityId)
-    }
-
-    if (justEnded) {
-      logger.info(`Detected community voice chat ended for community ${communityId}`, {
-        wasActive: wasActive.toString(),
-        isNowActive: isNowActive.toString()
-      })
-    }
-
-    return justEnded
+    return result === 'OK'
   }
 
   return {
     setCommunityVoiceChat,
     getCommunityVoiceChat,
-    removeCommunityVoiceChat,
-    getActiveCommunityVoiceChats,
-    updateAndDetectChange
+    takeCommunityVoiceChat,
+    restoreCommunityVoiceChat
   }
 }

@@ -55,12 +55,14 @@ export function createPubSubComponent(components: Pick<AppComponents, 'logs' | '
         throw error
       }
     },
-    async publishInChannel<T>(channel: string, update: T) {
+    async publishInChannel<T>(channel: string, update: T): Promise<boolean> {
       try {
         const message = JSON.stringify(update)
         await pubClient.publish(channel, message)
+        return true
       } catch (error: any) {
         logger.error(`Error while publishing update to channel ${channel}: ${error.message}`)
+        return false
       }
     }
   }
