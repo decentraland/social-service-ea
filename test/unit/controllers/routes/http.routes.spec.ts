@@ -3,6 +3,7 @@ import { Router } from '@dcl/http-server'
 import { errorHandler } from '@dcl/http-commons'
 import { setupHttpRoutes } from '../../../../src/controllers/routes/http.routes'
 import { communitiesErrorsHandler } from '../../../../src/controllers/middlewares/communities-errors'
+import { voiceChatsErrorsHandler } from '../../../../src/controllers/middlewares/voice-chats-errors'
 import { reportUnhandledErrors } from '../../../../src/controllers/middlewares/report-unhandled-errors'
 import { GlobalContext } from '../../../../src/types'
 
@@ -139,12 +140,19 @@ describe('when registering the error-handling middlewares', () => {
 
   // Registration order is composition order (koa-style onion), and this middleware only works in
   // one position: inside `errorHandler`, which swallows the error into a 500 and never rethrows,
-  // and outside `communitiesErrorsHandler`, whose mapped 4xx must never reach the reporter.
-  it('should place the reporter between the shared handler and the community mapper', () => {
+  // and outside the domain mappers, whose mapped 4xx must never reach the reporter.
+  it('should place the reporter between the shared handler and the domain mappers', () => {
     const errorMiddlewares = registered.filter((middleware) =>
-      [errorHandler, reportUnhandledErrors, communitiesErrorsHandler].includes(middleware as never)
+      [errorHandler, reportUnhandledErrors, communitiesErrorsHandler, voiceChatsErrorsHandler].includes(
+        middleware as never
+      )
     )
 
-    expect(errorMiddlewares).toEqual([errorHandler, reportUnhandledErrors, communitiesErrorsHandler])
+    expect(errorMiddlewares).toEqual([
+      errorHandler,
+      reportUnhandledErrors,
+      communitiesErrorsHandler,
+      voiceChatsErrorsHandler
+    ])
   })
 })

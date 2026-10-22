@@ -6,9 +6,11 @@ import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 import {
   UserAlreadyInVoiceChatError,
+  UserInCommunityVoiceChatError,
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError
 } from '../../../logic/voice/errors'
+import { startPrivateVoiceChat } from '../../../logic/voice/start-private-voice-chat'
 
 export function startPrivateVoiceChatService({
   components: { logs, voice, commsGatekeeper }
@@ -29,25 +31,7 @@ export function startPrivateVoiceChatService({
         }
       }
 
-      const [isCallerInCommunityCall, isCalleeInCommunityCall] = await Promise.all([
-        commsGatekeeper.isUserInCommunityVoiceChat(context.address),
-        commsGatekeeper.isUserInCommunityVoiceChat(request.callee.address)
-      ])
-
-      if (isCallerInCommunityCall || isCalleeInCommunityCall) {
-        return {
-          response: {
-            $case: 'conflictingError',
-            conflictingError: {
-              message: isCallerInCommunityCall
-                ? 'Cannot start private voice chat while in a community voice chat'
-                : 'Cannot start private voice chat: the callee is in a community voice chat'
-            }
-          }
-        }
-      }
-
-      const callId = await voice.startPrivateVoiceChat(context.address, request.callee.address)
+      const callId = await startPrivateVoiceChat({ voice, commsGatekeeper }, context.address, request.callee.address)
 
       return {
         response: {
@@ -79,7 +63,7 @@ export function startPrivateVoiceChatService({
             }
           }
         }
-      } else if (error instanceof UserAlreadyInVoiceChatError) {
+      } else if (error instanceof UserAlreadyInVoiceChatError || error instanceof UserInCommunityVoiceChatError) {
         return {
           response: {
             $case: 'conflictingError',

@@ -27,3 +27,13 @@ export class IncomingVoiceChatNotFoundError extends Error {
     super(`The incoming voice chat for the address ${address} was not found`)
   }
 }
+
+export class UserInCommunityVoiceChatError extends Error {
+  constructor(isCaller: boolean) {
+    super(
+      isCaller
+        ? 'Cannot start private voice chat while in a community voice chat'
+        : 'Cannot start private voice chat: the callee is in a community voice chat'
+    )
+  }
+}

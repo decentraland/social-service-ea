@@ -62,6 +62,68 @@ export const UpdateCommunityPartiallySchema: Schema = {
   }
 }
 
+export type StartPrivateVoiceChatRequestBody = {
+  calleeAddress: string
+}
+
+export type UpdatePrivateVoiceChatRequestBody = {
+  intention: 'accepted' | 'rejected'
+}
+
+export type StartCommunityVoiceChatRequestBody = {
+  communityId: string
+}
+
+export type UpdateCommunityVoiceChatSpeakerRequestBody = {
+  muted: boolean
+}
+
+export const StartPrivateVoiceChatSchema: Schema = {
+  type: 'object',
+  required: ['calleeAddress'],
+  additionalProperties: false,
+  properties: {
+    calleeAddress: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    }
+  }
+}
+
+export const UpdatePrivateVoiceChatSchema: Schema = {
+  type: 'object',
+  required: ['intention'],
+  additionalProperties: false,
+  properties: {
+    intention: {
+      type: 'string',
+      enum: ['accepted', 'rejected']
+    }
+  }
+}
+
+export const StartCommunityVoiceChatSchema: Schema = {
+  type: 'object',
+  required: ['communityId'],
+  additionalProperties: false,
+  properties: {
+    communityId: {
+      type: 'string'
+    }
+  }
+}
+
+export const UpdateCommunityVoiceChatSpeakerSchema: Schema = {
+  type: 'object',
+  required: ['muted'],
+  additionalProperties: false,
+  properties: {
+    muted: {
+      type: 'boolean'
+    }
+  }
+}
+
 export const AddCommunityPlacesSchema: Schema = {
   type: 'object',
   required: ['placeIds'],

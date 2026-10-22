@@ -25,6 +25,19 @@ import {
   updateCommunityPartiallyHandler,
   addReferralEmailHandler,
   getActiveCommunityVoiceChatsHandler,
+  startPrivateVoiceChatHandler,
+  getIncomingPrivateVoiceChatHandler,
+  updatePrivateVoiceChatHandler,
+  endPrivateVoiceChatHandler,
+  startCommunityVoiceChatHandler,
+  endCommunityVoiceChatHandler,
+  joinCommunityVoiceChatHandler,
+  kickCommunityVoiceChatParticipantHandler,
+  promoteCommunityVoiceChatSpeakerHandler,
+  demoteCommunityVoiceChatSpeakerHandler,
+  muteCommunityVoiceChatSpeakerHandler,
+  createCommunityVoiceChatSpeakRequestHandler,
+  removeCommunityVoiceChatSpeakRequestHandler,
   getMemberRequestsHandler,
   getCommunityRequestsHandler,
   getManagedCommunitiesHandler,
@@ -53,12 +66,17 @@ import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
 import { rejectSceneSigner } from '../../utils/auth-metadata'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { voiceChatsErrorsHandler } from '../middlewares/voice-chats-errors'
 import { reportUnhandledErrors } from '../middlewares/report-unhandled-errors'
 import {
   UpdateMemberRoleSchema,
   UpdateCommunityPartiallySchema,
   AddCommunityPlacesSchema,
   CreateCommunityPostSchema,
+  StartPrivateVoiceChatSchema,
+  UpdatePrivateVoiceChatSchema,
+  StartCommunityVoiceChatSchema,
+  UpdateCommunityVoiceChatSpeakerSchema,
   CreateReferralSchema,
   AddReferralEmailSchema,
   CreateCommunityRequestSchema,
@@ -89,10 +107,11 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.use(errorHandler)
   // Between the two on purpose: errorHandler turns the error into a 500 without rethrowing, so
-  // nothing outside it can see what failed, and communitiesErrorsHandler maps its own errors to
+  // nothing outside it can see what failed, and the domain error handlers map their own errors to
   // 4xx below, so those never reach the reporter.
   router.use(reportUnhandledErrors)
   router.use(communitiesErrorsHandler)
+  router.use(voiceChatsErrorsHandler)
 
   if (API_ADMIN_TOKEN) {
     router.get('/v1/communities/:address/managed', bearerTokenMiddleware(API_ADMIN_TOKEN), getManagedCommunitiesHandler)
@@ -206,6 +225,67 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)
+
+  // Private voice chats
+  router.post(
+    '/v1/private-voice-chats',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(StartPrivateVoiceChatSchema),
+    startPrivateVoiceChatHandler
+  )
+  router.get('/v1/private-voice-chats/incoming', signedFetchMiddleware(), getIncomingPrivateVoiceChatHandler)
+  router.patch(
+    '/v1/private-voice-chats/:callId',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdatePrivateVoiceChatSchema),
+    updatePrivateVoiceChatHandler
+  )
+  router.delete('/v1/private-voice-chats/:callId', signedFetchMiddleware(), endPrivateVoiceChatHandler)
+
+  // Community voice chats
+  router.post(
+    '/v1/community-voice-chats',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(StartCommunityVoiceChatSchema),
+    startCommunityVoiceChatHandler
+  )
+  router.delete('/v1/community-voice-chats/:communityId', signedFetchMiddleware(), endCommunityVoiceChatHandler)
+  router.post(
+    '/v1/community-voice-chats/:communityId/participants',
+    signedFetchMiddleware(),
+    joinCommunityVoiceChatHandler
+  )
+  router.delete(
+    '/v1/community-voice-chats/:communityId/participants/:address',
+    signedFetchMiddleware(),
+    kickCommunityVoiceChatParticipantHandler
+  )
+  router.put(
+    '/v1/community-voice-chats/:communityId/speakers/:address',
+    signedFetchMiddleware(),
+    promoteCommunityVoiceChatSpeakerHandler
+  )
+  router.patch(
+    '/v1/community-voice-chats/:communityId/speakers/:address',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdateCommunityVoiceChatSpeakerSchema),
+    muteCommunityVoiceChatSpeakerHandler
+  )
+  router.delete(
+    '/v1/community-voice-chats/:communityId/speakers/:address',
+    signedFetchMiddleware(),
+    demoteCommunityVoiceChatSpeakerHandler
+  )
+  router.post(
+    '/v1/community-voice-chats/:communityId/speak-requests',
+    signedFetchMiddleware(),
+    createCommunityVoiceChatSpeakRequestHandler
+  )
+  router.delete(
+    '/v1/community-voice-chats/:communityId/speak-requests/:address',
+    signedFetchMiddleware(),
+    removeCommunityVoiceChatSpeakRequestHandler
+  )
 
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
