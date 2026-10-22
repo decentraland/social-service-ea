@@ -5,6 +5,8 @@ import {
   User
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getPrivateMessagesSettingsService } from '../../../../../src/controllers/handlers/rpc/get-private-messages-settings'
+import { createSettingsComponent } from '../../../../../src/logic/settings'
+import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import {
   IFriendsDatabaseComponent,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
@@ -45,7 +47,7 @@ describe('getPrivateMessagesSettingsService', () => {
     getPrivateMessagesSettings = getPrivateMessagesSettingsService({
       components: {
         logs,
-        friendsDb
+        settings: createSettingsComponent({ friendsDb, commsGatekeeper: createCommsGatekeeperMockedComponent({}) })
       }
     })
   })

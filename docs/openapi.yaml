@@ -1222,6 +1222,123 @@ paths:
       tags:
         - Communities
 
+  /v1/social-settings:
+    get:
+      operationId: getSocialSettings
+      summary: Get the social settings
+      description: Returns the social settings of the authenticated user, or the defaults when they never changed them.
+      security:
+        - SignedFetch: []
+      responses:
+        '200':
+          description: Social settings of the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/SocialSettings200OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Social Settings
+
+    patch:
+      operationId: updateSocialSettings
+      summary: Update the social settings
+      description: |
+        Updates the submitted social settings of the authenticated user and returns all of them. At least one
+        setting must be submitted. The private messages privacy is also synced to Comms Gatekeeper; if that
+        fails the request answers 500, and a restriction to `only_friends` is not stored.
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                privateMessagesPrivacy:
+                  type: string
+                  enum: [all, only_friends]
+                blockedUsersMessagesVisibility:
+                  type: string
+                  enum: [show_messages, do_not_show_messages]
+                showSituationReactions:
+                  type: string
+                  enum: [show, hide]
+      responses:
+        '200':
+          description: Updated social settings
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/SocialSettings200OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Social Settings
+
+  /v1/private-messages-settings:
+    get:
+      operationId: getPrivateMessagesSettings
+      summary: Get the private messages settings of other users
+      description: Returns who can send private messages to each requested user, and whether each one is a friend of the authenticated user.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: addresses
+          in: query
+          schema:
+            type: array
+            maxItems: 50
+            items:
+              type: string
+          style: form
+          explode: true
+          description: Addresses to look up, at most 50 (e.g. `?addresses=0x1&addresses=0x2`)
+      responses:
+        '200':
+          description: Private messages settings of the requested users
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetPrivateMessagesSettings200OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Social Settings
+
   /v1/referral-progress:
     post:
       operationId: createReferralProgress
