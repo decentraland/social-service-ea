@@ -1377,3 +1377,108 @@ components:
             total:
               type: integer
               description: 'Total number of posts in the community'
+
+    FriendProfile:
+      type: object
+      required:
+        - address
+        - name
+        - hasClaimedName
+        - profilePictureUrl
+      properties:
+        address:
+          type: string
+          description: 'Ethereum address of the user'
+        name:
+          type: string
+          description: 'Display name of the user'
+        hasClaimedName:
+          type: boolean
+          description: 'Whether the name is a claimed NAME'
+        profilePictureUrl:
+          type: string
+          description: 'URL of the face snapshot of the avatar'
+        nameColor:
+          type: object
+          description: 'Color of the name, when the user picked one'
+          properties:
+            r:
+              type: number
+            g:
+              type: number
+            b:
+              type: number
+
+    FriendshipRequest:
+      type: object
+      required:
+        - id
+        - friend
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: 'Identifier of the friendship request'
+        friend:
+          $ref: '#/components/schemas/FriendProfile'
+        createdAt:
+          type: integer
+          description: 'When the request was created, in milliseconds since the epoch'
+        message:
+          type: string
+          description: 'Message sent along with the request'
+
+    GetFriends200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FriendProfile'
+
+    GetFriendshipRequests200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FriendshipRequest'
+
+    FriendshipRequest200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/FriendshipRequest'
+
+    GetFriendshipStatus200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - status
+          properties:
+            status:
+              type: integer
+              description: >-
+                Friendship status between the authenticated user and the other user, the same code the
+                community endpoints return in `friendshipStatus`: 0 request sent, 1 request received,
+                2 canceled, 3 accepted, 4 rejected, 5 deleted, 6 blocked, 7 none, 8 blocked by.

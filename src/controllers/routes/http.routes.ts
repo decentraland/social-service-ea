@@ -47,12 +47,20 @@ import {
   getBannedMembersV2Handler,
   getCommunityRequestsV2Handler,
   getMemberRequestsV2Handler,
-  getCommunityPostsV2Handler
+  getCommunityPostsV2Handler,
+  getFriendsHandler,
+  getMutualFriendsHandler,
+  getFriendshipStatusHandler,
+  getFriendshipRequestsHandler,
+  createFriendshipRequestHandler,
+  updateFriendshipRequestHandler,
+  removeFriendHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
 import { rejectSceneSigner } from '../../utils/auth-metadata'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { friendsErrorsHandler } from '../middlewares/friends-errors'
 import { reportUnhandledErrors } from '../middlewares/report-unhandled-errors'
 import {
   UpdateMemberRoleSchema,
@@ -63,7 +71,9 @@ import {
   AddReferralEmailSchema,
   CreateCommunityRequestSchema,
   UpdateCommunityRequestStatusSchema,
-  GetMemberCommunitiesByIdsSchema
+  GetMemberCommunitiesByIdsSchema,
+  CreateFriendshipRequestSchema,
+  UpdateFriendshipRequestSchema
 } from '../handlers/http/schemas'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
@@ -89,10 +99,11 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.use(errorHandler)
   // Between the two on purpose: errorHandler turns the error into a 500 without rethrowing, so
-  // nothing outside it can see what failed, and communitiesErrorsHandler maps its own errors to
+  // nothing outside it can see what failed, and the domain error handlers map their own errors to
   // 4xx below, so those never reach the reporter.
   router.use(reportUnhandledErrors)
   router.use(communitiesErrorsHandler)
+  router.use(friendsErrorsHandler)
 
   if (API_ADMIN_TOKEN) {
     router.get('/v1/communities/:address/managed', bearerTokenMiddleware(API_ADMIN_TOKEN), getManagedCommunitiesHandler)
@@ -203,6 +214,25 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.get('/v1/mutes', signedFetchMiddleware(), getUserMutesHandler)
   router.post('/v1/mutes', signedFetchMiddleware(), addUserMuteHandler)
   router.delete('/v1/mutes', signedFetchMiddleware(), removeUserMuteHandler)
+
+  // Friends
+  router.get('/v1/friends', signedFetchMiddleware(), getFriendsHandler)
+  router.delete('/v1/friends/:address', signedFetchMiddleware(), removeFriendHandler)
+  router.get('/v1/users/:address/mutual-friends', signedFetchMiddleware(), getMutualFriendsHandler)
+  router.get('/v1/users/:address/friendship-status', signedFetchMiddleware(), getFriendshipStatusHandler)
+  router.get('/v1/friendship-requests', signedFetchMiddleware(), getFriendshipRequestsHandler)
+  router.post(
+    '/v1/friendship-requests',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(CreateFriendshipRequestSchema),
+    createFriendshipRequestHandler
+  )
+  router.patch(
+    '/v1/friendship-requests/:address',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdateFriendshipRequestSchema),
+    updateFriendshipRequestHandler
+  )
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)
