@@ -88,6 +88,26 @@ export const metricDeclarations = {
     help: 'Number of updates sent on RPC subscription streams',
     labelNames: ['event']
   },
+  stream_ws_messages_received: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of messages received on the plain WebSocket stream protocol',
+    labelNames: ['type'] // 'subscribe', 'unsubscribe', 'ping', 'invalid'
+  },
+  stream_ws_updates_sent: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of updates sent on plain WebSocket stream subscriptions',
+    labelNames: ['event']
+  },
+  stream_ws_errors: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of errors reported on the plain WebSocket stream protocol',
+    labelNames: ['type']
+  },
+  stream_ws_close_codes: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of plain WebSocket stream protocol close codes',
+    labelNames: ['code']
+  },
   ws_unexpected_send_result_events: {
     type: IMetricsComponent.CounterType,
     help: 'Number of unexpected send result events'

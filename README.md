@@ -49,7 +49,7 @@ This server interacts with PostgreSQL for data persistence, Redis for caching, N
 
 ## API Documentation
 
-The API is fully documented using the [OpenAPI standard](https://swagger.io/specification/). The schema is located at [docs/openapi.yaml](docs/openapi.yaml).
+The API is fully documented using the [OpenAPI standard](https://swagger.io/specification/). The schema is located at [docs/openapi.yaml](docs/openapi.yaml). The real-time updates (friendships, connectivity, blocks, voice chats) are served over a WebSocket described in [docs/websocket-stream-protocol.md](docs/websocket-stream-protocol.md).
 
 ### Authentication
 
