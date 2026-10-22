@@ -595,6 +595,72 @@ components:
               type: integer
               description: 'Total number of active voice chats'
 
+    StartPrivateVoiceChat201OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - callId
+          properties:
+            callId:
+              type: string
+              format: uuid
+              description: 'ID of the new private voice chat'
+
+    GetIncomingPrivateVoiceChat200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - callId
+            - callerAddress
+          properties:
+            callId:
+              type: string
+              format: uuid
+              description: 'ID of the incoming private voice chat'
+            callerAddress:
+              type: string
+              description: 'Ethereum address of the caller'
+
+    AcceptPrivateVoiceChat200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - callId
+            - connectionUrl
+          properties:
+            callId:
+              type: string
+              format: uuid
+            connectionUrl:
+              type: string
+              description: 'Credentials of the authenticated user to connect to the call'
+
+    VoiceChatCredentials201OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - connectionUrl
+          properties:
+            connectionUrl:
+              type: string
+              description: 'Credentials of the authenticated user to connect to the voice chat'
+
     GetCommunityRequests200OkResponse:
       type: object
       required:
