@@ -169,3 +169,41 @@ export const GetMemberCommunitiesByIdsSchema: Schema = {
     }
   }
 }
+
+export type CreateFriendshipRequestRequestBody = {
+  address: string
+  message?: string
+}
+
+export type FriendshipRequestIntention = 'accepted' | 'rejected' | 'cancelled'
+
+export type UpdateFriendshipRequestRequestBody = {
+  intention: FriendshipRequestIntention
+}
+
+export const CreateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    },
+    message: {
+      type: 'string'
+    }
+  }
+}
+
+export const UpdateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['intention'],
+  additionalProperties: false,
+  properties: {
+    intention: {
+      type: 'string',
+      enum: ['accepted', 'rejected', 'cancelled']
+    }
+  }
+}
