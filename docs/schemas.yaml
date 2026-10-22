@@ -1482,3 +1482,57 @@ components:
                 Friendship status between the authenticated user and the other user, the same code the
                 community endpoints return in `friendshipStatus`: 0 request sent, 1 request received,
                 2 canceled, 3 accepted, 4 rejected, 5 deleted, 6 blocked, 7 none, 8 blocked by.
+
+    BlockedUser:
+      allOf:
+        - $ref: '#/components/schemas/FriendProfile'
+        - type: object
+          properties:
+            blockedAt:
+              type: integer
+              description: 'When the user was blocked, in milliseconds since the epoch'
+
+    GetBlockedUsers200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BlockedUser'
+
+    BlockUser201OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/BlockedUser'
+
+    GetBlockingStatus200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - blockedUsers
+            - blockedByUsers
+          properties:
+            blockedUsers:
+              type: array
+              items:
+                type: string
+              description: 'Addresses the authenticated user blocked'
+            blockedByUsers:
+              type: array
+              items:
+                type: string
+              description: 'Addresses that blocked the authenticated user'
