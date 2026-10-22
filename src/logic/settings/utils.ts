@@ -8,12 +8,10 @@ import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SituationReactionsVisibility as DBSituationReactionsVisibility,
-  SocialSettings as DBSocialSettings,
-  User
+  SocialSettings as DBSocialSettings
 } from '../../types'
 
 const DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY = DBPrivateMessagesPrivacy.ALL
-const DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY = RPCPrivateMessagePrivacySetting.ALL
 
 const RPC_PRIVATE_MESSAGE_PRIVACY_TO_DB_PRIVATE_MESSAGE_PRIVACY: Record<
   RPCPrivateMessagePrivacySetting,
@@ -74,10 +72,15 @@ export class InvalidSocialSettingsError extends Error {
   }
 }
 
+export function convertDBPrivateMessagesPrivacyToRPCSetting(
+  privacy: DBPrivateMessagesPrivacy
+): RPCPrivateMessagePrivacySetting {
+  return DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY[privacy]
+}
+
 export function convertDBSettingsToRPCSettings(settings: DBSocialSettings): RPCSocialSettings {
   return {
-    privateMessagesPrivacy:
-      DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY[settings.private_messages_privacy],
+    privateMessagesPrivacy: convertDBPrivateMessagesPrivacyToRPCSetting(settings.private_messages_privacy),
     blockedUsersMessagesVisibility:
       DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY[
         settings.blocked_users_messages_visibility
@@ -149,27 +152,36 @@ export function getDefaultSettings(address: string): DBSocialSettings {
   }
 }
 
-export function buildPrivateMessagesRPCSettingsForAddresses(
-  addresses: string[],
-  settings: DBSocialSettings[],
-  friends: User[]
-): Record<string, { privacy: RPCPrivateMessagePrivacySetting; isFriend: boolean }> {
-  // Create base message privacy information map
-  const privacyInformation = addresses.reduce(
-    (acc, address) => {
-      acc[address] = { privacy: DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY, isFriend: false }
-      return acc
-    },
-    {} as Record<string, { privacy: RPCPrivateMessagePrivacySetting; isFriend: boolean }>
-  )
+export type HTTPSocialSettings = {
+  privateMessagesPrivacy: DBPrivateMessagesPrivacy
+  blockedUsersMessagesVisibility: DBBlockedUsersMessagesVisibilitySetting
+  showSituationReactions: DBSituationReactionsVisibility
+}
 
-  settings.forEach((setting) => {
-    privacyInformation[setting.address].privacy = convertDBSettingsToRPCSettings(setting).privateMessagesPrivacy
-  })
+export function convertDBSettingsToHTTPSettings(settings: DBSocialSettings): HTTPSocialSettings {
+  return {
+    privateMessagesPrivacy: settings.private_messages_privacy,
+    blockedUsersMessagesVisibility: settings.blocked_users_messages_visibility,
+    showSituationReactions: settings.show_situation_reactions
+  }
+}
 
-  friends.forEach((friend) => {
-    privacyInformation[friend.address].isFriend = true
-  })
+export function convertHTTPSettingsIntoDBSettings(
+  settings: Partial<HTTPSocialSettings>
+): Partial<Omit<DBSocialSettings, 'address'>> {
+  const dbSettings: Partial<Omit<DBSocialSettings, 'address'>> = {}
 
-  return privacyInformation
+  if (settings.privateMessagesPrivacy !== undefined) {
+    dbSettings.private_messages_privacy = settings.privateMessagesPrivacy
+  }
+
+  if (settings.blockedUsersMessagesVisibility !== undefined) {
+    dbSettings.blocked_users_messages_visibility = settings.blockedUsersMessagesVisibility
+  }
+
+  if (settings.showSituationReactions !== undefined) {
+    dbSettings.show_situation_reactions = settings.showSituationReactions
+  }
+
+  return dbSettings
 }

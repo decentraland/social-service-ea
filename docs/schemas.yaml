@@ -940,6 +940,59 @@ components:
                         format: date-time
                         description: 'When the user was muted'
 
+    SocialSettings:
+      type: object
+      required:
+        - privateMessagesPrivacy
+        - blockedUsersMessagesVisibility
+        - showSituationReactions
+      properties:
+        privateMessagesPrivacy:
+          type: string
+          enum: [all, only_friends]
+          description: 'Who can send private messages to the user'
+        blockedUsersMessagesVisibility:
+          type: string
+          enum: [show_messages, do_not_show_messages]
+          description: 'Whether messages from blocked users are shown'
+        showSituationReactions:
+          type: string
+          enum: [show, hide]
+          description: 'Whether situation reactions are shown'
+
+    SocialSettings200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/SocialSettings'
+
+    GetPrivateMessagesSettings200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - address
+              - privateMessagesPrivacy
+              - isFriend
+            properties:
+              address:
+                type: string
+                description: 'Ethereum address of the user'
+              privateMessagesPrivacy:
+                type: string
+                enum: [all, only_friends]
+                description: 'Who can send private messages to the user'
+              isFriend:
+                type: boolean
+                description: 'Whether the user is a friend of the authenticated user'
+
     GetMemberCommunitiesByIds200OkResponse:
       type: object
       required:
