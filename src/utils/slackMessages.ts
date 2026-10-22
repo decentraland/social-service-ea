@@ -159,4 +159,62 @@ const referralSuspiciousTimingMessage = (
   }
 }
 
-export { referral100InvitesReachedMessage, referralIpMatchRejectionMessage, referralSuspiciousTimingMessage }
+const referralBannedChainRejectionMessage = (
+  referrer: string,
+  invitedUser: string,
+  bannedWallet: string,
+  chainPath: string,
+  isDev: boolean,
+  referralMetabaseDashboard: string
+) => {
+  return {
+    channel: isDev ? 'notifications-dev' : 'referral-notifications',
+    text: `🔗 Banned Chain Rejection - Referral blocked due to banned referral chain`,
+    blocks: [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '🔗 Banned Chain Rejection Detected',
+          emoji: true
+        }
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*⛓️ Banned Referral Chain Detected*\n\n*Referrer:* \`${referrer}\`\n*Invited User:* \`${invitedUser}\`\n*Banned Wallet in Chain:* \`${bannedWallet}\``
+        }
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*📊 Chain Details:*\n• Chain path: ${chainPath}\n• Referral automatically rejected\n• Referrer is downstream of a banned wallet\n\n*🔍 Next Steps:*\n• Review if referrer should be added to deny list\n• Monitor for similar chain patterns`
+        }
+      },
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: {
+              type: 'plain_text',
+              text: 'View Referral Dashboard',
+              emoji: true
+            },
+            url: referralMetabaseDashboard,
+            style: 'danger'
+          }
+        ]
+      }
+    ]
+  }
+}
+
+export {
+  referral100InvitesReachedMessage,
+  referralIpMatchRejectionMessage,
+  referralSuspiciousTimingMessage,
+  referralBannedChainRejectionMessage
+}
