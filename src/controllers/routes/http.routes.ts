@@ -54,7 +54,11 @@ import {
   getFriendshipRequestsHandler,
   createFriendshipRequestHandler,
   updateFriendshipRequestHandler,
-  removeFriendHandler
+  removeFriendHandler,
+  getBlockedUsersHandler,
+  getBlockingStatusHandler,
+  blockUserHandler,
+  unblockUserHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
@@ -73,7 +77,8 @@ import {
   UpdateCommunityRequestStatusSchema,
   GetMemberCommunitiesByIdsSchema,
   CreateFriendshipRequestSchema,
-  UpdateFriendshipRequestSchema
+  UpdateFriendshipRequestSchema,
+  BlockUserSchema
 } from '../handlers/http/schemas'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
@@ -233,6 +238,17 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     schemaValidator.withSchemaValidatorMiddleware(UpdateFriendshipRequestSchema),
     updateFriendshipRequestHandler
   )
+
+  // Blocks
+  router.get('/v1/blocks', signedFetchMiddleware(), getBlockedUsersHandler)
+  router.post(
+    '/v1/blocks',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(BlockUserSchema),
+    blockUserHandler
+  )
+  router.delete('/v1/blocks/:address', signedFetchMiddleware(), unblockUserHandler)
+  router.get('/v1/blocking-status', signedFetchMiddleware(), getBlockingStatusHandler)
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)

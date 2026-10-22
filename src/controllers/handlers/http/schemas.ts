@@ -207,3 +207,19 @@ export const UpdateFriendshipRequestSchema: Schema = {
     }
   }
 }
+
+export type BlockUserRequestBody = {
+  address: string
+}
+
+export const BlockUserSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    }
+  }
+}
