@@ -65,7 +65,12 @@ export function useCTEs(CTEs: CTE[]) {
 }
 
 /**
- * Returns a CTE to get the user's friends without taking into account the blocked users
+ * Returns a CTE for the user's active friends, excluding anyone either side has blocked.
+ *
+ * `is_active` alone is not sufficient. Blocking deactivates the friendship in the same transaction,
+ * but `upsertFriendship` reads the block state outside its transaction and takes no row lock, so an
+ * ACCEPT racing a BLOCK can leave a `blocks` row beside `is_active = true`.
+ *
  * @param userAddress - The address of the user
  * @returns A CTE for the user's friends
  */
@@ -83,36 +88,21 @@ export function getUserFriendsCTE(userAddress: string): CTE {
     AND (
       f.address_requester = ${normalizedUserAddress}
       OR f.address_requested = ${normalizedUserAddress}
-    )`,
+    )
+    AND `.append(getBlockingCondition(normalizedUserAddress)),
     name: 'user_friends'
-  }
-}
-
-function getBlockedForUserCTE(userAddress: string): CTE {
-  const normalizedUserAddress = normalizeAddress(userAddress)
-  return {
-    query: SQL`SELECT DISTINCT 
-      CASE WHEN b.blocker_address = ${normalizedUserAddress}
-      THEN b.blocked_address
-      ELSE b.blocker_address
-    END as address
-    FROM blocks b
-    WHERE b.blocker_address = ${normalizedUserAddress}
-      OR b.blocked_address = ${normalizedUserAddress}`,
-    name: 'blocked_for_user'
   }
 }
 
 export function getFriendsFromListBaseQuery(userAddress: string, otherUserAddresses: string[]): SQLStatement {
   const userFriendsCTE = getUserFriendsCTE(userAddress)
-  const blockedForUserCTE = getBlockedForUserCTE(userAddress)
   const normalizedOtherUserAddresses = otherUserAddresses.map(normalizeAddress)
-  // Correlated against the row's own address: comparing the block list to the whole batch makes
-  // the subquery a constant, so one block anywhere in the batch would empty the result.
-  return useCTEs([userFriendsCTE, blockedForUserCTE])
+  // The CTE already excludes anyone in a block relationship with this user, in either direction, so
+  // there is no second filter here. There used to be one, built from a materialized list of the
+  // user's blocks; it expressed the same set and is gone rather than left looking load-bearing.
+  return useCTEs([userFriendsCTE])
     .append(`SELECT uf.address FROM ${userFriendsCTE.name} uf `)
-    .append(SQL`WHERE uf.address = ANY(${normalizedOtherUserAddresses}) AND NOT EXISTS (`)
-    .append(`SELECT 1 FROM ${blockedForUserCTE.name} b WHERE b.address = uf.address)`)
+    .append(SQL`WHERE uf.address = ANY(${normalizedOtherUserAddresses})`)
 }
 
 export function getFriendsBaseQuery(
@@ -255,6 +245,12 @@ export function getMutualFriendsBaseQuery(
     .append(SQL` FROM friendsA f_b WHERE f_b.address IN (`)
     .append(friendsSubquery(normalizedUserAddress2, 'f_b'))
     .append(SQL`)`)
+    // The two subqueries above filter each side by that side's own blocks. Neither asks whether
+    // these two have blocked each other, so the pair predicate belongs here — in the query rather
+    // than beside it, so every caller gets the rule and the rows and the count apply the same one.
+    .append(
+      SQL` AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_address = ${normalizedUserAddress1} AND b.blocked_address = ${normalizedUserAddress2}) OR (b.blocker_address = ${normalizedUserAddress2} AND b.blocked_address = ${normalizedUserAddress1}))`
+    )
 
   if (!onlyCount) {
     query.append(SQL` ORDER BY f_b.address`)
