@@ -1,6 +1,13 @@
 import { Schema } from 'ajv'
-import { CommunityRole } from '../../../types/entities'
+import {
+  BlockedUsersMessagesVisibilitySetting,
+  CommunityRole,
+  PrivateMessagesPrivacy,
+  SituationReactionsVisibility
+} from '../../../types/entities'
 import { CommunityRequestType, CommunityRequestStatus } from '../../../logic/community/types'
+import { HTTPSocialSettings } from '../../../logic/settings'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/constants'
 
 // TypeScript types derived from schemas
 export type UpdateMemberRoleRequestBody = {
@@ -208,6 +215,28 @@ export const UpdateCommunityRequestStatusSchema: Schema = {
   }
 }
 
+export type UpdateSocialSettingsRequestBody = Partial<HTTPSocialSettings>
+
+export const UpdateSocialSettingsSchema: Schema = {
+  type: 'object',
+  minProperties: 1,
+  additionalProperties: false,
+  properties: {
+    privateMessagesPrivacy: {
+      type: 'string',
+      enum: Object.values(PrivateMessagesPrivacy)
+    },
+    blockedUsersMessagesVisibility: {
+      type: 'string',
+      enum: Object.values(BlockedUsersMessagesVisibilitySetting)
+    },
+    showSituationReactions: {
+      type: 'string',
+      enum: Object.values(SituationReactionsVisibility)
+    }
+  }
+}
+
 const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 const MAX_COMMUNITY_IDS = 50
 
@@ -228,6 +257,61 @@ export const GetMemberCommunitiesByIdsSchema: Schema = {
       },
       minItems: 1,
       maxItems: MAX_COMMUNITY_IDS
+    }
+  }
+}
+
+export type CreateFriendshipRequestRequestBody = {
+  address: string
+  message?: string
+}
+
+export type FriendshipRequestIntention = 'accepted' | 'rejected' | 'cancelled'
+
+export type UpdateFriendshipRequestRequestBody = {
+  intention: FriendshipRequestIntention
+}
+
+export const CreateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    },
+    message: {
+      type: 'string',
+      maxLength: FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH
+    }
+  }
+}
+
+export const UpdateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['intention'],
+  additionalProperties: false,
+  properties: {
+    intention: {
+      type: 'string',
+      enum: ['accepted', 'rejected', 'cancelled']
+    }
+  }
+}
+
+export type BlockUserRequestBody = {
+  address: string
+}
+
+export const BlockUserSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
     }
   }
 }

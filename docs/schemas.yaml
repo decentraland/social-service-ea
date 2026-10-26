@@ -1006,6 +1006,59 @@ components:
                         format: date-time
                         description: 'When the user was muted'
 
+    SocialSettings:
+      type: object
+      required:
+        - privateMessagesPrivacy
+        - blockedUsersMessagesVisibility
+        - showSituationReactions
+      properties:
+        privateMessagesPrivacy:
+          type: string
+          enum: [all, only_friends]
+          description: 'Who can send private messages to the user'
+        blockedUsersMessagesVisibility:
+          type: string
+          enum: [show_messages, do_not_show_messages]
+          description: 'Whether messages from blocked users are shown'
+        showSituationReactions:
+          type: string
+          enum: [show, hide]
+          description: 'Whether situation reactions are shown'
+
+    SocialSettings200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/SocialSettings'
+
+    GetPrivateMessagesSettings200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - address
+              - privateMessagesPrivacy
+              - isFriend
+            properties:
+              address:
+                type: string
+                description: 'Ethereum address of the user'
+              privateMessagesPrivacy:
+                type: string
+                enum: [all, only_friends]
+                description: 'Who can send private messages to the user'
+              isFriend:
+                type: boolean
+                description: 'Whether the user is a friend of the authenticated user'
+
     GetMemberCommunitiesByIds200OkResponse:
       type: object
       required:
@@ -1443,3 +1496,146 @@ components:
             total:
               type: integer
               description: 'Total number of posts in the community'
+
+    Friend:
+      type: object
+      required:
+        - address
+      properties:
+        address:
+          type: string
+          description: 'Ethereum address of the friend. Clients resolve the profile themselves.'
+
+    FriendshipRequest:
+      type: object
+      required:
+        - id
+        - address
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: 'Identifier of the friendship request'
+        address:
+          type: string
+          description: 'Ethereum address of the other user: the sender of a received request, the receiver of a sent one'
+        createdAt:
+          type: integer
+          description: 'When the request was created, in milliseconds since the epoch'
+        message:
+          type: string
+          maxLength: 256
+          description: 'Message sent along with the request, limited to 256 Unicode code points. Absent when the request has none.'
+
+    GetFriends200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Friend'
+
+    GetFriendshipRequests200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FriendshipRequest'
+
+    FriendshipRequest200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/FriendshipRequest'
+
+    GetFriendshipStatus200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - status
+          properties:
+            status:
+              type: integer
+              description: >-
+                Friendship status between the authenticated user and the other user, the same code the
+                community endpoints return in `friendshipStatus`: 0 request sent, 1 request received,
+                2 canceled, 3 accepted, 4 rejected, 5 deleted, 6 blocked, 7 none, 8 blocked by.
+
+    BlockedUser:
+      type: object
+      required:
+        - address
+        - blockedAt
+      properties:
+        address:
+          type: string
+          description: 'Ethereum address of the blocked user. Clients resolve the profile themselves.'
+        blockedAt:
+          type: integer
+          description: 'When the user was blocked, in milliseconds since the epoch'
+
+    GetBlockedUsers200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BlockedUser'
+
+    BlockUser201OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/BlockedUser'
+
+    GetBlockingStatus200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - blockedUsers
+            - blockedByUsers
+          properties:
+            blockedUsers:
+              type: array
+              items:
+                type: string
+              description: 'Addresses the authenticated user blocked'
+            blockedByUsers:
+              type: array
+              items:
+                type: string
+              description: 'Addresses that blocked the authenticated user'

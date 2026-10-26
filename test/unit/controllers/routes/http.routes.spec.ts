@@ -4,6 +4,7 @@ import { errorHandler } from '@dcl/http-commons'
 import { setupHttpRoutes } from '../../../../src/controllers/routes/http.routes'
 import { communitiesErrorsHandler } from '../../../../src/controllers/middlewares/communities-errors'
 import { voiceChatsErrorsHandler } from '../../../../src/controllers/middlewares/voice-chats-errors'
+import { friendsErrorsHandler } from '../../../../src/controllers/middlewares/friends-errors'
 import { reportUnhandledErrors } from '../../../../src/controllers/middlewares/report-unhandled-errors'
 import { GlobalContext } from '../../../../src/types'
 
@@ -143,7 +144,7 @@ describe('when registering the error-handling middlewares', () => {
   // and outside the domain mappers, whose mapped 4xx must never reach the reporter.
   it('should place the reporter between the shared handler and the domain mappers', () => {
     const errorMiddlewares = registered.filter((middleware) =>
-      [errorHandler, reportUnhandledErrors, communitiesErrorsHandler, voiceChatsErrorsHandler].includes(
+      [errorHandler, reportUnhandledErrors, communitiesErrorsHandler, voiceChatsErrorsHandler, friendsErrorsHandler].includes(
         middleware as never
       )
     )
@@ -152,7 +153,8 @@ describe('when registering the error-handling middlewares', () => {
       errorHandler,
       reportUnhandledErrors,
       communitiesErrorsHandler,
-      voiceChatsErrorsHandler
+      voiceChatsErrorsHandler,
+      friendsErrorsHandler
     ])
   })
 })

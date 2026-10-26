@@ -9,7 +9,7 @@
 - **Community Posts**: Share updates and announcements within communities with post likes
 - **Place Associations**: Link communities with specific Decentraland locations
 - **Voice Chat**: Real-time voice chat sessions within communities with role-based participation
-- **Friendship Management**: Manage friend relationships and social connections (via RPC/gRPC)
+- **Friendship Management**: Manage friend relationships and social connections (via RPC/gRPC and HTTP)
 - **Privacy Controls**: Blocking and privacy settings for user interactions
 - **Referral System**: Track user referrals, invitations, and referral progress
 - **User Mutes**: Mute/unmute users with paginated retrieval and address filtering

@@ -261,11 +261,8 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
         WHERE blocker_address = ${normalizeAddress(blockerAddress)}
           AND blocked_address = ${normalizeAddress(blockedAddress)}
       `
-      if (txClient) {
-        await txClient.query(query)
-      } else {
-        await pg.query(query)
-      }
+      const result = txClient ? await txClient.query(query) : await pg.query(query)
+      return (result.rowCount ?? 0) > 0
     },
     async blockUsers(blockerAddress, blockedAddresses) {
       if (blockedAddresses.length === 0) {
