@@ -3,7 +3,8 @@ import { PoolClient } from 'pg'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { InvalidRequestError } from '@dcl/http-commons'
-import { createFriendsComponent, FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../src/logic/friends/component'
+import { createFriendsComponent } from '../../../src/logic/friends/component'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../src/logic/friends/constants'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
 import { mockConfig, mockMetrics, mockRedis, mockRegistry } from '../../mocks/components'
@@ -1965,9 +1966,14 @@ describe('Friends Component', () => {
     })
   })
 
-  describe.each(['upsertFriendship', 'upsertFriendshipWithoutProfiles'] as const)(
-    'when a friendship request sent with %s carries a message',
-    (method) => {
+  describe.each([
+    ['upsertFriendship', 'a'],
+    ['upsertFriendship', '😀'],
+    ['upsertFriendshipWithoutProfiles', 'a'],
+    ['upsertFriendshipWithoutProfiles', '😀']
+  ] as const)(
+    'when a friendship request sent with %s carries a message made of %s',
+    (method, character) => {
       let userAddress: EthAddress
       let friendAddress: EthAddress
 
@@ -1986,7 +1992,7 @@ describe('Friends Component', () => {
         let metadata: Record<string, string>
 
         beforeEach(() => {
-          metadata = { message: 'a'.repeat(FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH + 1) }
+          metadata = { message: character.repeat(FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH + 1) }
         })
 
         it('should reject the request with an InvalidRequestError', async () => {
@@ -2008,7 +2014,7 @@ describe('Friends Component', () => {
         let metadata: Record<string, string>
 
         beforeEach(() => {
-          metadata = { message: 'a'.repeat(FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH) }
+          metadata = { message: character.repeat(FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH) }
         })
 
         it('should record the request with the message', async () => {

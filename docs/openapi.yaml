@@ -2203,9 +2203,8 @@ paths:
           schema:
             type: integer
             minimum: 0
-            maximum: 100000
             default: 0
-          description: Number of results to skip
+          description: Number of results to skip. Values above 100000 are clamped to 100000.
       responses:
         '200':
           description: Friends of the authenticated user
@@ -2307,9 +2306,8 @@ paths:
           schema:
             type: integer
             minimum: 0
-            maximum: 100000
             default: 0
-          description: Number of results to skip
+          description: Number of results to skip. Values above 100000 are clamped to 100000.
       responses:
         '200':
           description: Mutual friends
@@ -2398,9 +2396,8 @@ paths:
           schema:
             type: integer
             minimum: 0
-            maximum: 100000
             default: 0
-          description: Number of results to skip
+          description: Number of results to skip. Values above 100000 are clamped to 100000.
       responses:
         '200':
           description: Pending friendship requests
@@ -2446,7 +2443,7 @@ paths:
                 message:
                   type: string
                   maxLength: 256
-                  description: Optional message sent along with the request
+                  description: Optional message sent along with the request, limited to 256 Unicode code points
       responses:
         '201':
           description: Friendship request sent, with the receiver's address

@@ -1,7 +1,7 @@
 import { Schema } from 'ajv'
 import { CommunityRole } from '../../../types/entities'
 import { CommunityRequestType, CommunityRequestStatus } from '../../../logic/community/types'
-import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/component'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/constants'
 
 // TypeScript types derived from schemas
 export type UpdateMemberRoleRequestBody = {

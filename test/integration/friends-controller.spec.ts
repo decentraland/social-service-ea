@@ -2,6 +2,7 @@ import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_servi
 import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
+import { connectAuthenticatedRpcClient } from './utils/rpc-client'
 import { createOrUpsertActiveFriendship, createPendingFriendshipRequest } from './utils/friendships'
 
 test('Friends Controller', function ({ components, stubComponents }) {
@@ -279,6 +280,56 @@ test('Friends Controller', function ({ components, stubComponents }) {
         const response = await makeRequest(identity, '/v1/friendship-requests', 'POST', { address: 'not-an-address' })
 
         expect(response.status).toBe(400)
+      })
+    })
+  })
+
+  describe.each(['HTTP', 'RPC'] as const)('when sending an emoji message through %s', (transport) => {
+    let rpcConnection: Awaited<ReturnType<typeof connectAuthenticatedRpcClient>> | undefined
+    let message: string
+    let responseStatus: number
+    let responseMessage: string | undefined
+
+    afterEach(() => {
+      rpcConnection?.close()
+      rpcConnection = undefined
+    })
+
+    describe.each([256, 257])('and the message contains %s Unicode code points', (length) => {
+      beforeEach(async () => {
+        message = '😀'.repeat(length)
+        responseMessage = undefined
+
+        if (transport === 'HTTP') {
+          const response = await makeRequest(identity, '/v1/friendship-requests', 'POST', {
+            address: otherAddress,
+            message
+          })
+          responseStatus = response.status
+          responseMessage = (await response.json()).data?.message
+        } else {
+          rpcConnection = await connectAuthenticatedRpcClient(components, identity)
+          const result = await rpcConnection.client.upsertFriendship({
+            action: { $case: 'request', request: { user: { address: otherAddress }, message } }
+          })
+          responseStatus = result.response?.$case === 'accepted' ? 201 : 400
+          if (result.response?.$case === 'accepted') {
+            responseMessage = result.response.accepted.message
+          } else {
+            expect(result.response?.$case).toBe('invalidRequest')
+          }
+        }
+      })
+
+      it('should accept the boundary and reject a message above it', () => {
+        expect(responseStatus).toBe(length === 256 ? 201 : 400)
+        expect(responseMessage).toBe(length === 256 ? message : undefined)
+      })
+
+      it('should persist only the message within the limit', async () => {
+        expect(await getStatus(identity, otherAddress)).toBe(
+          length === 256 ? FriendshipStatus.REQUEST_SENT : FriendshipStatus.NONE
+        )
       })
     })
   })
