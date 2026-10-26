@@ -1406,7 +1406,7 @@ components:
         message:
           type: string
           maxLength: 256
-          description: 'Message sent along with the request. Absent when the request has none.'
+          description: 'Message sent along with the request, limited to 256 Unicode code points. Absent when the request has none.'
 
     GetFriends200OkResponse:
       type: object

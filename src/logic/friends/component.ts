@@ -29,12 +29,7 @@ import {
 } from '../../utils/friendship-pagination'
 import { normalizeAddress } from '../../utils/address'
 import { BlockedUser, IFriendsComponent } from './types'
-
-/**
- * The longest message a friendship request can carry. The message is stored in the action metadata and
- * fanned out through pub/sub, the streams and the notifications, so it is bounded for every transport.
- */
-export const FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH = 256
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from './constants'
 
 // Pair rate-limit buckets. The two scopes MUST keep separate keys: a friendship is symmetric, a block is not.
 const PAIR_RATE_LIMIT_KEY = {
@@ -119,7 +114,7 @@ export async function createFriendsComponent(
     action: Action,
     metadata: Record<string, string> | null
   ): Promise<{ id: string; actionId: string; createdAt: Date }> {
-    if (metadata?.message && metadata.message.length > FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH) {
+    if (metadata?.message && [...metadata.message].length > FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH) {
       throw new InvalidRequestError(
         `The friendship request message cannot be longer than ${FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH} characters`
       )
