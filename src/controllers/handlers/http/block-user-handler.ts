@@ -1,15 +1,14 @@
 import { InvalidRequestError } from '@dcl/http-commons'
 import { EthAddress } from '@dcl/schemas'
-import { BlockedUserProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { parseAddressToBlockedUser, parseProfileToBlockedUser } from '../../../logic/friends'
+import { BlockedUserWithoutProfile, parseBlockedUserWithoutProfile } from '../../../logic/friends'
 import { BlockUserRequestBody } from './schemas'
 
 export async function blockUserHandler(
   context: Pick<HandlerContextWithPath<'friends' | 'logs', '/v1/blocks'>, 'components' | 'request' | 'verification'>
-): Promise<HTTPResponse<BlockedUserProfile>> {
+): Promise<HTTPResponse<BlockedUserWithoutProfile>> {
   const {
     components: { friends, logs },
     request,
@@ -32,14 +31,12 @@ export async function blockUserHandler(
       throw new InvalidRequestError('You cannot block yourself')
     }
 
-    const { profile, blockedAt } = await friends.blockUser(blockerAddress, blockedAddress)
+    const { blockedAt } = await friends.blockUserWithoutProfile(blockerAddress, blockedAddress)
 
     return {
       status: 201,
       body: {
-        data: profile
-          ? parseProfileToBlockedUser(profile, blockedAt)
-          : parseAddressToBlockedUser(blockedAddress, blockedAt)
+        data: parseBlockedUserWithoutProfile(blockedAddress, blockedAt)
       }
     }
   } catch (error) {

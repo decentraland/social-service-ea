@@ -279,6 +279,102 @@ export async function createFriendsComponent(
     return { requests, total }
   }
 
+  /** Writes the block and publishes it. Shared by both variants of `blockUser`. */
+  async function applyBlock(
+    blockerAddress: string,
+    rawBlockedAddress: string
+  ): Promise<{ blockedAddress: string; blockedAt: Date }> {
+    // Normalize once, up front. EthAddress.validate accepts EIP-55 mixed case and the database
+    // layer lowercases on write, so an un-normalized value here would still block correctly but
+    // publish an address the subscription filters — which compare against the always-lowercased
+    // connection address — would never match, leaving the blocked user's client unaware.
+    const blockedAddress = normalizeAddress(rawBlockedAddress)
+
+    await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
+
+    const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
+      const { blocked_at: blockedAt } = await friendsDb.blockUser(blockerAddress, blockedAddress, tx)
+
+      const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
+      if (!friendship) return { blockedAt }
+
+      const [_, actionId] = await Promise.all([
+        friendsDb.updateFriendshipStatus(friendship.id, false, tx),
+        friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.BLOCK, null, tx)
+      ])
+
+      return { actionId, blockedAt }
+    })
+
+    await Promise.all([
+      actionId
+        ? pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+            id: actionId,
+            from: blockerAddress,
+            to: blockedAddress,
+            action: Action.BLOCK,
+            timestamp: blockedAt.getTime()
+          })
+        : Promise.resolve(),
+      pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
+        blockerAddress,
+        blockedAddress,
+        isBlocked: true
+      })
+    ])
+
+    return { blockedAddress, blockedAt }
+  }
+
+  /** Removes the block and publishes it. Shared by both variants of `unblockUser`. */
+  async function applyUnblock(blockerAddress: string, rawBlockedAddress: string): Promise<string> {
+    const blockedAddress = normalizeAddress(rawBlockedAddress)
+
+    await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
+
+    const actionId = await friendsDb.executeTx(async (tx) => {
+      await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
+
+      const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
+      if (!friendship) return
+
+      const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+      return actionId
+    })
+
+    await Promise.all([
+      actionId
+        ? pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+            id: actionId,
+            from: blockerAddress,
+            to: blockedAddress,
+            action: Action.DELETE,
+            timestamp: Date.now()
+          })
+        : Promise.resolve(),
+      pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
+        blockerAddress,
+        blockedAddress,
+        isBlocked: false
+      })
+    ])
+
+    return blockedAddress
+  }
+
+  async function getBlockedUsers(
+    userAddress: string,
+    pagination: Pagination
+  ): Promise<{ blockedUsers: BlockedUserWithDate[]; total: number }> {
+    // total must be the row count, not the page length: clients page until they reach it.
+    const [blockedUsers, total] = await Promise.all([
+      friendsDb.getBlockedUsers(userAddress, normalizeBlockedUsersPagination(pagination)),
+      friendsDb.getBlockedUsersCount(userAddress)
+    ])
+
+    return { blockedUsers, total }
+  }
+
   return {
     getFriendsProfiles: async (
       userAddress: EthAddress,
@@ -294,56 +390,20 @@ export async function createFriendsComponent(
     },
     getFriendsWithoutProfiles: getFriends,
     blockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<BlockedUser> => {
-      // Normalize once, up front. EthAddress.validate accepts EIP-55 mixed case and the database
-      // layer lowercases on write, so an un-normalized value here would still block correctly but
-      // publish an address the subscription filters — which compare against the always-lowercased
-      // connection address — would never match, leaving the blocked user's client unaware.
-      const blockedAddress = normalizeAddress(rawBlockedAddress)
-
-      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
-
-      const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
-        const { blocked_at: blockedAt } = await friendsDb.blockUser(blockerAddress, blockedAddress, tx)
-
-        const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
-        if (!friendship) return { blockedAt }
-
-        const [_, actionId] = await Promise.all([
-          friendsDb.updateFriendshipStatus(friendship.id, false, tx),
-          friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.BLOCK, null, tx)
-        ])
-
-        return { actionId, blockedAt }
-      })
-
-      await Promise.all([
-        actionId
-          ? pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
-              id: actionId,
-              from: blockerAddress,
-              to: blockedAddress,
-              action: Action.BLOCK,
-              timestamp: blockedAt.getTime()
-            })
-          : Promise.resolve(),
-        pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
-          blockerAddress,
-          blockedAddress,
-          isBlocked: true
-        })
-      ])
+      const { blockedAddress, blockedAt } = await applyBlock(blockerAddress, rawBlockedAddress)
 
       return { profile: await tryGetProfile(blockedAddress), blockedAt }
+    },
+    blockUserWithoutProfile: async (blockerAddress: string, blockedAddress: string): Promise<{ blockedAt: Date }> => {
+      const { blockedAt } = await applyBlock(blockerAddress, blockedAddress)
+
+      return { blockedAt }
     },
     getBlockedUsers: async (
       userAddress: string,
       pagination: Pagination
     ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }> => {
-      // total must be the row count, not the page length: clients page until they reach it.
-      const [blockedUsers, total] = await Promise.all([
-        friendsDb.getBlockedUsers(userAddress, normalizeBlockedUsersPagination(pagination)),
-        friendsDb.getBlockedUsersCount(userAddress)
-      ])
+      const { blockedUsers, total } = await getBlockedUsers(userAddress, pagination)
       const profiles = await registry.getProfiles(blockedUsers.map((user) => user.address))
 
       return {
@@ -352,6 +412,7 @@ export async function createFriendsComponent(
         total
       }
     },
+    getBlockedUsersWithoutProfiles: getBlockedUsers,
     getBlockingStatus: async (userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }> => {
       const [blockedUsers, blockedByUsers] = await Promise.all([
         friendsDb.getBlockedUsers(userAddress),
@@ -416,38 +477,12 @@ export async function createFriendsComponent(
     },
     getSentFriendshipRequestsWithoutProfiles: getSentFriendshipRequests,
     unblockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<Profile | null> => {
-      const blockedAddress = normalizeAddress(rawBlockedAddress)
-
-      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
-
-      const actionId = await friendsDb.executeTx(async (tx) => {
-        await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
-
-        const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
-        if (!friendship) return
-
-        const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
-        return actionId
-      })
-
-      await Promise.all([
-        actionId
-          ? pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
-              id: actionId,
-              from: blockerAddress,
-              to: blockedAddress,
-              action: Action.DELETE,
-              timestamp: Date.now()
-            })
-          : Promise.resolve(),
-        pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
-          blockerAddress,
-          blockedAddress,
-          isBlocked: false
-        })
-      ])
+      const blockedAddress = await applyUnblock(blockerAddress, rawBlockedAddress)
 
       return tryGetProfile(blockedAddress)
+    },
+    unblockUserWithoutProfile: async (blockerAddress: string, blockedAddress: string): Promise<void> => {
+      await applyUnblock(blockerAddress, blockedAddress)
     },
     upsertFriendship: async (
       userAddress: EthAddress,

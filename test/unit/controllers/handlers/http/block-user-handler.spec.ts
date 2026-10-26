@@ -2,8 +2,6 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { blockUserHandler } from '../../../../../src/controllers/handlers/http/block-user-handler'
 import { createFriendsMockedComponent } from '../../../../mocks/components/friends'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { createMockProfile } from '../../../../mocks/profile'
-import { parseAddressToBlockedUser, parseProfileToBlockedUser } from '../../../../../src/logic/friends'
 import { FriendshipRateLimitError } from '../../../../../src/logic/friends/errors'
 
 const USER_ADDRESS = '0x1234567890123456789012345678901234567890'
@@ -25,57 +23,42 @@ beforeEach(() => {
   logs = createLogsMockedComponent()
 })
 
-describe('when blocking a user with a profile', () => {
-  let profile: ReturnType<typeof createMockProfile>
-  let blockedAt: Date
-
+describe('when blocking a user', () => {
   beforeEach(() => {
-    profile = createMockProfile(BLOCKED_ADDRESS)
-    blockedAt = new Date(1000)
-    friends.blockUser.mockResolvedValue({ profile, blockedAt })
+    friends.blockUserWithoutProfile.mockResolvedValue({ blockedAt: new Date(1000) })
   })
 
-  it('should respond with a 201 and the blocked user', async () => {
+  it('should respond with a 201, the blocked address and when it was blocked', async () => {
     await expect(callHandler({ address: BLOCKED_ADDRESS })).resolves.toEqual({
       status: 201,
-      body: { data: parseProfileToBlockedUser(profile, blockedAt) }
+      body: { data: { address: BLOCKED_ADDRESS, blockedAt: 1000 } }
     })
   })
 
   it('should block the normalized address', async () => {
     await callHandler({ address: BLOCKED_ADDRESS.toUpperCase().replace('0X', '0x') })
 
-    expect(friends.blockUser).toHaveBeenCalledWith(USER_ADDRESS, BLOCKED_ADDRESS)
-  })
-})
-
-describe('when blocking a user without a profile', () => {
-  let blockedAt: Date
-
-  beforeEach(() => {
-    blockedAt = new Date(1000)
-    friends.blockUser.mockResolvedValue({ profile: null, blockedAt })
+    expect(friends.blockUserWithoutProfile).toHaveBeenCalledWith(USER_ADDRESS, BLOCKED_ADDRESS)
   })
 
-  it('should respond with the blocked address and no display fields', async () => {
-    await expect(callHandler({ address: BLOCKED_ADDRESS })).resolves.toEqual({
-      status: 201,
-      body: { data: parseAddressToBlockedUser(BLOCKED_ADDRESS, blockedAt) }
-    })
+  it('should not resolve the profile', async () => {
+    await callHandler({ address: BLOCKED_ADDRESS })
+
+    expect(friends.blockUser).not.toHaveBeenCalled()
   })
 })
 
 describe('when the address is not valid', () => {
   it('should throw an InvalidRequestError without blocking anyone', async () => {
     await expect(callHandler({ address: '0x123' })).rejects.toThrow(InvalidRequestError)
-    expect(friends.blockUser).not.toHaveBeenCalled()
+    expect(friends.blockUserWithoutProfile).not.toHaveBeenCalled()
   })
 })
 
 describe('when the caller blocks themselves', () => {
   it('should throw an InvalidRequestError without blocking anyone', async () => {
     await expect(callHandler({ address: USER_ADDRESS })).rejects.toThrow('You cannot block yourself')
-    expect(friends.blockUser).not.toHaveBeenCalled()
+    expect(friends.blockUserWithoutProfile).not.toHaveBeenCalled()
   })
 })
 
@@ -84,7 +67,7 @@ describe('when the caller is rate limited', () => {
 
   beforeEach(() => {
     error = new FriendshipRateLimitError()
-    friends.blockUser.mockRejectedValue(error)
+    friends.blockUserWithoutProfile.mockRejectedValue(error)
   })
 
   it('should propagate the error for the friends error handler', async () => {

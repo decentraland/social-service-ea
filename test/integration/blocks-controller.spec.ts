@@ -33,7 +33,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
   describe('when the request is not signed', () => {
     it('should respond with a 400 status code on every blocks endpoint', async () => {
       const routes: [string, string][] = [
-        ['GET', '/v1/blocks'],
+        ['GET', '/v2/blocks'],
         ['POST', '/v1/blocks'],
         ['DELETE', `/v1/blocks/${otherAddress}`],
         ['GET', '/v1/blocking-status']
@@ -48,13 +48,18 @@ test('Blocks Controller', function ({ components, stubComponents }) {
 
   describe('when blocking a user (POST /v1/blocks)', () => {
     describe('and the request is valid', () => {
-      it('should respond with a 201 and the blocked user', async () => {
+      it('should respond with a 201, the blocked address and when it was blocked', async () => {
         const response = await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
 
         expect(response.status).toBe(201)
-        expect((await response.json()).data).toEqual(
-          expect.objectContaining({ address: otherAddress, blockedAt: expect.any(Number) })
-        )
+        expect((await response.json()).data).toEqual({ address: otherAddress, blockedAt: expect.any(Number) })
+      })
+
+      it('should not resolve the blocked user profile', async () => {
+        await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
+
+        expect(stubComponents.registry.getProfile).not.toHaveBeenCalled()
+        expect(stubComponents.registry.getProfiles).not.toHaveBeenCalled()
       })
 
       it('should show the block in the blocking status of both users', async () => {
@@ -73,7 +78,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
       it('should end the friendship', async () => {
         await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
 
-        const response = await makeRequest(otherIdentity, '/v1/friends')
+        const response = await makeRequest(otherIdentity, '/v2/friends')
         expect((await response.json()).data.total).toBe(0)
       })
     })
@@ -95,17 +100,17 @@ test('Blocks Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('when getting the blocked users (GET /v1/blocks)', () => {
+  describe('when getting the blocked users (GET /v2/blocks)', () => {
     beforeEach(async () => {
       await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
     })
 
-    it('should respond with the blocked user and the pagination properties', async () => {
-      const response = await makeRequest(identity, '/v1/blocks?limit=10')
+    it('should respond with the blocked address and the pagination properties', async () => {
+      const response = await makeRequest(identity, '/v2/blocks?limit=10')
 
       expect(response.status).toBe(200)
       expect((await response.json()).data).toEqual({
-        results: [expect.objectContaining({ address: otherAddress, blockedAt: expect.any(Number) })],
+        results: [{ address: otherAddress, blockedAt: expect.any(Number) }],
         total: 1,
         page: 1,
         pages: 1,
@@ -114,7 +119,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
     })
 
     it('should not list the block for the blocked user', async () => {
-      const response = await makeRequest(otherIdentity, '/v1/blocks')
+      const response = await makeRequest(otherIdentity, '/v2/blocks')
 
       expect((await response.json()).data.total).toBe(0)
     })

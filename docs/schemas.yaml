@@ -1464,13 +1464,17 @@ components:
                 2 canceled, 3 accepted, 4 rejected, 5 deleted, 6 blocked, 7 none, 8 blocked by.
 
     BlockedUser:
-      allOf:
-        - $ref: '#/components/schemas/FriendProfile'
-        - type: object
-          properties:
-            blockedAt:
-              type: integer
-              description: 'When the user was blocked, in milliseconds since the epoch'
+      type: object
+      required:
+        - address
+        - blockedAt
+      properties:
+        address:
+          type: string
+          description: 'Ethereum address of the blocked user. Clients resolve the profile themselves.'
+        blockedAt:
+          type: integer
+          description: 'When the user was blocked, in milliseconds since the epoch'
 
     GetBlockedUsers200OkResponse:
       type: object

@@ -2558,13 +2558,13 @@ paths:
       tags:
         - Friends
 
-  /v1/blocks:
+  /v2/blocks:
     get:
-      operationId: getBlockedUsers
-      summary: Get blocked users
+      operationId: getBlockedUsersV2
+      summary: Get blocked users (addresses only)
       description: |
-        Returns a paginated list of the users the authenticated user blocked, with when each one was blocked.
-        Blocked users whose profile cannot be resolved are left out of `results` but still counted in `total`.
+        Returns a paginated list of the addresses the authenticated user blocked, with when each one was
+        blocked. The response has no profile information: clients resolve the profiles themselves.
       security:
         - SignedFetch: []
       parameters:
@@ -2606,12 +2606,13 @@ paths:
       tags:
         - Blocks
 
+  /v1/blocks:
     post:
       operationId: blockUser
       summary: Block a user
       description: |
-        Blocks `address` for the authenticated user. Blocking a friend also ends the friendship.
-        A user without a profile can still be blocked; the response then carries only the address.
+        Blocks `address` for the authenticated user. Blocking a friend also ends the friendship. Blocking
+        an address that is already blocked keeps the original `blockedAt`.
       security:
         - SignedFetch: []
       requestBody:
@@ -2622,20 +2623,22 @@ paths:
               type: object
               required:
                 - address
+              additionalProperties: false
               properties:
                 address:
                   type: string
+                  pattern: '^0x[a-fA-F0-9]{40}$'
                   description: Ethereum address of the user to block
                   example: '0x0000000000000000000000000000000000000001'
       responses:
         '201':
-          description: User blocked
+          description: User blocked, with the blocked address and when it was blocked
           content:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/BlockUser201OkResponse'
         '400':
-          description: Invalid request or missing authentication
+          description: Invalid request or missing authentication, including an attempt to block yourself
           content:
             application/json:
               schema:

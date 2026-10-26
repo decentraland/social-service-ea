@@ -25,7 +25,7 @@ beforeEach(() => {
 
 describe('when unblocking a user', () => {
   beforeEach(() => {
-    friends.unblockUser.mockResolvedValue(null)
+    friends.unblockUserWithoutProfile.mockResolvedValue(undefined)
   })
 
   it('should respond with a 204', async () => {
@@ -35,21 +35,21 @@ describe('when unblocking a user', () => {
   it('should unblock the normalized address', async () => {
     await callHandler(BLOCKED_ADDRESS.toUpperCase().replace('0X', '0x'))
 
-    expect(friends.unblockUser).toHaveBeenCalledWith(USER_ADDRESS, BLOCKED_ADDRESS)
+    expect(friends.unblockUserWithoutProfile).toHaveBeenCalledWith(USER_ADDRESS, BLOCKED_ADDRESS)
   })
 })
 
 describe('when the address is not valid', () => {
   it('should throw an InvalidRequestError without unblocking anyone', async () => {
     await expect(callHandler('not-an-address')).rejects.toThrow(InvalidRequestError)
-    expect(friends.unblockUser).not.toHaveBeenCalled()
+    expect(friends.unblockUserWithoutProfile).not.toHaveBeenCalled()
   })
 })
 
 describe('when the caller unblocks themselves', () => {
   it('should throw an InvalidRequestError without unblocking anyone', async () => {
     await expect(callHandler(USER_ADDRESS)).rejects.toThrow('You cannot unblock yourself')
-    expect(friends.unblockUser).not.toHaveBeenCalled()
+    expect(friends.unblockUserWithoutProfile).not.toHaveBeenCalled()
   })
 })
 
@@ -58,7 +58,7 @@ describe('when the caller is rate limited', () => {
 
   beforeEach(() => {
     error = new FriendshipRateLimitError()
-    friends.unblockUser.mockRejectedValue(error)
+    friends.unblockUserWithoutProfile.mockRejectedValue(error)
   })
 
   it('should propagate the error for the friends error handler', async () => {

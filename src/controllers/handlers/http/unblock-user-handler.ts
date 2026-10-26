@@ -29,7 +29,7 @@ export async function unblockUserHandler(
       throw new InvalidRequestError('You cannot unblock yourself')
     }
 
-    await friends.unblockUser(blockerAddress, blockedAddress)
+    await friends.unblockUserWithoutProfile(blockerAddress, blockedAddress)
 
     return { status: 204 }
   } catch (error) {
