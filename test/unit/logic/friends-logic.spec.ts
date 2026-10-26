@@ -464,7 +464,7 @@ describe('Friends Component', () => {
       beforeEach(async () => {
         loopError = undefined
 
-        mockFriendsDB.unblockUser.mockResolvedValue(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValue(true)
         mockRegistry.getProfile.mockResolvedValue(createMockProfile(recipientAddress))
 
         for (let attempt = 0; attempt < pairRateLimit / 2; attempt++) {
@@ -1199,7 +1199,7 @@ describe('Friends Component', () => {
       let result: Awaited<ReturnType<typeof friendsComponent.unblockUser>>
 
       beforeEach(async () => {
-        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
         mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
         mockRegistry.getProfile.mockRejectedValueOnce(new Error(`Profile not found: ${blockedAddress}`))
         result = await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
@@ -1234,7 +1234,7 @@ describe('Friends Component', () => {
         now = Date.now()
         jest.spyOn(Date, 'now').mockReturnValueOnce(now)
         mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
-        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
         mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
         mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
       })
@@ -1285,7 +1285,7 @@ describe('Friends Component', () => {
     describe('and the user is not friends with the blocked user', () => {
       beforeEach(() => {
         mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
-        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
         mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
       })
 
@@ -2032,6 +2032,125 @@ describe('Friends Component', () => {
     }
   )
 
+  describe('when blocking a user without resolving the profile', () => {
+    let blockedAt: Date
+    let checksummed: string
+    let result: Awaited<ReturnType<typeof friendsComponent.blockUserWithoutProfile>>
+
+    beforeEach(async () => {
+      blockedAt = new Date(1000)
+      checksummed = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      mockRegistry.getProfile.mockReset()
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as PoolClient))
+      mockFriendsDB.blockUser.mockResolvedValueOnce({ blocked_at: blockedAt } as any)
+      mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+      mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
+
+      result = await friendsComponent.blockUserWithoutProfile(mockUserAddress, checksummed)
+    })
+
+    it('should resolve with the time the user was blocked', () => {
+      expect(result).toEqual({ blockedAt })
+    })
+
+    it('should write the block and end the friendship like the profile variant', () => {
+      expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(mockUserAddress, checksummed.toLowerCase(), expect.anything())
+      expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith('friendship-id', false, expect.anything())
+    })
+
+    it('should publish the block update with the normalized address', () => {
+      expect(mockPublishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+        blockerAddress: mockUserAddress,
+        blockedAddress: checksummed.toLowerCase(),
+        isBlocked: true
+      })
+    })
+
+    it('should not resolve the profile', () => {
+      expect(mockRegistry.getProfile).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when unblocking a user without resolving the profile', () => {
+    let blockedAddress: string
+
+    beforeEach(async () => {
+      blockedAddress = '0x12356abc4078a0cc3b89b419928b857b8af826ef'
+      mockRegistry.getProfile.mockReset()
+      mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as PoolClient))
+      mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+
+      await friendsComponent.unblockUserWithoutProfile(mockUserAddress, blockedAddress)
+    })
+
+    it('should remove the block and publish it', () => {
+      expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, expect.anything())
+      expect(mockPublishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+        blockerAddress: mockUserAddress,
+        blockedAddress,
+        isBlocked: false
+      })
+    })
+
+    it('should not resolve the profile', () => {
+      expect(mockRegistry.getProfile).not.toHaveBeenCalled()
+    })
+  })
+
+  describe.each(['unblockUser', 'unblockUserWithoutProfile'] as const)(
+    'when %s cannot remove a block',
+    (method) => {
+      let target: string
+
+      beforeEach(() => {
+        target = '0x2234567890123456789012345678901234567890'
+        mockFriendsDB.executeTx.mockImplementation(async (cb) => cb({} as PoolClient))
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(false)
+        mockRegistry.getProfile.mockResolvedValueOnce(null)
+      })
+
+      it('should leave friendship history unchanged and emit no updates', async () => {
+        await friendsComponent[method](mockUserAddress, target)
+
+        expect(mockFriendsDB.getFriendship).not.toHaveBeenCalled()
+        expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
+        expect(mockPublishInChannel).not.toHaveBeenCalled()
+      })
+    }
+  )
+
+  describe.each(['unblockUser', 'unblockUserWithoutProfile'] as const)(
+    'when %s is rate limited',
+    (method) => {
+      let target: string
+
+      beforeEach(() => {
+        target = '0x2234567890123456789012345678901234567890'
+        mockRedis.consumeRateLimit.mockResolvedValueOnce(false)
+      })
+
+      it('should reject before deleting a block or publishing an update', async () => {
+        await expect(friendsComponent[method](mockUserAddress, target)).rejects.toThrow(FriendshipRateLimitError)
+        expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+        expect(mockPublishInChannel).not.toHaveBeenCalled()
+      })
+    }
+  )
+
+  describe('when blocking is rate limited, without resolving the profile', () => {
+    beforeEach(() => {
+      mockRedis.consumeRateLimit.mockResolvedValue(false)
+    })
+
+    it('should reject the block with a rate limit error before writing anything', async () => {
+      await expect(
+        friendsComponent.blockUserWithoutProfile(mockUserAddress, '0x12356abc4078a0cc3b89b419928b857b8af826ef')
+      ).rejects.toThrow(FriendshipRateLimitError)
+      expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when reading friends data without profiles', () => {
     let pagination: Pagination
 
@@ -2052,6 +2171,28 @@ describe('Friends Component', () => {
           total: 5
         })
         expect(mockFriendsDB.getFriends).toHaveBeenCalledWith(mockUserAddress, { pagination, onlyActive: true })
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and getting the blocked users', () => {
+      let blockedUsers: BlockedUserWithDate[]
+
+      beforeEach(() => {
+        blockedUsers = [{ address: '0xblocked', blocked_at: new Date(1000) }]
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(blockedUsers)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(3)
+      })
+
+      it('should return the page with the full row count, without resolving profiles', async () => {
+        await expect(friendsComponent.getBlockedUsersWithoutProfiles(mockUserAddress, pagination)).resolves.toEqual({
+          blockedUsers,
+          total: 3
+        })
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(
+          mockUserAddress,
+          normalizeBlockedUsersPagination(pagination)
+        )
         expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })

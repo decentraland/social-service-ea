@@ -54,7 +54,11 @@ import {
   getFriendshipRequestsV2Handler,
   createFriendshipRequestHandler,
   updateFriendshipRequestHandler,
-  removeFriendHandler
+  removeFriendHandler,
+  getBlockedUsersV2Handler,
+  getBlockingStatusHandler,
+  blockUserHandler,
+  unblockUserHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
@@ -73,7 +77,8 @@ import {
   UpdateCommunityRequestStatusSchema,
   GetMemberCommunitiesByIdsSchema,
   CreateFriendshipRequestSchema,
-  UpdateFriendshipRequestSchema
+  UpdateFriendshipRequestSchema,
+  BlockUserSchema
 } from '../handlers/http/schemas'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
@@ -231,6 +236,16 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     updateFriendshipRequestHandler
   )
 
+  // Blocks. The read is in the v2 section below.
+  router.post(
+    '/v1/blocks',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(BlockUserSchema),
+    blockUserHandler
+  )
+  router.delete('/v1/blocks/:address', signedFetchMiddleware(), unblockUserHandler)
+  router.get('/v1/blocking-status', signedFetchMiddleware(), getBlockingStatusHandler)
+
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)
 
@@ -239,7 +254,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // v2 endpoints: same behavior as their v1 counterparts but the responses contain only
   // addresses (no Catalyst profile information). Same middleware as the v1 routes. The friends
-  // reads have no v1 route: their profile-returning versions only exist on RPC.
+  // and blocks reads have no v1 route: their profile-returning versions only exist on RPC.
   router.get('/v2/communities/:id', signedFetchMiddleware({ optional: true }), getCommunityV2Handler)
   router.get('/v2/communities', signedFetchMiddleware({ optional: true }), getCommunitiesV2Handler)
   router.get('/v2/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersV2Handler)
@@ -250,6 +265,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.get('/v2/friends', signedFetchMiddleware(), getFriendsV2Handler)
   router.get('/v2/users/:address/mutual-friends', signedFetchMiddleware(), getMutualFriendsV2Handler)
   router.get('/v2/friendship-requests', signedFetchMiddleware(), getFriendshipRequestsV2Handler)
+  router.get('/v2/blocks', signedFetchMiddleware(), getBlockedUsersV2Handler)
 
   return router
 }

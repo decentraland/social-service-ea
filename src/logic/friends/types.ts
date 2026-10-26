@@ -18,8 +18,14 @@ export type FriendshipRequestWithoutProfile = {
   message?: string
 }
 
+/** A blocked user as the address-only endpoints return it. */
+export type BlockedUserWithoutProfile = {
+  address: string
+  /** When the user was blocked, in milliseconds since the epoch. */
+  blockedAt: number
+}
+
 export interface IFriendsComponent {
-  blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
   /**
    * Reads one page of the caller's blocked users.
    *
@@ -30,6 +36,11 @@ export interface IFriendsComponent {
     userAddress: string,
     pagination: Pagination
   ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }>
+  /** Same page as {@link IFriendsComponent.getBlockedUsers}, without resolving profiles. */
+  getBlockedUsersWithoutProfiles(
+    userAddress: string,
+    pagination: Pagination
+  ): Promise<{ blockedUsers: BlockedUserWithDate[]; total: number }>
   getBlockingStatus(userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }>
   getFriendsProfiles(
     userAddress: EthAddress,
@@ -40,7 +51,11 @@ export interface IFriendsComponent {
     pagination?: Pagination
   ): Promise<{ friends: User[]; total: number }>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
+  /** Same checks, writes and updates as {@link IFriendsComponent.blockUser}, without resolving the profile. */
+  blockUserWithoutProfile(blockerAddress: string, blockedAddress: string): Promise<{ blockedAt: Date }>
   unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile | null>
+  /** Same checks, writes and updates as {@link IFriendsComponent.unblockUser}, without resolving the profile. */
+  unblockUserWithoutProfile(blockerAddress: string, blockedAddress: string): Promise<void>
   upsertFriendship(
     userAddress: EthAddress,
     friendAddress: EthAddress,

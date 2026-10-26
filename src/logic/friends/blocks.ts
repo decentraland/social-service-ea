@@ -5,6 +5,7 @@ import {
 import { getProfileInfo, getProfileUserId } from '../profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { BlockedUserWithDate, SubscriptionEventsEmitter } from '../../types'
+import { BlockedUserWithoutProfile } from './types'
 
 /**
  * Builds the response entry for a blocked address whose profile could not be resolved.
@@ -45,6 +46,10 @@ export function parseProfilesToBlockedUsers(
     const blockedAt = blockedAtByAddress.get(userId)
     return parseProfileToBlockedUser(profile, blockedAt)
   })
+}
+
+export function parseBlockedUserWithoutProfile(address: string, blockedAt: Date): BlockedUserWithoutProfile {
+  return { address: address.toLowerCase(), blockedAt: new Date(blockedAt).getTime() }
 }
 
 export function parseEmittedUpdateToBlockUpdate(
