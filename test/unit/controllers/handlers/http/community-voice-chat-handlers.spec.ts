@@ -53,7 +53,7 @@ describe('when starting a community voice chat', () => {
         status: 201,
         body: { data: { connectionUrl: 'livekit:wss://voice?token=abc' } }
       })
-      expect(communityVoice.startCommunityVoiceChat).toHaveBeenCalledWith(COMMUNITY_ID, USER_ADDRESS)
+      expect(communityVoice.startCommunityVoiceChat).toHaveBeenCalledWith(COMMUNITY_ID, USER_ADDRESS, { includeProfile: false })
     })
   })
 

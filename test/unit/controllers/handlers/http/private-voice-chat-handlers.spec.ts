@@ -4,7 +4,6 @@ import { getIncomingPrivateVoiceChatHandler } from '../../../../../src/controlle
 import { updatePrivateVoiceChatHandler } from '../../../../../src/controllers/handlers/http/update-private-voice-chat-handler'
 import { endPrivateVoiceChatHandler } from '../../../../../src/controllers/handlers/http/end-private-voice-chat-handler'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
-import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import {
   IncomingVoiceChatNotFoundError,
@@ -17,20 +16,18 @@ const OTHER_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 const CALL_ID = '4c1a9d0c-7a3f-4f5e-9a5b-0c6f1f3a2b10'
 
 let voice: ReturnType<typeof createVoiceMockedComponent>
-let commsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
 let logs: ReturnType<typeof createLogsMockedComponent>
 const verification = { auth: USER_ADDRESS } as any
 
 beforeEach(() => {
   voice = createVoiceMockedComponent({})
-  commsGatekeeper = createCommsGatekeeperMockedComponent({})
   logs = createLogsMockedComponent()
 })
 
 describe('when starting a private voice chat', () => {
   function callHandler(body: Record<string, unknown>) {
     return startPrivateVoiceChatHandler({
-      components: { voice, commsGatekeeper, logs },
+      components: { voice, logs },
       request: { json: jest.fn().mockResolvedValue(body) } as any,
       verification
     })
@@ -38,7 +35,6 @@ describe('when starting a private voice chat', () => {
 
   describe('and neither user is in a community voice chat', () => {
     beforeEach(() => {
-      commsGatekeeper.isUserInCommunityVoiceChat.mockResolvedValue(false)
       voice.startPrivateVoiceChat.mockResolvedValue(CALL_ID)
     })
 
@@ -53,12 +49,12 @@ describe('when starting a private voice chat', () => {
 
   describe('and the callee is in a community voice chat', () => {
     beforeEach(() => {
-      commsGatekeeper.isUserInCommunityVoiceChat.mockImplementation(async (address) => address === OTHER_ADDRESS)
+      voice.startPrivateVoiceChat.mockRejectedValueOnce(new UserInCommunityVoiceChatError(false))
     })
 
-    it('should reject with the conflict without starting the call', async () => {
+    it('should propagate the component conflict', async () => {
       await expect(callHandler({ calleeAddress: OTHER_ADDRESS })).rejects.toThrow(UserInCommunityVoiceChatError)
-      expect(voice.startPrivateVoiceChat).not.toHaveBeenCalled()
+      expect(voice.startPrivateVoiceChat).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS)
     })
   })
 

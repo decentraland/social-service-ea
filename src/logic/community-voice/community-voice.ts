@@ -1,3 +1,5 @@
+import { CommunityVoiceChatOptions } from './types'
+import { isValidUUID } from '../../utils/uuid'
 import { Events } from '@dcl/schemas'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import {
@@ -15,6 +17,7 @@ import { ActiveCommunityVoiceChat, CommunityPrivacyEnum, CommunityVisibilityEnum
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   CommunityVoiceChatNotFoundError,
+  CommunityVoiceChatResourceNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
   CommunityVoiceChatCreationError,
   InvalidCommunityIdError,
@@ -28,8 +31,6 @@ import {
   validateCommunityVoiceChatModerator,
   validateCommunityVoiceChatParticipation
 } from './validation'
-
-const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 export async function createCommunityVoiceComponent({
   logs,
@@ -100,7 +101,8 @@ export async function createCommunityVoiceComponent({
 
   async function startCommunityVoiceChat(
     communityId: string,
-    creatorAddress: string
+    creatorAddress: string,
+    options: CommunityVoiceChatOptions = {}
   ): Promise<{ connectionUrl: string }> {
     logger.info(`Starting community voice chat for community ${communityId} by ${creatorAddress}`)
 
@@ -121,7 +123,7 @@ export async function createCommunityVoiceComponent({
 
     try {
       // Fetch user profile data using helper function
-      const profileData = await getUserProfileData(creatorAddress)
+      const profileData = options.includeProfile === false ? null : await getUserProfileData(creatorAddress)
 
       // Resolve the audience from required community data before creating the room or fetching
       // optional enrichment. Thumbnail or place failures must never downgrade a public/listed room
@@ -172,7 +174,7 @@ export async function createCommunityVoiceComponent({
 
         if (placeIds.length > 0) {
           const uniquePlaceIds = Array.from(new Set(placeIds))
-          const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+          const uuidIds = uniquePlaceIds.filter((id) => isValidUUID(id))
           const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
 
           const placesData = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
@@ -243,13 +245,19 @@ export async function createCommunityVoiceComponent({
           creatorAddress
         }
       )
+      if (error instanceof CommunityVoiceChatResourceNotFoundError) throw error
+
       throw new CommunityVoiceChatCreationError(
         `Failed to start community voice chat: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
       )
     }
   }
 
-  async function joinCommunityVoiceChat(communityId: string, userAddress: string): Promise<{ connectionUrl: string }> {
+  async function joinCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    options: CommunityVoiceChatOptions = {}
+  ): Promise<{ connectionUrl: string }> {
     logger.info(`User ${userAddress} joining community voice chat for community ${communityId}`)
 
     // Active room, active community, not banned, and membership when private.
@@ -261,7 +269,7 @@ export async function createCommunityVoiceComponent({
     )
 
     // Fetch user profile data using helper function
-    const profileData = await getUserProfileData(userAddress)
+    const profileData = options.includeProfile === false ? null : await getUserProfileData(userAddress)
 
     // Get credentials from comms-gatekeeper with profile data and user role
     const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(

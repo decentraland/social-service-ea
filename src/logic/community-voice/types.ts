@@ -1,13 +1,24 @@
 import { CommunityVoiceChat } from '../../types'
 import { ActiveCommunityVoiceChat } from '../community/types'
 
+/** Optional profile enrichment for legacy RPC callers; HTTP callers disable it. */
+export type CommunityVoiceChatOptions = { includeProfile?: boolean }
+
 export interface ICommunityVoiceComponent {
   // Community voice chat management
-  startCommunityVoiceChat(communityId: string, creatorAddress: string): Promise<{ connectionUrl: string }>
+  startCommunityVoiceChat(
+    communityId: string,
+    creatorAddress: string,
+    options?: CommunityVoiceChatOptions
+  ): Promise<{ connectionUrl: string }>
   endCommunityVoiceChat(communityId: string, userAddress: string): Promise<void>
 
   // Participant management
-  joinCommunityVoiceChat(communityId: string, userAddress: string): Promise<{ connectionUrl: string }>
+  joinCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    options?: CommunityVoiceChatOptions
+  ): Promise<{ connectionUrl: string }>
   requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string, isRaisingHand: boolean): Promise<void>
   muteSpeakerInCommunityVoiceChat(
     communityId: string,

@@ -10,11 +10,8 @@ import {
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError
 } from '../../../logic/voice/errors'
-import { startPrivateVoiceChat } from '../../../logic/voice/start-private-voice-chat'
 
-export function startPrivateVoiceChatService({
-  components: { logs, voice, commsGatekeeper }
-}: RPCServiceContext<'logs' | 'voice' | 'commsGatekeeper'>) {
+export function startPrivateVoiceChatService({ components: { logs, voice } }: RPCServiceContext<'logs' | 'voice'>) {
   const logger = logs.getLogger('start-private-voice-chat-service')
 
   return async function (
@@ -31,7 +28,7 @@ export function startPrivateVoiceChatService({
         }
       }
 
-      const callId = await startPrivateVoiceChat({ voice, commsGatekeeper }, context.address, request.callee.address)
+      const callId = await voice.startPrivateVoiceChat(context.address, request.callee.address)
 
       return {
         response: {

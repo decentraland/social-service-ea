@@ -1,3 +1,4 @@
+import { UUID_PATTERN } from '../../../utils/uuid'
 import { Schema } from 'ajv'
 import {
   BlockedUsersMessagesVisibilitySetting,
@@ -115,7 +116,8 @@ export const StartCommunityVoiceChatSchema: Schema = {
   additionalProperties: false,
   properties: {
     communityId: {
-      type: 'string'
+      type: 'string',
+      pattern: UUID_PATTERN
     }
   }
 }
@@ -237,7 +239,6 @@ export const UpdateSocialSettingsSchema: Schema = {
   }
 }
 
-const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 const MAX_COMMUNITY_IDS = 50
 
 export type GetMemberCommunitiesByIdsRequestBody = {

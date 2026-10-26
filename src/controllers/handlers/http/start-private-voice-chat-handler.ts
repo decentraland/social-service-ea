@@ -3,17 +3,16 @@ import { EthAddress } from '@dcl/schemas'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { startPrivateVoiceChat } from '../../../logic/voice/start-private-voice-chat'
 import { StartPrivateVoiceChatRequestBody } from './schemas'
 
 export async function startPrivateVoiceChatHandler(
   context: Pick<
-    HandlerContextWithPath<'voice' | 'commsGatekeeper' | 'logs', '/v1/private-voice-chats'>,
+    HandlerContextWithPath<'voice' | 'logs', '/v1/private-voice-chats'>,
     'components' | 'request' | 'verification'
   >
 ): Promise<HTTPResponse<{ callId: string }>> {
   const {
-    components: { voice, commsGatekeeper, logs },
+    components: { voice, logs },
     request,
     verification
   } = context
@@ -34,7 +33,7 @@ export async function startPrivateVoiceChatHandler(
       throw new InvalidRequestError('You cannot call yourself')
     }
 
-    const callId = await startPrivateVoiceChat({ voice, commsGatekeeper }, callerAddress, calleeAddress)
+    const callId = await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
 
     return {
       status: 201,

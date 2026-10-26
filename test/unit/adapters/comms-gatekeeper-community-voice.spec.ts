@@ -1,3 +1,4 @@
+import { CommunityVoiceChatResourceNotFoundError } from '../../../src/logic/community-voice/errors'
 import { ICommsGatekeeperComponent, CommunityRole } from '../../../src/types'
 import { createCommsGatekeeperComponent } from '../../../src/adapters/comms-gatekeeper'
 import { createMockConfigComponent } from '../../mocks/components/config'
@@ -86,7 +87,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       it('should throw an error', async () => {
         await expect(
           commsGatekeeper.getCommunityVoiceChatCredentials(testCommunityId, testUserAddress, CommunityRole.Member)
-        ).rejects.toThrow('Server responded with status 404')
+        ).rejects.toThrow(CommunityVoiceChatResourceNotFoundError)
       })
     })
   })
@@ -605,7 +606,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       it('should throw an error', async () => {
         await expect(
           commsGatekeeper.promoteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress)
-        ).rejects.toThrow('Server responded with status 404')
+        ).rejects.toThrow(CommunityVoiceChatResourceNotFoundError)
       })
     })
   })
@@ -647,7 +648,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       it('should throw an error', async () => {
         await expect(
           commsGatekeeper.demoteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress)
-        ).rejects.toThrow('Server responded with status 404')
+        ).rejects.toThrow(CommunityVoiceChatResourceNotFoundError)
       })
     })
   })
@@ -832,4 +833,27 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
     })
   })
+  describe.each([
+    'endCommunityVoiceChatRoom',
+    'requestToSpeakInCommunityVoiceChat',
+    'rejectSpeakRequestInCommunityVoiceChat',
+    'promoteSpeakerInCommunityVoiceChat',
+    'demoteSpeakerInCommunityVoiceChat',
+    'kickUserFromCommunityVoiceChat'
+  ] as const)('when %s receives a missing-resource response', (method) => {
+    let response: Response
+
+    beforeEach(() => {
+      response = new Response('internal upstream details', { status: 404 })
+      mockFetch.mockResolvedValueOnce(response)
+    })
+
+    it('should throw a typed not-found error and release the response body', async () => {
+      await expect(commsGatekeeper[method](testCommunityId, testUserAddress)).rejects.toThrow(
+        CommunityVoiceChatResourceNotFoundError
+      )
+      expect(response.bodyUsed).toBe(true)
+    })
+  })
+
 })

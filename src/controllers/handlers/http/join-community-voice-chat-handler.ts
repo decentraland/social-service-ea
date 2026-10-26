@@ -25,7 +25,9 @@ export async function joinCommunityVoiceChatHandler(
       throw new InvalidRequestError('Invalid communityId')
     }
 
-    const { connectionUrl } = await communityVoice.joinCommunityVoiceChat(communityId, userAddress)
+    const { connectionUrl } = await communityVoice.joinCommunityVoiceChat(communityId, userAddress, {
+      includeProfile: false
+    })
 
     return {
       status: 201,

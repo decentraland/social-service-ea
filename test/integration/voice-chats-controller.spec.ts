@@ -1,12 +1,13 @@
+import { connectAuthenticatedRpcClient } from './utils/rpc-client'
 import { randomUUID } from 'crypto'
 import { NotAuthorizedError } from '@dcl/http-commons'
-import { CommunityRole } from '../../src/types'
-import { CommunityVoiceChatAlreadyActiveError } from '../../src/logic/community-voice/errors'
+import { CommunityRole, PrivateMessagesPrivacy } from '../../src/types'
+import { CommunityVoiceChatAlreadyActiveError, CommunityVoiceChatResourceNotFoundError } from '../../src/logic/community-voice/errors'
 import { test } from '../components'
 import { mockCommunity } from '../mocks/communities'
-import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
+import { createAuthHeaders, createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 
-test('Voice Chats Controller', function ({ components, spyComponents }) {
+test('Voice Chats Controller', function ({ components, spyComponents, stubComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   let identity: Identity
@@ -36,7 +37,7 @@ test('Voice Chats Controller', function ({ components, spyComponents }) {
     return spy
   }
 
-  describe('when the request is not signed', () => {
+  describe.each(['unsigned', 'scene'] as const)('when the request is %s', (signer) => {
     it('should respond with a 400 status code on every voice chat endpoint', async () => {
       const callId = randomUUID()
       const communityId = randomUUID()
@@ -57,7 +58,11 @@ test('Voice Chats Controller', function ({ components, spyComponents }) {
       ]
 
       for (const [method, path] of routes) {
-        const response = await components.localHttpFetch.fetch(path, { method })
+        const response = await components.localHttpFetch.fetch(path, {
+          method,
+          headers: signer === 'scene' ? createAuthHeaders(method, path, { signer: 'decentraland-kernel-scene' }, identity) : {}
+        })
+        await response.text()
         expect({ method, path, status: response.status }).toEqual({ method, path, status: 400 })
       }
     })
@@ -75,6 +80,102 @@ test('Voice Chats Controller', function ({ components, spyComponents }) {
       expect(response.status).toBe(201)
       return (await response.json()).data.callId
     }
+
+    describe.each(['HTTP', 'RPC'] as const)('and a forbidden caller probes presence using %s', (transport) => {
+      let connection: Awaited<ReturnType<typeof connectAuthenticatedRpcClient>> | undefined
+      let presenceSpy: jest.SpyInstance
+      let status: number
+
+      afterEach(() => {
+        connection?.close()
+        connection = undefined
+      })
+
+      describe.each(['blocked', 'blocked-by', 'callee-private', 'caller-private'] as const)(
+        'and authorization fails because of %s',
+        (reason) => {
+          beforeEach(async () => {
+            presenceSpy = stubGatekeeper('isUserInCommunityVoiceChat', async () => true)
+            if (reason === 'blocked') await components.friendsDb.blockUser(address, otherAddress)
+            if (reason === 'blocked-by') await components.friendsDb.blockUser(otherAddress, address)
+            if (reason === 'callee-private' || reason === 'caller-private') {
+              await components.friendsDb.upsertSocialSettings(reason === 'callee-private' ? otherAddress : address, {
+                private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS
+              })
+            }
+            if (transport === 'HTTP') {
+              const response = await makeRequest(identity, '/v1/private-voice-chats', 'POST', { calleeAddress: otherAddress })
+              await response.text()
+              status = response.status
+            } else {
+              connection = await connectAuthenticatedRpcClient(components, identity)
+              const result = await connection.client.startPrivateVoiceChat({ callee: { address: otherAddress } })
+              expect(result.response?.$case).toBe('forbiddenError')
+              status = 403
+            }
+          })
+
+          it('should reject before looking up presence or recording a call', async () => {
+            expect(status).toBe(403)
+            expect(presenceSpy).not.toHaveBeenCalled()
+            expect(await components.voiceDb.getPrivateVoiceChatForCalleeAddress(otherAddress)).toBeNull()
+          })
+        }
+      )
+    })
+
+    describe.each(['HTTP', 'RPC'] as const)('and an authorized caller checks presence using %s', (transport) => {
+      let connection: Awaited<ReturnType<typeof connectAuthenticatedRpcClient>> | undefined
+      let presenceSpy: jest.SpyInstance
+
+      afterEach(() => {
+        connection?.close()
+        connection = undefined
+      })
+
+      describe.each(['caller', 'callee'] as const)('and the %s is in a community call', (participant) => {
+        beforeEach(() => {
+          presenceSpy = stubGatekeeper('isUserInCommunityVoiceChat', async (user) =>
+            user === (participant === 'caller' ? address : otherAddress)
+          )
+        })
+
+        it('should report a conflict without creating a private call', async () => {
+          if (transport === 'HTTP') {
+            const response = await makeRequest(identity, '/v1/private-voice-chats', 'POST', { calleeAddress: otherAddress })
+            await response.text()
+            expect(response.status).toBe(409)
+          } else {
+            connection = await connectAuthenticatedRpcClient(components, identity)
+            expect((await connection.client.startPrivateVoiceChat({ callee: { address: otherAddress } })).response?.$case).toBe('conflictingError')
+          }
+          expect(presenceSpy).toHaveBeenCalled()
+          expect(await components.voiceDb.getPrivateVoiceChatForCalleeAddress(otherAddress)).toBeNull()
+        })
+      })
+    })
+
+    describe.each(['accepted', 'rejected', 'ended'] as const)('and an outsider tries to mark a call as %s', (intention) => {
+      let outsider: Identity
+      let callId: string
+
+      beforeEach(async () => {
+        outsider = await createTestIdentity()
+        callId = await startCall()
+      })
+
+      it('should reject access without removing the pending call', async () => {
+        const response = await makeRequest(
+          outsider,
+          `/v1/private-voice-chats/${callId}`,
+          intention === 'ended' ? 'DELETE' : 'PATCH',
+          intention === 'ended' ? undefined : { intention }
+        )
+        await response.text()
+        expect(response.status).toBe(intention === 'accepted' ? 403 : 404)
+        expect(await components.voiceDb.getPrivateVoiceChatForCalleeAddress(otherAddress)).toEqual(expect.objectContaining({ id: callId }))
+      })
+    })
 
     describe('and the caller starts a call', () => {
       it('should show it as the incoming call of the callee', async () => {
@@ -221,6 +322,50 @@ test('Voice Chats Controller', function ({ components, spyComponents }) {
     afterEach(async () => {
       await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [address, otherAddress, memberAddress])
       await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+    })
+
+    describe('and HTTP starts a room without profile enrichment', () => {
+      beforeEach(() => {
+        stubGatekeeper('getCommunityVoiceChatStatus', async () => null)
+        stubGatekeeper('createCommunityVoiceChatRoom', async () => ({ connectionUrl: 'livekit:owner' }))
+        stubComponents.registry.getProfile.mockRejectedValue(new Error('Profiles unavailable'))
+      })
+
+      it('should return credentials without fetching the owner profile', async () => {
+        const response = await makeRequest(identity, '/v1/community-voice-chats', 'POST', { communityId })
+        expect((await response.json()).data).toEqual({ connectionUrl: 'livekit:owner' })
+        expect(response.status).toBe(201)
+        expect(stubComponents.registry.getProfile).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and HTTP joins a room without profile enrichment', () => {
+      beforeEach(() => {
+        stubGatekeeper('getCommunityVoiceChatStatus', async () => ({ isActive: true, participantCount: 1, moderatorCount: 1 }))
+        stubGatekeeper('getCommunityVoiceChatCredentials', async () => ({ connectionUrl: 'livekit:member' }))
+        stubComponents.registry.getProfile.mockRejectedValue(new Error('Profiles unavailable'))
+      })
+
+      it('should return credentials without fetching the member profile', async () => {
+        const response = await makeRequest(otherIdentity, `/v1/community-voice-chats/${communityId}/participants`, 'POST')
+        expect((await response.json()).data).toEqual({ connectionUrl: 'livekit:member' })
+        expect(response.status).toBe(201)
+        expect(stubComponents.registry.getProfile).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and an authorized promotion targets a participant who left', () => {
+      beforeEach(() => {
+        stubGatekeeper('promoteSpeakerInCommunityVoiceChat', async () => {
+          throw new CommunityVoiceChatResourceNotFoundError(communityId)
+        })
+      })
+
+      it('should respond with a 404 instead of a server error', async () => {
+        const response = await makeRequest(identity, `/v1/community-voice-chats/${communityId}/speakers/${otherAddress}`, 'PUT')
+        await response.text()
+        expect(response.status).toBe(404)
+      })
     })
 
     describe('and the owner promotes a member (PUT /speakers/:address)', () => {

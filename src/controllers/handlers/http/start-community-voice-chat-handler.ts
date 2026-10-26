@@ -29,7 +29,9 @@ export async function startCommunityVoiceChatHandler(
       throw new InvalidRequestError('Invalid communityId')
     }
 
-    const { connectionUrl } = await communityVoice.startCommunityVoiceChat(communityId, userAddress)
+    const { connectionUrl } = await communityVoice.startCommunityVoiceChat(communityId, userAddress, {
+      includeProfile: false
+    })
 
     return {
       status: 201,

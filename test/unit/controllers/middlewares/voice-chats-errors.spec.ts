@@ -10,6 +10,7 @@ import {
 import {
   CommunityVoiceChatAlreadyActiveError,
   CommunityVoiceChatNotFoundError,
+  CommunityVoiceChatResourceNotFoundError,
   CommunityVoiceChatPermissionError,
   InvalidCommunityIdError,
   InvalidUserAddressError,
@@ -30,6 +31,7 @@ describe('voiceChatsErrorsHandler', () => {
 
   describe('when the route throws a voice chat error', () => {
     const cases: [string, Error, number, string][] = [
+      ['a missing Gatekeeper participant', new CommunityVoiceChatResourceNotFoundError('community'), 404, 'Not Found'],
       ['a missing private call', new VoiceChatNotFoundError('call'), 404, 'Not Found'],
       ['a missing incoming call', new IncomingVoiceChatNotFoundError('0x1'), 404, 'Not Found'],
       ['a missing community call', new CommunityVoiceChatNotFoundError('community'), 404, 'Not Found'],

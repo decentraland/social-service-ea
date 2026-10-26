@@ -1,11 +1,10 @@
+import { isValidUUID } from '../../utils/uuid'
 import { NotAuthorizedError } from '@dcl/http-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlaceWithDetails, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
-
-const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 export async function createCommunityPlacesComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'placesApi' | 'logs'>
@@ -23,7 +22,7 @@ export async function createCommunityPlacesComponent(
     }
 
     const uniquePlaceIds = Array.from(new Set(placeIds))
-    const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+    const uuidIds = uniquePlaceIds.filter((id) => isValidUUID(id))
     const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
 
     const places = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
@@ -133,7 +132,7 @@ export async function createCommunityPlacesComponent(
 
       if (places.length === 0) return { places, totalPlaces }
 
-      const uuidIds = places.map((p) => p.id).filter((id) => UUID_REGEX.test(id))
+      const uuidIds = places.map((p) => p.id).filter((id) => isValidUUID(id))
       const worldNameIds = places.map((p) => p.id).filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
 
       const detailsMap = new Map<string, { title: string; positions: string[]; world: boolean; world_name: string }>()
@@ -202,7 +201,7 @@ export async function createCommunityPlacesComponent(
         }
 
         const uniquePlaceIds = Array.from(new Set(placeIds))
-        const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+        const uuidIds = uniquePlaceIds.filter((id) => isValidUUID(id))
         const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
 
         const allPlacesData = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
