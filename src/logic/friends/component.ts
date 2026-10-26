@@ -1,4 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import {
@@ -7,7 +8,8 @@ import {
   BlockedUserWithDate,
   FriendshipAction,
   FriendshipRequest,
-  FriendshipStatus
+  FriendshipStatus,
+  User
 } from '../../types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { isErrorWithMessage } from '../../utils/errors'
@@ -27,6 +29,7 @@ import {
 } from '../../utils/friendship-pagination'
 import { normalizeAddress } from '../../utils/address'
 import { BlockedUser, IFriendsComponent } from './types'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from './constants'
 
 // Pair rate-limit buckets. The two scopes MUST keep separate keys: a friendship is symmetric, a block is not.
 const PAIR_RATE_LIMIT_KEY = {
@@ -100,16 +103,183 @@ export async function createFriendsComponent(
     }
   }
 
+  /**
+   * Validates, writes and publishes a friendship action. Every variant of `upsertFriendship` goes through
+   * here, so the message bound, the rate limits, the block check and the state machine are the same
+   * whether the caller wants profiles back or not.
+   */
+  async function applyFriendshipAction(
+    userAddress: EthAddress,
+    friendAddress: EthAddress,
+    action: Action,
+    metadata: Record<string, string> | null
+  ): Promise<{ id: string; actionId: string; createdAt: Date }> {
+    if (metadata?.message && [...metadata.message].length > FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH) {
+      throw new InvalidRequestError(
+        `The friendship request message cannot be longer than ${FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH} characters`
+      )
+    }
+
+    await enforceMutationRateLimit(userAddress, friendAddress, 'symmetric')
+    const isBlocked = await friendsDb.isFriendshipBlocked(userAddress, friendAddress)
+
+    if (isBlocked) {
+      throw new BlockedUserError()
+    }
+
+    const lastAction = await friendsDb.getLastFriendshipActionByUsers(userAddress, friendAddress)
+
+    // Enforce the friendship state machine before mutating any state. Without this guard an action
+    // like ACCEPT with no pending request would be applied blindly, letting a user forge another
+    // user's friendship (setting is_active = true) with no consent and defeat privacy gates that
+    // key on that flag (e.g. the ONLY_FRIENDS private-voice check).
+    if (!validateNewFriendshipAction(userAddress, { action, user: friendAddress }, lastAction)) {
+      throw new InvalidFriendshipActionError()
+    }
+
+    const friendshipStatus = getNewFriendshipStatus(action)
+    const isActive = friendshipStatus === FriendshipStatus.Friends
+
+    const { id, actionId, createdAt } = await friendsDb.executeTx(async (tx) => {
+      let id: string, createdAt: Date
+
+      if (lastAction) {
+        const { created_at } = await friendsDb.updateFriendshipStatus(lastAction.friendship_id, isActive, tx)
+        id = lastAction.friendship_id
+        createdAt = created_at
+      } else {
+        const { id: newFriendshipId, created_at } = await friendsDb.createFriendship(
+          [userAddress, friendAddress],
+          isActive,
+          tx
+        )
+        id = newFriendshipId
+        createdAt = created_at
+      }
+
+      const actionId = await friendsDb.recordFriendshipAction(id, userAddress, action, metadata, tx)
+
+      return { id, actionId, createdAt }
+    })
+
+    await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+      id: actionId,
+      from: userAddress,
+      to: friendAddress,
+      action,
+      timestamp: Date.now(),
+      metadata
+    })
+
+    return { id, actionId, createdAt }
+  }
+
+  /**
+   * Sends the notification of an action that is already committed. The notification carries both
+   * users' names and pictures, so a profile that can't be resolved skips it instead of failing the action.
+   */
+  async function notifyFriendshipAction(
+    action: Action.REQUEST | Action.ACCEPT,
+    actionId: string,
+    userAddress: EthAddress,
+    friendAddress: EthAddress,
+    metadata: Record<string, string> | null
+  ): Promise<void> {
+    try {
+      const profiles = await registry.getProfiles([userAddress, friendAddress])
+      const profilesMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
+      const senderProfile = profilesMap.get(userAddress)
+      const receiverProfile = profilesMap.get(friendAddress)
+
+      if (!senderProfile || !receiverProfile) {
+        logger.warn('Skipping the friendship notification, a profile could not be resolved', {
+          action,
+          senderAddress: userAddress,
+          receiverAddress: friendAddress
+        })
+        return
+      }
+
+      await sendNotification(
+        action,
+        {
+          requestId: actionId,
+          senderAddress: userAddress,
+          receiverAddress: friendAddress,
+          senderProfile,
+          receiverProfile,
+          message: metadata?.message
+        },
+        { sns, logs }
+      )
+    } catch (error) {
+      logger.error('Could not send the friendship notification', {
+        action,
+        senderAddress: userAddress,
+        receiverAddress: friendAddress,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+    }
+  }
+
+  async function getFriends(
+    userAddress: EthAddress,
+    pagination?: Pagination
+  ): Promise<{ friends: User[]; total: number }> {
+    const [friends, total] = await Promise.all([
+      friendsDb.getFriends(userAddress, { pagination: normalizeFriendsPagination(pagination), onlyActive: true }),
+      friendsDb.getFriendsCount(userAddress, { onlyActive: true })
+    ])
+
+    // The rows carry more columns than the address; only the address is part of the contract.
+    return { friends: friends.map(({ address }) => ({ address })), total }
+  }
+
+  async function getMutualFriends(
+    requesterAddress: string,
+    requestedAddress: string,
+    pagination?: Pagination
+  ): Promise<{ friends: User[]; total: number }> {
+    const [friends, total] = await Promise.all([
+      friendsDb.getMutualFriends(requesterAddress, requestedAddress, normalizeFriendsPagination(pagination)),
+      friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
+    ])
+
+    return { friends: friends.map(({ address }) => ({ address })), total }
+  }
+
+  async function getPendingFriendshipRequests(
+    userAddress: string,
+    pagination?: Pagination
+  ): Promise<{ requests: FriendshipRequest[]; total: number }> {
+    const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
+    const [requests, total] = await Promise.all([
+      friendsDb.getReceivedFriendshipRequests(userAddress, boundedPagination),
+      friendsDb.getReceivedFriendshipRequestsCount(userAddress)
+    ])
+
+    return { requests, total }
+  }
+
+  async function getSentFriendshipRequests(
+    userAddress: string,
+    pagination?: Pagination
+  ): Promise<{ requests: FriendshipRequest[]; total: number }> {
+    const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
+    const [requests, total] = await Promise.all([
+      friendsDb.getSentFriendshipRequests(userAddress, boundedPagination),
+      friendsDb.getSentFriendshipRequestsCount(userAddress)
+    ])
+
+    return { requests, total }
+  }
+
   return {
     getFriendsProfiles: async (
       userAddress: EthAddress,
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
-      const [friends, total] = await Promise.all([
-        friendsDb.getFriends(userAddress, { pagination: normalizeFriendsPagination(pagination), onlyActive: true }),
-        friendsDb.getFriendsCount(userAddress, { onlyActive: true })
-      ])
-
+      const { friends, total } = await getFriends(userAddress, pagination)
       const friendsProfiles = await registry.getProfiles(friends.map((friend) => friend.address))
 
       return {
@@ -117,6 +287,7 @@ export async function createFriendsComponent(
         total
       }
     },
+    getFriendsWithoutProfiles: getFriends,
     blockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<BlockedUser> => {
       // Normalize once, up front. EthAddress.validate accepts EIP-55 mixed case and the database
       // layer lowercases on write, so an un-normalized value here would still block correctly but
@@ -202,56 +373,43 @@ export async function createFriendsComponent(
       requestedAddress: string,
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
-      const [mutualFriends, total] = await Promise.all([
-        friendsDb.getMutualFriends(requesterAddress, requestedAddress, normalizeFriendsPagination(pagination)),
-        friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
-      ])
-
-      const profiles = await registry.getProfiles(mutualFriends.map((friend) => friend.address))
+      const { friends, total } = await getMutualFriends(requesterAddress, requestedAddress, pagination)
+      const profiles = await registry.getProfiles(friends.map((friend) => friend.address))
 
       return {
         friendsProfiles: profiles,
         total
       }
     },
+    getMutualFriendsWithoutProfiles: getMutualFriends,
     getPendingFriendshipRequests: async (
       userAddress: string,
       pagination?: Pagination
     ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
-      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
-      const [pendingRequests, pendingRequestsCount] = await Promise.all([
-        friendsDb.getReceivedFriendshipRequests(userAddress, boundedPagination),
-        friendsDb.getReceivedFriendshipRequestsCount(userAddress)
-      ])
-
-      const pendingRequestsAddresses = pendingRequests.map(({ address }) => address)
-      const pendingRequesterProfiles = await registry.getProfiles(pendingRequestsAddresses)
+      const { requests, total } = await getPendingFriendshipRequests(userAddress, pagination)
+      const profiles = await registry.getProfiles(requests.map(({ address }) => address))
 
       return {
-        requests: pendingRequests,
-        profiles: pendingRequesterProfiles,
-        total: pendingRequestsCount
+        requests,
+        profiles,
+        total
       }
     },
+    getPendingFriendshipRequestsWithoutProfiles: getPendingFriendshipRequests,
     getSentFriendshipRequests: async (
       userAddress: string,
       pagination?: Pagination
     ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
-      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
-      const [sentRequests, sentRequestsCount] = await Promise.all([
-        friendsDb.getSentFriendshipRequests(userAddress, boundedPagination),
-        friendsDb.getSentFriendshipRequestsCount(userAddress)
-      ])
-
-      const sentRequestsAddresses = sentRequests.map(({ address }) => address)
-      const sentRequestedProfiles = await registry.getProfiles(sentRequestsAddresses)
+      const { requests, total } = await getSentFriendshipRequests(userAddress, pagination)
+      const profiles = await registry.getProfiles(requests.map(({ address }) => address))
 
       return {
-        requests: sentRequests,
-        profiles: sentRequestedProfiles,
-        total: sentRequestsCount
+        requests,
+        profiles,
+        total
       }
     },
+    getSentFriendshipRequestsWithoutProfiles: getSentFriendshipRequests,
     unblockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<Profile | null> => {
       const blockedAddress = normalizeAddress(rawBlockedAddress)
 
@@ -292,60 +450,9 @@ export async function createFriendsComponent(
       action: Action,
       metadata: Record<string, string> | null
     ) => {
-      await enforceMutationRateLimit(userAddress, friendAddress, 'symmetric')
-      const isBlocked = await friendsDb.isFriendshipBlocked(userAddress, friendAddress)
+      const { id, actionId, createdAt } = await applyFriendshipAction(userAddress, friendAddress, action, metadata)
 
-      if (isBlocked) {
-        throw new BlockedUserError()
-      }
-
-      const lastAction = await friendsDb.getLastFriendshipActionByUsers(userAddress, friendAddress)
-
-      // Enforce the friendship state machine before mutating any state. Without this guard an action
-      // like ACCEPT with no pending request would be applied blindly, letting a user forge another
-      // user's friendship (setting is_active = true) with no consent and defeat privacy gates that
-      // key on that flag (e.g. the ONLY_FRIENDS private-voice check).
-      if (!validateNewFriendshipAction(userAddress, { action, user: friendAddress }, lastAction)) {
-        throw new InvalidFriendshipActionError()
-      }
-
-      const friendshipStatus = getNewFriendshipStatus(action)
-      const isActive = friendshipStatus === FriendshipStatus.Friends
-
-      const { id, actionId, createdAt } = await friendsDb.executeTx(async (tx) => {
-        let id: string, createdAt: Date
-
-        if (lastAction) {
-          const { created_at } = await friendsDb.updateFriendshipStatus(lastAction.friendship_id, isActive, tx)
-          id = lastAction.friendship_id
-          createdAt = created_at
-        } else {
-          const { id: newFriendshipId, created_at } = await friendsDb.createFriendship(
-            [userAddress, friendAddress],
-            isActive,
-            tx
-          )
-          id = newFriendshipId
-          createdAt = created_at
-        }
-
-        const actionId = await friendsDb.recordFriendshipAction(id, userAddress, action, metadata, tx)
-
-        return { id, actionId, createdAt }
-      })
-
-      const [_, profiles] = await Promise.all([
-        await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
-          id: actionId,
-          from: userAddress,
-          to: friendAddress,
-          action,
-          timestamp: Date.now(),
-          metadata
-        }),
-        registry.getProfiles([userAddress, friendAddress])
-      ])
-
+      const profiles = await registry.getProfiles([userAddress, friendAddress])
       const profilesMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
 
       const senderProfile = profilesMap.get(userAddress)
@@ -385,6 +492,25 @@ export async function createFriendsComponent(
       return {
         friendshipRequest,
         receiverProfile
+      }
+    },
+    upsertFriendshipWithoutProfiles: async (
+      userAddress: EthAddress,
+      friendAddress: EthAddress,
+      action: Action,
+      metadata: Record<string, string> | null
+    ): Promise<FriendshipRequest> => {
+      const { id, actionId, createdAt } = await applyFriendshipAction(userAddress, friendAddress, action, metadata)
+
+      if (shouldNotify(action)) {
+        void notifyFriendshipAction(action, actionId, userAddress, friendAddress, metadata)
+      }
+
+      return {
+        id,
+        address: friendAddress,
+        timestamp: createdAt.toString(),
+        metadata: metadata || null
       }
     }
   }

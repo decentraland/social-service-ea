@@ -1,6 +1,7 @@
 import { Schema } from 'ajv'
 import { CommunityRole } from '../../../types/entities'
 import { CommunityRequestType, CommunityRequestStatus } from '../../../logic/community/types'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/constants'
 
 // TypeScript types derived from schemas
 export type UpdateMemberRoleRequestBody = {
@@ -166,6 +167,45 @@ export const GetMemberCommunitiesByIdsSchema: Schema = {
       },
       minItems: 1,
       maxItems: MAX_COMMUNITY_IDS
+    }
+  }
+}
+
+export type CreateFriendshipRequestRequestBody = {
+  address: string
+  message?: string
+}
+
+export type FriendshipRequestIntention = 'accepted' | 'rejected' | 'cancelled'
+
+export type UpdateFriendshipRequestRequestBody = {
+  intention: FriendshipRequestIntention
+}
+
+export const CreateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    },
+    message: {
+      type: 'string',
+      maxLength: FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH
+    }
+  }
+}
+
+export const UpdateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['intention'],
+  additionalProperties: false,
+  properties: {
+    intention: {
+      type: 'string',
+      enum: ['accepted', 'rejected', 'cancelled']
     }
   }
 }
