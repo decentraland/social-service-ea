@@ -41,6 +41,9 @@ import {
   addUserMuteHandler,
   removeUserMuteHandler,
   getUserMutesHandler,
+  getSocialSettingsHandler,
+  updateSocialSettingsHandler,
+  getPrivateMessagesSettingsHandler,
   getCommunityV2Handler,
   getCommunitiesV2Handler,
   getCommunityMembersV2Handler,
@@ -75,6 +78,7 @@ import {
   AddReferralEmailSchema,
   CreateCommunityRequestSchema,
   UpdateCommunityRequestStatusSchema,
+  UpdateSocialSettingsSchema,
   GetMemberCommunitiesByIdsSchema,
   CreateFriendshipRequestSchema,
   UpdateFriendshipRequestSchema,
@@ -214,6 +218,16 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     schemaValidator.withSchemaValidatorMiddleware(UpdateCommunityRequestStatusSchema),
     updateCommunityRequestStatusHandler
   )
+
+  // Social settings
+  router.get('/v1/social-settings', signedFetchMiddleware(), getSocialSettingsHandler)
+  router.patch(
+    '/v1/social-settings',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdateSocialSettingsSchema),
+    updateSocialSettingsHandler
+  )
+  router.get('/v1/private-messages-settings', signedFetchMiddleware(), getPrivateMessagesSettingsHandler)
 
   // User mute routes
   router.get('/v1/mutes', signedFetchMiddleware(), getUserMutesHandler)

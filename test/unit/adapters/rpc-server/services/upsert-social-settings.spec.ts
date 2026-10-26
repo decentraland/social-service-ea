@@ -6,7 +6,7 @@ import {
   UpsertSocialSettingsResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { upsertSocialSettingsService } from '../../../../../src/controllers/handlers/rpc/upsert-social-settings'
-import { convertDBSettingsToRPCSettings } from '../../../../../src/logic/settings'
+import { convertDBSettingsToRPCSettings, createSettingsComponent } from '../../../../../src/logic/settings'
 import {
   IFriendsDatabaseComponent,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
@@ -52,8 +52,7 @@ describe('upsertSocialSettingsService', () => {
     upsertSocialSettings = upsertSocialSettingsService({
       components: {
         logs,
-        friendsDb,
-        commsGatekeeper
+        settings: createSettingsComponent({ friendsDb, commsGatekeeper })
       }
     })
   })

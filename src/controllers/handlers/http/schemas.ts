@@ -1,6 +1,12 @@
 import { Schema } from 'ajv'
-import { CommunityRole } from '../../../types/entities'
+import {
+  BlockedUsersMessagesVisibilitySetting,
+  CommunityRole,
+  PrivateMessagesPrivacy,
+  SituationReactionsVisibility
+} from '../../../types/entities'
 import { CommunityRequestType, CommunityRequestStatus } from '../../../logic/community/types'
+import { HTTPSocialSettings } from '../../../logic/settings'
 import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/constants'
 
 // TypeScript types derived from schemas
@@ -143,6 +149,28 @@ export const UpdateCommunityRequestStatusSchema: Schema = {
     intention: {
       type: 'string',
       enum: [CommunityRequestStatus.Accepted, CommunityRequestStatus.Rejected, CommunityRequestStatus.Cancelled]
+    }
+  }
+}
+
+export type UpdateSocialSettingsRequestBody = Partial<HTTPSocialSettings>
+
+export const UpdateSocialSettingsSchema: Schema = {
+  type: 'object',
+  minProperties: 1,
+  additionalProperties: false,
+  properties: {
+    privateMessagesPrivacy: {
+      type: 'string',
+      enum: Object.values(PrivateMessagesPrivacy)
+    },
+    blockedUsersMessagesVisibility: {
+      type: 'string',
+      enum: Object.values(BlockedUsersMessagesVisibilitySetting)
+    },
+    showSituationReactions: {
+      type: 'string',
+      enum: Object.values(SituationReactionsVisibility)
     }
   }
 }
