@@ -464,7 +464,7 @@ describe('Friends Component', () => {
       beforeEach(async () => {
         loopError = undefined
 
-        mockFriendsDB.unblockUser.mockResolvedValue(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValue(true)
         mockRegistry.getProfile.mockResolvedValue(createMockProfile(recipientAddress))
 
         for (let attempt = 0; attempt < pairRateLimit / 2; attempt++) {
@@ -1199,7 +1199,7 @@ describe('Friends Component', () => {
       let result: Awaited<ReturnType<typeof friendsComponent.unblockUser>>
 
       beforeEach(async () => {
-        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
         mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
         mockRegistry.getProfile.mockRejectedValueOnce(new Error(`Profile not found: ${blockedAddress}`))
         result = await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
@@ -1234,7 +1234,7 @@ describe('Friends Component', () => {
         now = Date.now()
         jest.spyOn(Date, 'now').mockReturnValueOnce(now)
         mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
-        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
         mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
         mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
       })
@@ -1285,7 +1285,7 @@ describe('Friends Component', () => {
     describe('and the user is not friends with the blocked user', () => {
       beforeEach(() => {
         mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
-        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
         mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
       })
 
@@ -2077,6 +2077,7 @@ describe('Friends Component', () => {
     beforeEach(async () => {
       blockedAddress = '0x12356abc4078a0cc3b89b419928b857b8af826ef'
       mockRegistry.getProfile.mockReset()
+      mockFriendsDB.unblockUser.mockResolvedValueOnce(true)
       mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as PoolClient))
       mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
 
@@ -2096,6 +2097,46 @@ describe('Friends Component', () => {
       expect(mockRegistry.getProfile).not.toHaveBeenCalled()
     })
   })
+
+  describe.each(['unblockUser', 'unblockUserWithoutProfile'] as const)(
+    'when %s cannot remove a block',
+    (method) => {
+      let target: string
+
+      beforeEach(() => {
+        target = '0x2234567890123456789012345678901234567890'
+        mockFriendsDB.executeTx.mockImplementation(async (cb) => cb({} as PoolClient))
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(false)
+        mockRegistry.getProfile.mockResolvedValueOnce(null)
+      })
+
+      it('should leave friendship history unchanged and emit no updates', async () => {
+        await friendsComponent[method](mockUserAddress, target)
+
+        expect(mockFriendsDB.getFriendship).not.toHaveBeenCalled()
+        expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
+        expect(mockPublishInChannel).not.toHaveBeenCalled()
+      })
+    }
+  )
+
+  describe.each(['unblockUser', 'unblockUserWithoutProfile'] as const)(
+    'when %s is rate limited',
+    (method) => {
+      let target: string
+
+      beforeEach(() => {
+        target = '0x2234567890123456789012345678901234567890'
+        mockRedis.consumeRateLimit.mockResolvedValueOnce(false)
+      })
+
+      it('should reject before deleting a block or publishing an update', async () => {
+        await expect(friendsComponent[method](mockUserAddress, target)).rejects.toThrow(FriendshipRateLimitError)
+        expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+        expect(mockPublishInChannel).not.toHaveBeenCalled()
+      })
+    }
+  )
 
   describe('when blocking is rate limited, without resolving the profile', () => {
     beforeEach(() => {

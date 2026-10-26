@@ -327,16 +327,21 @@ export async function createFriendsComponent(
 
     await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
 
-    const actionId = await friendsDb.executeTx(async (tx) => {
-      await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
+    const result = await friendsDb.executeTx(async (tx) => {
+      const removed = await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
+      // A retry or a never-blocked target must not rewrite friendship history or emit fake updates.
+      if (!removed) return undefined
 
       const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
-      if (!friendship) return
+      if (!friendship) return { actionId: undefined }
 
       const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
-      return actionId
+      return { actionId }
     })
 
+    if (!result) return blockedAddress
+
+    const { actionId } = result
     await Promise.all([
       actionId
         ? pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {

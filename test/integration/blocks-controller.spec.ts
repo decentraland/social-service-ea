@@ -25,6 +25,12 @@ test('Blocks Controller', function ({ components, stubComponents }) {
     )
   })
 
+  async function makeSetupRequest(...args: Parameters<typeof makeRequest>): Promise<void> {
+    const response = await makeRequest(...args)
+    await response.text()
+    expect(response.status).toBe(201)
+  }
+
   async function getBlockingStatus(from: Identity) {
     const response = await makeRequest(from, '/v1/blocking-status')
     return (await response.json()).data
@@ -41,6 +47,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
 
       for (const [method, path] of routes) {
         const response = await components.localHttpFetch.fetch(path, { method })
+        await response.text()
         expect({ method, path, status: response.status }).toEqual({ method, path, status: 400 })
       }
     })
@@ -56,14 +63,14 @@ test('Blocks Controller', function ({ components, stubComponents }) {
       })
 
       it('should not resolve the blocked user profile', async () => {
-        await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
+        await makeSetupRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
 
         expect(stubComponents.registry.getProfile).not.toHaveBeenCalled()
         expect(stubComponents.registry.getProfiles).not.toHaveBeenCalled()
       })
 
       it('should show the block in the blocking status of both users', async () => {
-        await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
+        await makeSetupRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
 
         expect(await getBlockingStatus(identity)).toEqual({ blockedUsers: [otherAddress], blockedByUsers: [] })
         expect(await getBlockingStatus(otherIdentity)).toEqual({ blockedUsers: [], blockedByUsers: [address] })
@@ -76,7 +83,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
       })
 
       it('should end the friendship', async () => {
-        await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
+        await makeSetupRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
 
         const response = await makeRequest(otherIdentity, '/v2/friends')
         expect((await response.json()).data.total).toBe(0)
@@ -87,6 +94,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
       it('should respond with a 400 status code', async () => {
         const response = await makeRequest(identity, '/v1/blocks', 'POST', { address })
 
+        await response.text()
         expect(response.status).toBe(400)
       })
     })
@@ -95,6 +103,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
       it('should respond with a 400 status code', async () => {
         const response = await makeRequest(identity, '/v1/blocks', 'POST', { user: otherAddress })
 
+        await response.text()
         expect(response.status).toBe(400)
       })
     })
@@ -102,7 +111,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
 
   describe('when getting the blocked users (GET /v2/blocks)', () => {
     beforeEach(async () => {
-      await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
+      await makeSetupRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
     })
 
     it('should respond with the blocked address and the pagination properties', async () => {
@@ -127,7 +136,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
 
   describe('when unblocking a user (DELETE /v1/blocks/:address)', () => {
     beforeEach(async () => {
-      await makeRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
+      await makeSetupRequest(identity, '/v1/blocks', 'POST', { address: otherAddress })
     })
 
     describe('and the address is blocked', () => {
@@ -143,6 +152,7 @@ test('Blocks Controller', function ({ components, stubComponents }) {
       it('should respond with a 400 status code', async () => {
         const response = await makeRequest(identity, '/v1/blocks/0x123', 'DELETE')
 
+        await response.text()
         expect(response.status).toBe(400)
       })
     })
