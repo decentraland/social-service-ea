@@ -11,38 +11,30 @@ import {
   toFriendshipStreamEvent,
   toPrivateVoiceChatStreamEvent
 } from '../../../../../src/controllers/handlers/uws/stream-registry'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { VoiceChatStatus } from '../../../../../src/logic/voice/types'
 import { Action, RpcServerContext } from '../../../../../src/types'
-import { createMockProfile } from '../../../../mocks/profile'
 
 const USER_ADDRESS = '0x1234567890123456789012345678901234567890'
 const OTHER_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 
 describe('when mapping a friendship update', () => {
   describe('and it is a request', () => {
-    it('should carry the request, its message and the profile of the requester', () => {
-      const profile = createMockProfile(OTHER_ADDRESS)
-
+    it('should carry the request, its message and the requester address, without a profile', () => {
       expect(
-        toFriendshipStreamEvent(
-          {
-            id: 'request-id',
-            from: OTHER_ADDRESS,
-            to: USER_ADDRESS,
-            action: Action.REQUEST,
-            timestamp: 1000,
-            metadata: { message: 'hi' }
-          },
-          profile
-        )
+        toFriendshipStreamEvent({
+          id: 'request-id',
+          from: OTHER_ADDRESS,
+          to: USER_ADDRESS,
+          action: Action.REQUEST,
+          timestamp: 1000,
+          metadata: { message: 'hi' }
+        })
       ).toEqual({
         action: 'request',
         id: 'request-id',
         address: OTHER_ADDRESS,
         createdAt: 1000,
-        message: 'hi',
-        friend: parseProfileToFriend(profile)
+        message: 'hi'
       })
     })
   })
@@ -52,10 +44,7 @@ describe('when mapping a friendship update', () => {
     (action) => {
       it('should carry only the action and who did it', () => {
         expect(
-          toFriendshipStreamEvent(
-            { id: 'id', from: OTHER_ADDRESS, to: USER_ADDRESS, action, timestamp: 1000 },
-            createMockProfile(OTHER_ADDRESS)
-          )
+          toFriendshipStreamEvent({ id: 'id', from: OTHER_ADDRESS, to: USER_ADDRESS, action, timestamp: 1000 })
         ).toEqual({ action, address: OTHER_ADDRESS })
       })
     }
@@ -67,22 +56,15 @@ describe('when mapping a friend connectivity update', () => {
     [ConnectivityStatus.ONLINE, 'online'],
     [ConnectivityStatus.OFFLINE, 'offline'],
     [ConnectivityStatus.AWAY, 'away']
-  ])('should name the status %s as %s', (status, name) => {
-    const profile = createMockProfile(OTHER_ADDRESS)
-
-    expect(toFriendConnectivityStreamEvent({ address: OTHER_ADDRESS, status }, profile)).toEqual({
-      friend: parseProfileToFriend(profile),
+  ])('should carry the friend address and name the status %s as %s', (status, name) => {
+    expect(toFriendConnectivityStreamEvent({ address: OTHER_ADDRESS, status })).toEqual({
+      address: OTHER_ADDRESS,
       status: name
     })
   })
 
   it('should drop an unknown status', () => {
-    expect(
-      toFriendConnectivityStreamEvent(
-        { address: OTHER_ADDRESS, status: ConnectivityStatus.UNRECOGNIZED },
-        createMockProfile(OTHER_ADDRESS)
-      )
-    ).toBeNull()
+    expect(toFriendConnectivityStreamEvent({ address: OTHER_ADDRESS, status: ConnectivityStatus.UNRECOGNIZED })).toBeNull()
   })
 })
 
@@ -179,18 +161,15 @@ describe('when opening the streams', () => {
   let streams: ReturnType<typeof createStreamRegistry>
   let context: RpcServerContext
   let friendsDb: { getOnlineFriends: jest.Mock }
-  let registry: { getProfiles: jest.Mock }
   let peersStats: { getConnectedPeers: jest.Mock }
 
   beforeEach(() => {
     handleSubscriptionUpdates = jest.fn().mockReturnValue((async function* () {})())
     friendsDb = { getOnlineFriends: jest.fn() }
-    registry = { getProfiles: jest.fn() }
     peersStats = { getConnectedPeers: jest.fn() }
     streams = createStreamRegistry({
       updateHandler: { handleSubscriptionUpdates } as any,
       friendsDb: friendsDb as any,
-      registry: registry as any,
       peersStats: peersStats as any
     })
     context = { address: USER_ADDRESS, wsConnectionId: 'connection', subscribersContext: {} as any }
@@ -208,6 +187,15 @@ describe('when opening the streams', () => {
 
     expect(handleSubscriptionUpdates).toHaveBeenCalledWith(expect.objectContaining({ rpcContext: context, eventName }))
   })
+
+  it.each(['friendship_updates', 'friend_connectivity_updates'])(
+    'should not resolve profiles for the %s updates',
+    (stream) => {
+      streams[stream].open(context)
+
+      expect(handleSubscriptionUpdates.mock.calls[0][0].shouldRetrieveProfile).toBeFalsy()
+    }
+  )
 
   describe('and the stream is friendship_updates', () => {
     it('should only handle updates other users send to the connection user', () => {
@@ -234,16 +222,13 @@ describe('when opening the streams', () => {
     beforeEach(() => {
       peersStats.getConnectedPeers.mockResolvedValue([OTHER_ADDRESS])
       friendsDb.getOnlineFriends.mockResolvedValue([{ address: OTHER_ADDRESS }])
-      registry.getProfiles.mockResolvedValue([createMockProfile(OTHER_ADDRESS)])
     })
 
     it('should start with the friends that are already online', async () => {
       streams.friend_connectivity_updates.open(context)
       const { getInitialUpdates } = handleSubscriptionUpdates.mock.calls[0][0]
 
-      await expect(getInitialUpdates()).resolves.toEqual([
-        { friend: parseProfileToFriend(createMockProfile(OTHER_ADDRESS)), status: 'online' }
-      ])
+      await expect(getInitialUpdates()).resolves.toEqual([{ address: OTHER_ADDRESS, status: 'online' }])
       expect(friendsDb.getOnlineFriends).toHaveBeenCalledWith(USER_ADDRESS, [OTHER_ADDRESS])
     })
 

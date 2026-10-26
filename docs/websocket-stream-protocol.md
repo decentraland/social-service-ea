@@ -47,13 +47,13 @@ Error codes: `invalid_message`, `unknown_stream`, `duplicate_subscription`, `unk
 
 ## Streams
 
-A profile (`FriendProfile`) is `{ address, name, hasClaimedName, profilePictureUrl, nameColor? }`, the same shape the
-friends HTTP endpoints return.
+Events carry addresses only, never profiles: clients resolve the profiles themselves, as with the v2 HTTP endpoints.
+Unlike the RPC streams, an event is not dropped when the other user has no resolvable profile.
 
 | `stream` | `data` | Replaces |
 | --- | --- | --- |
-| `friendship_updates` | `{ action: "request", id, address, createdAt, message?, friend: FriendProfile }` for a new request; `{ action: "accept" \| "reject" \| "cancel" \| "delete" \| "block", address }` otherwise. `address` is the other user. | `subscribeToFriendshipUpdates` |
-| `friend_connectivity_updates` | `{ friend: FriendProfile, status: "online" \| "offline" \| "away" }`. Starts with one `online` event per friend already online. | `subscribeToFriendConnectivityUpdates` |
+| `friendship_updates` | `{ action: "request", id, address, createdAt, message? }` for a new request; `{ action: "accept" \| "reject" \| "cancel" \| "delete" \| "block", address }` otherwise. `address` is the other user. | `subscribeToFriendshipUpdates` |
+| `friend_connectivity_updates` | `{ address, status: "online" \| "offline" \| "away" }`: `address` is the friend. Starts with one `online` event per friend already online. | `subscribeToFriendConnectivityUpdates` |
 | `block_updates` | `{ address, isBlocked }`: `address` blocked (or unblocked) the user. | `subscribeToBlockUpdates` |
 | `private_voice_chat_updates` | `{ callId, status: "requested" \| "accepted" \| "rejected" \| "ended" \| "expired", callerAddress?, connectionUrl? }`. `callerAddress` comes with `requested`; `connectionUrl` comes to the caller with `accepted`. | `subscribeToPrivateVoiceChatUpdates` |
 | `community_member_connectivity_updates` | `{ communityId, memberAddress, status: "online" \| "offline" \| "away" }` | `subscribeToCommunityMemberConnectivityUpdates` |

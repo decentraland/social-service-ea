@@ -338,14 +338,15 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
 
   describe('when a friendship request is sent', () => {
     describe('and the receiver is subscribed to friendship updates over the stream socket', () => {
-      it('should deliver the request with the profile of the requester', async () => {
+      it('should deliver the request with the requester address, without looking up their profile', async () => {
         const requester = await createTestIdentity()
         const requesterAddress = requester.realAccount.address.toLowerCase()
         stubComponents.registry.getProfiles.mockResolvedValue([
           createMockProfile(requesterAddress),
           createMockProfile(address)
         ])
-        stubComponents.registry.getProfile.mockResolvedValue(createMockProfile(requesterAddress))
+        // The RPC stream would drop the event when the profile can't be resolved; this one must not need it.
+        stubComponents.registry.getProfile.mockRejectedValue(new Error('profile not found'))
 
         const client = await open()
         client.send({ type: 'subscribe', id: 'friends', stream: 'friendship_updates' })
@@ -363,8 +364,7 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
           id: expect.any(String),
           address: requesterAddress,
           createdAt: expect.any(Number),
-          message: 'hello from the stream',
-          friend: expect.objectContaining({ address: requesterAddress, name: expect.any(String) })
+          message: 'hello from the stream'
         })
 
         const friendship = await components.friendsDb.getFriendship([address, requesterAddress])

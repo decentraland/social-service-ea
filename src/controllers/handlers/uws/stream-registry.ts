@@ -1,12 +1,9 @@
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import {
   CommunityVoiceChatStatus,
-  ConnectivityStatus,
-  FriendProfile
+  ConnectivityStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../../../types'
 import { StreamEvent } from '../../../adapters/rpc-server/metrics-wrapper'
-import { parseProfilesToFriends, parseProfileToFriend } from '../../../logic/friends'
 import { VoiceChatStatus } from '../../../logic/voice/types'
 
 /**
@@ -14,7 +11,8 @@ import { VoiceChatStatus } from '../../../logic/voice/types'
  *
  * They read the same per-user updates as the RPC streams (`updateHandler.handleSubscriptionUpdates`,
  * same event names and filters), but each one maps them to its own JSON event instead of the
- * protobuf messages, so this protocol does not depend on `social_service_v2.proto`.
+ * protobuf messages, so this protocol does not depend on `social_service_v2.proto`. Unlike the RPC
+ * streams, the events carry addresses only: clients resolve the profiles themselves.
  */
 
 export type StreamDefinition = {
@@ -31,11 +29,10 @@ export type FriendshipStreamEvent =
       address: string
       createdAt: number
       message?: string
-      friend: FriendProfile
     }
   | { action: Exclude<Action, Action.REQUEST>; address: string }
 
-export type FriendConnectivityStreamEvent = { friend: FriendProfile; status: ConnectivityStatusName }
+export type FriendConnectivityStreamEvent = { address: string; status: ConnectivityStatusName }
 
 export type BlockStreamEvent = { address: string; isBlocked: boolean }
 
@@ -78,8 +75,7 @@ const COMMUNITY_VOICE_CHAT_STATUS_NAMES: Partial<Record<CommunityVoiceChatStatus
 }
 
 export function toFriendshipStreamEvent(
-  update: SubscriptionEventsEmitter['friendshipUpdate'],
-  profile: Profile
+  update: SubscriptionEventsEmitter['friendshipUpdate']
 ): FriendshipStreamEvent | null {
   if (update.action === Action.REQUEST) {
     return {
@@ -87,8 +83,7 @@ export function toFriendshipStreamEvent(
       id: update.id,
       address: update.from,
       createdAt: update.timestamp,
-      ...(update.metadata?.message && { message: update.metadata.message }),
-      friend: parseProfileToFriend(profile)
+      ...(update.metadata?.message && { message: update.metadata.message })
     }
   }
 
@@ -96,11 +91,10 @@ export function toFriendshipStreamEvent(
 }
 
 export function toFriendConnectivityStreamEvent(
-  update: SubscriptionEventsEmitter['friendConnectivityUpdate'],
-  profile: Profile
+  update: SubscriptionEventsEmitter['friendConnectivityUpdate']
 ): FriendConnectivityStreamEvent | null {
   const status = CONNECTIVITY_STATUS_NAMES[update.status]
-  return status ? { friend: parseProfileToFriend(profile), status } : null
+  return status ? { address: update.address, status } : null
 }
 
 export function toBlockStreamEvent(update: SubscriptionEventsEmitter['blockUpdate']): BlockStreamEvent {
@@ -147,16 +141,14 @@ export function toCommunityVoiceChatStreamEvent(
 export function createStreamRegistry({
   updateHandler,
   friendsDb,
-  registry,
   peersStats
-}: Pick<AppComponents, 'updateHandler' | 'friendsDb' | 'registry' | 'peersStats'>): Record<string, StreamDefinition> {
+}: Pick<AppComponents, 'updateHandler' | 'friendsDb' | 'peersStats'>): Record<string, StreamDefinition> {
   return {
     [StreamEvent.FRIENDSHIP_UPDATES]: {
       open: (context) =>
         updateHandler.handleSubscriptionUpdates<FriendshipStreamEvent, SubscriptionEventsEmitter['friendshipUpdate']>({
           rpcContext: context,
           eventName: 'friendshipUpdate',
-          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update) => update.from,
           shouldHandleUpdate: (update) => update.from !== context.address && update.to === context.address,
           parser: toFriendshipStreamEvent
@@ -170,7 +162,6 @@ export function createStreamRegistry({
         >({
           rpcContext: context,
           eventName: 'friendConnectivityUpdate',
-          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update) => update.address,
           shouldHandleUpdate: (update) => update.address !== context.address,
           parser: toFriendConnectivityStreamEvent,
@@ -178,9 +169,8 @@ export function createStreamRegistry({
           getInitialUpdates: async () => {
             const onlinePeers = await peersStats.getConnectedPeers()
             const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
-            const profiles = await registry.getProfiles(onlineFriends.map((friend) => friend.address))
 
-            return parseProfilesToFriends(profiles).map((friend) => ({ friend, status: 'online' as const }))
+            return onlineFriends.map(({ address }) => ({ address, status: 'online' as const }))
           }
         })
     },
