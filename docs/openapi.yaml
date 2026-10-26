@@ -1267,6 +1267,7 @@ paths:
             schema:
               type: object
               minProperties: 1
+              additionalProperties: false
               properties:
                 privateMessagesPrivacy:
                   type: string
@@ -1314,9 +1315,10 @@ paths:
             maxItems: 50
             items:
               type: string
+              pattern: '^0x[a-fA-F0-9]{40}$'
           style: form
           explode: true
-          description: Addresses to look up, at most 50 (e.g. `?addresses=0x1&addresses=0x2`)
+          description: Addresses to look up, at most 50 (e.g. `?addresses=0x0000000000000000000000000000000000000001&addresses=0x0000000000000000000000000000000000000002`)
       responses:
         '200':
           description: Private messages settings of the requested users

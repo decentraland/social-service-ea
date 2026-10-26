@@ -38,6 +38,7 @@ test('Social Settings Controller', function ({ components }) {
 
       for (const [method, path] of routes) {
         const response = await components.localHttpFetch.fetch(path, { method })
+        await response.text()
         expect({ method, path, status: response.status }).toEqual({ method, path, status: 400 })
       }
     })
@@ -79,7 +80,8 @@ test('Social Settings Controller', function ({ components }) {
       })
 
       it('should not call Gatekeeper', async () => {
-        await makeRequest(identity, '/v1/social-settings', 'PATCH', { showSituationReactions: 'hide' })
+        const response = await makeRequest(identity, '/v1/social-settings', 'PATCH', { showSituationReactions: 'hide' })
+        await response.text()
 
         expect(gatekeeperSpy).not.toHaveBeenCalled()
       })
@@ -91,6 +93,7 @@ test('Social Settings Controller', function ({ components }) {
           privateMessagesPrivacy: 'only_friends'
         })
 
+        await response.text()
         expect(response.status).toBe(200)
         expect(gatekeeperSpy).toHaveBeenCalledWith(address, PrivateMessagesPrivacy.ONLY_FRIENDS)
         expect((await getSettings()).privateMessagesPrivacy).toBe('only_friends')
@@ -107,6 +110,7 @@ test('Social Settings Controller', function ({ components }) {
           privateMessagesPrivacy: 'only_friends'
         })
 
+        await response.text()
         expect(response.status).toBe(500)
         expect((await getSettings()).privateMessagesPrivacy).toBe('all')
       })
@@ -116,6 +120,7 @@ test('Social Settings Controller', function ({ components }) {
       it('should respond with a 400 status code', async () => {
         const response = await makeRequest(identity, '/v1/social-settings', 'PATCH', {})
 
+        await response.text()
         expect(response.status).toBe(400)
       })
     })
@@ -126,6 +131,7 @@ test('Social Settings Controller', function ({ components }) {
           privateMessagesPrivacy: 'nobody'
         })
 
+        await response.text()
         expect(response.status).toBe(400)
       })
     })
@@ -163,6 +169,7 @@ test('Social Settings Controller', function ({ components }) {
       it('should respond with a 400 status code', async () => {
         const response = await makeRequest(identity, '/v1/private-messages-settings?addresses=0x123')
 
+        await response.text()
         expect(response.status).toBe(400)
       })
     })
