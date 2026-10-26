@@ -1,9 +1,7 @@
 import { InvalidRequestError } from '@dcl/http-commons'
-import { getMutualFriendsHandler } from '../../../../../src/controllers/handlers/http/get-mutual-friends-handler'
+import { getMutualFriendsV2Handler } from '../../../../../src/controllers/handlers/http/get-mutual-friends-v2-handler'
 import { createFriendsMockedComponent } from '../../../../mocks/components/friends'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
 
 const USER_ADDRESS = '0x1234567890123456789012345678901234567890'
 const OTHER_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -13,9 +11,9 @@ let friends: ReturnType<typeof createFriendsMockedComponent>
 let logs: ReturnType<typeof createLogsMockedComponent>
 
 function callHandler(address: string, query = '') {
-  return getMutualFriendsHandler({
+  return getMutualFriendsV2Handler({
     components: { friends, logs },
-    url: new URL(`http://localhost/v1/users/${address}/mutual-friends${query}`),
+    url: new URL(`http://localhost/v2/users/${address}/mutual-friends${query}`),
     params: { address },
     verification: { auth: USER_ADDRESS } as any
   })
@@ -27,21 +25,18 @@ beforeEach(() => {
 })
 
 describe('when getting the mutual friends with a valid address', () => {
-  let profile: ReturnType<typeof createMockProfile>
-
   beforeEach(() => {
-    profile = createMockProfile(MUTUAL_ADDRESS)
-    friends.getMutualFriendsProfiles.mockResolvedValue({ friendsProfiles: [profile], total: 1 })
+    friends.getMutualFriendsWithoutProfiles.mockResolvedValue({ friends: [{ address: MUTUAL_ADDRESS }], total: 1 })
   })
 
-  it('should respond with the mutual friends page', async () => {
+  it('should respond with the mutual friend addresses', async () => {
     const result = await callHandler(OTHER_ADDRESS, '?limit=10')
 
     expect(result).toEqual({
       status: 200,
       body: {
         data: {
-          results: [parseProfileToFriend(profile)],
+          results: [{ address: MUTUAL_ADDRESS }],
           total: 1,
           page: 1,
           pages: 1,
@@ -54,7 +49,7 @@ describe('when getting the mutual friends with a valid address', () => {
   it('should query the mutual friends with the normalized address', async () => {
     await callHandler(OTHER_ADDRESS.toUpperCase().replace('0X', '0x'), '?limit=10')
 
-    expect(friends.getMutualFriendsProfiles).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS, {
+    expect(friends.getMutualFriendsWithoutProfiles).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS, {
       limit: 10,
       offset: 0
     })
@@ -64,7 +59,7 @@ describe('when getting the mutual friends with a valid address', () => {
 describe('when the address is not valid', () => {
   it('should throw an InvalidRequestError without querying', async () => {
     await expect(callHandler('not-an-address')).rejects.toThrow(InvalidRequestError)
-    expect(friends.getMutualFriendsProfiles).not.toHaveBeenCalled()
+    expect(friends.getMutualFriendsWithoutProfiles).not.toHaveBeenCalled()
   })
 })
 
@@ -73,7 +68,7 @@ describe('when the lookup fails', () => {
 
   beforeEach(() => {
     error = new Error('database down')
-    friends.getMutualFriendsProfiles.mockRejectedValue(error)
+    friends.getMutualFriendsWithoutProfiles.mockRejectedValue(error)
   })
 
   it('should propagate the error', async () => {

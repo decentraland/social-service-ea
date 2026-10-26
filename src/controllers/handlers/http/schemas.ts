@@ -1,6 +1,7 @@
 import { Schema } from 'ajv'
 import { CommunityRole } from '../../../types/entities'
 import { CommunityRequestType, CommunityRequestStatus } from '../../../logic/community/types'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/component'
 
 // TypeScript types derived from schemas
 export type UpdateMemberRoleRequestBody = {
@@ -191,7 +192,8 @@ export const CreateFriendshipRequestSchema: Schema = {
       pattern: '^0x[a-fA-F0-9]{40}$'
     },
     message: {
-      type: 'string'
+      type: 'string',
+      maxLength: FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH
     }
   }
 }

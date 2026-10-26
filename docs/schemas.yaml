@@ -1378,55 +1378,35 @@ components:
               type: integer
               description: 'Total number of posts in the community'
 
-    FriendProfile:
+    Friend:
       type: object
       required:
         - address
-        - name
-        - hasClaimedName
-        - profilePictureUrl
       properties:
         address:
           type: string
-          description: 'Ethereum address of the user'
-        name:
-          type: string
-          description: 'Display name of the user'
-        hasClaimedName:
-          type: boolean
-          description: 'Whether the name is a claimed NAME'
-        profilePictureUrl:
-          type: string
-          description: 'URL of the face snapshot of the avatar'
-        nameColor:
-          type: object
-          description: 'Color of the name, when the user picked one'
-          properties:
-            r:
-              type: number
-            g:
-              type: number
-            b:
-              type: number
+          description: 'Ethereum address of the friend. Clients resolve the profile themselves.'
 
     FriendshipRequest:
       type: object
       required:
         - id
-        - friend
+        - address
         - createdAt
       properties:
         id:
           type: string
           description: 'Identifier of the friendship request'
-        friend:
-          $ref: '#/components/schemas/FriendProfile'
+        address:
+          type: string
+          description: 'Ethereum address of the other user: the sender of a received request, the receiver of a sent one'
         createdAt:
           type: integer
           description: 'When the request was created, in milliseconds since the epoch'
         message:
           type: string
-          description: 'Message sent along with the request'
+          maxLength: 256
+          description: 'Message sent along with the request. Absent when the request has none.'
 
     GetFriends200OkResponse:
       type: object
@@ -1441,7 +1421,7 @@ components:
                 results:
                   type: array
                   items:
-                    $ref: '#/components/schemas/FriendProfile'
+                    $ref: '#/components/schemas/Friend'
 
     GetFriendshipRequests200OkResponse:
       type: object

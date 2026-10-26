@@ -1,8 +1,6 @@
-import { getFriendsHandler } from '../../../../../src/controllers/handlers/http/get-friends-handler'
+import { getFriendsV2Handler } from '../../../../../src/controllers/handlers/http/get-friends-v2-handler'
 import { createFriendsMockedComponent } from '../../../../mocks/components/friends'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
 
 const USER_ADDRESS = '0x1234567890123456789012345678901234567890'
 const FRIEND_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -11,9 +9,9 @@ let friends: ReturnType<typeof createFriendsMockedComponent>
 let logs: ReturnType<typeof createLogsMockedComponent>
 
 function callHandler(query = '') {
-  return getFriendsHandler({
+  return getFriendsV2Handler({
     components: { friends, logs },
-    url: new URL(`http://localhost/v1/friends${query}`),
+    url: new URL(`http://localhost/v2/friends${query}`),
     verification: { auth: USER_ADDRESS } as any
   })
 }
@@ -24,21 +22,18 @@ beforeEach(() => {
 })
 
 describe('when getting the friends of the caller', () => {
-  let profile: ReturnType<typeof createMockProfile>
-
   beforeEach(() => {
-    profile = createMockProfile(FRIEND_ADDRESS)
-    friends.getFriendsProfiles.mockResolvedValue({ friendsProfiles: [profile], total: 3 })
+    friends.getFriendsWithoutProfiles.mockResolvedValue({ friends: [{ address: FRIEND_ADDRESS }], total: 3 })
   })
 
-  it('should respond with the friends page and the pagination properties', async () => {
+  it('should respond with the friend addresses and the pagination properties', async () => {
     const result = await callHandler('?limit=1&offset=1')
 
     expect(result).toEqual({
       status: 200,
       body: {
         data: {
-          results: [parseProfileToFriend(profile)],
+          results: [{ address: FRIEND_ADDRESS }],
           total: 3,
           page: 2,
           pages: 3,
@@ -51,19 +46,25 @@ describe('when getting the friends of the caller', () => {
   it('should query the friends of the caller with the requested page', async () => {
     await callHandler('?limit=1&offset=1')
 
-    expect(friends.getFriendsProfiles).toHaveBeenCalledWith(USER_ADDRESS, { limit: 1, offset: 1 })
+    expect(friends.getFriendsWithoutProfiles).toHaveBeenCalledWith(USER_ADDRESS, { limit: 1, offset: 1 })
+  })
+
+  it('should not resolve any profile', async () => {
+    await callHandler()
+
+    expect(friends.getFriendsProfiles).not.toHaveBeenCalled()
   })
 })
 
 describe('when no pagination is requested', () => {
   beforeEach(() => {
-    friends.getFriendsProfiles.mockResolvedValue({ friendsProfiles: [], total: 0 })
+    friends.getFriendsWithoutProfiles.mockResolvedValue({ friends: [], total: 0 })
   })
 
   it('should use the default page', async () => {
     await callHandler()
 
-    expect(friends.getFriendsProfiles).toHaveBeenCalledWith(USER_ADDRESS, { limit: 100, offset: 0 })
+    expect(friends.getFriendsWithoutProfiles).toHaveBeenCalledWith(USER_ADDRESS, { limit: 100, offset: 0 })
   })
 })
 
@@ -72,7 +73,7 @@ describe('when the friends lookup fails', () => {
 
   beforeEach(() => {
     error = new Error('database down')
-    friends.getFriendsProfiles.mockRejectedValue(error)
+    friends.getFriendsWithoutProfiles.mockRejectedValue(error)
   })
 
   it('should propagate the error', async () => {

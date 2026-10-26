@@ -1,10 +1,9 @@
 import { InvalidRequestError } from '@dcl/http-commons'
 import { EthAddress } from '@dcl/schemas'
-import { FriendshipRequestResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { parseFriendshipRequestToFriendshipRequestResponse } from '../../../logic/friends'
+import { FriendshipRequestWithoutProfile, parseFriendshipRequestWithoutProfile } from '../../../logic/friends'
 import { FriendshipRequestIntention, UpdateFriendshipRequestRequestBody } from './schemas'
 
 const ACTION_BY_INTENTION: Record<FriendshipRequestIntention, Action.ACCEPT | Action.REJECT | Action.CANCEL> = {
@@ -23,7 +22,7 @@ export async function updateFriendshipRequestHandler(
     HandlerContextWithPath<'friends' | 'logs', '/v1/friendship-requests/:address'>,
     'components' | 'params' | 'request' | 'verification'
   >
-): Promise<HTTPResponse<FriendshipRequestResponse>> {
+): Promise<HTTPResponse<FriendshipRequestWithoutProfile>> {
   const {
     components: { friends, logs },
     params,
@@ -46,7 +45,7 @@ export async function updateFriendshipRequestHandler(
 
     const { intention }: UpdateFriendshipRequestRequestBody = await request.json()
 
-    const { friendshipRequest, receiverProfile } = await friends.upsertFriendship(
+    const friendshipRequest = await friends.upsertFriendshipWithoutProfiles(
       userAddress,
       otherAddress,
       ACTION_BY_INTENTION[intention],
@@ -56,7 +55,7 @@ export async function updateFriendshipRequestHandler(
     return {
       status: 200,
       body: {
-        data: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, receiverProfile)
+        data: parseFriendshipRequestWithoutProfile(friendshipRequest)
       }
     }
   } catch (error) {

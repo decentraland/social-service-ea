@@ -1,18 +1,19 @@
 import { getPaginationParams, InvalidRequestError } from '@dcl/http-commons'
 import { EthAddress, PaginatedResponse } from '@dcl/schemas'
-import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { HandlerContextWithPath, HTTPResponse, User } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { getPaginationResultProperties } from '../../../utils/pagination'
-import { parseProfilesToFriends } from '../../../logic/friends'
 
-export async function getMutualFriendsHandler(
+/**
+ * Returns the friends the caller and `:address` have in common, as addresses only.
+ */
+export async function getMutualFriendsV2Handler(
   context: Pick<
-    HandlerContextWithPath<'friends' | 'logs', '/v1/users/:address/mutual-friends'>,
+    HandlerContextWithPath<'friends' | 'logs', '/v2/users/:address/mutual-friends'>,
     'components' | 'url' | 'params' | 'verification'
   >
-): Promise<HTTPResponse<PaginatedResponse<FriendProfile>>> {
+): Promise<HTTPResponse<PaginatedResponse<User>>> {
   const {
     components: { friends, logs },
     url,
@@ -20,7 +21,7 @@ export async function getMutualFriendsHandler(
     verification
   } = context
 
-  const logger = logs.getLogger('get-mutual-friends-handler')
+  const logger = logs.getLogger('get-mutual-friends-v2-handler')
   const userAddress = normalizeAddress(verification!.auth)
   const otherAddress = normalizeAddress(params.address)
 
@@ -30,7 +31,7 @@ export async function getMutualFriendsHandler(
     }
 
     const paginationParams = getPaginationParams(url.searchParams)
-    const { friendsProfiles, total } = await friends.getMutualFriendsProfiles(
+    const { friends: results, total } = await friends.getMutualFriendsWithoutProfiles(
       userAddress,
       otherAddress,
       paginationParams
@@ -40,7 +41,7 @@ export async function getMutualFriendsHandler(
       status: 200,
       body: {
         data: {
-          results: parseProfilesToFriends(friendsProfiles),
+          results,
           total,
           ...getPaginationResultProperties(total, paginationParams)
         }
