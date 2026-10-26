@@ -1900,6 +1900,664 @@ paths:
       tags:
         - Communities
 
+  /v1/private-voice-chats:
+    post:
+      operationId: startPrivateVoiceChat
+      summary: Start a private voice chat
+      description: |
+        Calls `calleeAddress`. Fails with 403 when either user only accepts calls from friends and they are not
+        friends, or one blocked the other, and with 409 when either user is already in, or being invited to,
+        another private or community voice chat.
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - calleeAddress
+              properties:
+                calleeAddress:
+                  type: string
+                  example: '0x0000000000000000000000000000000000000001'
+      responses:
+        '201':
+          description: Call started
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/StartPrivateVoiceChat201OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: The action conflicts with the current state
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Private Voice Chats
+
+  /v1/private-voice-chats/incoming:
+    get:
+      operationId: getIncomingPrivateVoiceChat
+      summary: Get the incoming private voice chat
+      description: Returns the call the authenticated user is being invited to, or 404 when there is none.
+      security:
+        - SignedFetch: []
+      responses:
+        '200':
+          description: Incoming call
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetIncomingPrivateVoiceChat200OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Private Voice Chats
+
+  /v1/private-voice-chats/{callId}:
+    patch:
+      operationId: updatePrivateVoiceChat
+      summary: Accept or reject a private voice chat
+      description: |
+        The callee accepts the call, getting the credentials to join it (200), or rejects it (204). Only the
+        callee can do either.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the private voice chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - intention
+              properties:
+                intention:
+                  type: string
+                  enum: [accepted, rejected]
+      responses:
+        '200':
+          description: Call accepted
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/AcceptPrivateVoiceChat200OkResponse'
+        '204':
+          description: Call rejected
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Private Voice Chats
+
+    delete:
+      operationId: endPrivateVoiceChat
+      summary: End a private voice chat
+      description: Ends the call, or cancels it before it is accepted. Either participant can do it.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the private voice chat
+      responses:
+        '204':
+          description: Call ended
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Private Voice Chats
+
+  /v1/community-voice-chats:
+    post:
+      operationId: startCommunityVoiceChat
+      summary: Start a community voice chat
+      description: Starts the voice chat of a community. Only its owner and moderators can do it.
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - communityId
+              properties:
+                communityId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Voice chat started; the credentials let the host join it
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/VoiceChatCredentials201OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: The community voice chat resource was not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: The action conflicts with the current state
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+  /v1/community-voice-chats/{communityId}:
+    delete:
+      operationId: endCommunityVoiceChat
+      summary: End a community voice chat
+      description: Ends the voice chat of a community for everyone. Only its owner and moderators can do it.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+      responses:
+        '204':
+          description: Voice chat ended
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+  /v1/community-voice-chats/{communityId}/participants:
+    post:
+      operationId: joinCommunityVoiceChat
+      summary: Join a community voice chat
+      description: Joins the active voice chat of a community as the authenticated user.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+      responses:
+        '201':
+          description: Joined; the credentials let the user connect
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/VoiceChatCredentials201OkResponse'
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+  /v1/community-voice-chats/{communityId}/participants/{address}:
+    delete:
+      operationId: kickCommunityVoiceChatParticipant
+      summary: Kick a participant
+      description: Removes `address` from the voice chat. Only owners and moderators can do it, and nobody can kick the owner.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the other user
+      responses:
+        '204':
+          description: Participant kicked
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+  /v1/community-voice-chats/{communityId}/speakers/{address}:
+    put:
+      operationId: promoteCommunityVoiceChatSpeaker
+      summary: Promote a participant to speaker
+      description: Only owners and moderators can do it.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the other user
+      responses:
+        '204':
+          description: Participant promoted
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+    patch:
+      operationId: muteCommunityVoiceChatSpeaker
+      summary: Mute or unmute a speaker
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the other user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - muted
+              properties:
+                muted:
+                  type: boolean
+      responses:
+        '204':
+          description: Speaker muted or unmuted
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+    delete:
+      operationId: demoteCommunityVoiceChatSpeaker
+      summary: Demote a speaker to listener
+      description: Any speaker can demote themselves; demoting someone else takes an owner or moderator.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the other user
+      responses:
+        '204':
+          description: Speaker demoted
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+  /v1/community-voice-chats/{communityId}/speak-requests:
+    post:
+      operationId: createCommunityVoiceChatSpeakRequest
+      summary: Raise the hand
+      description: Asks to speak in the voice chat as the authenticated user.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+      responses:
+        '204':
+          description: Hand raised
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
+  /v1/community-voice-chats/{communityId}/speak-requests/{address}:
+    delete:
+      operationId: removeCommunityVoiceChatSpeakRequest
+      summary: Lower the hand or reject a speak request
+      description: |
+        On the authenticated user's own address it lowers their hand. On someone else's it rejects their
+        request, which only owners and moderators can do. Lowering one's own hand is idempotent and
+        returns 204 even if the room or participant is already gone.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the community
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the other user
+      responses:
+        '204':
+          description: Speak request removed
+        '400':
+          description: Invalid request or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '403':
+          description: The authenticated user is not allowed to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
+
   /v1/community-voice-chats/active:
     get:
       operationId: getActiveCommunityVoiceChats

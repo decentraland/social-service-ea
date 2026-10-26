@@ -11,10 +11,7 @@ import {
   CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
-import {
-  validateCommunityVoiceChatModerator,
-  validateCommunityVoiceChatTargetMembership
-} from '../../../logic/community-voice/validation'
+import { rejectSpeakRequestInCommunityVoiceChat } from '../../../logic/community-voice/moderation'
 import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function rejectSpeakRequestInCommunityVoiceChatService({
@@ -33,44 +30,12 @@ export function rejectSpeakRequestInCommunityVoiceChatService({
         moderatorAddress: context.address
       })
 
-      if (!request.communityId || request.communityId.trim() === '') {
-        logger.warn('Missing or empty community ID in request')
-        throw new InvalidCommunityIdError()
-      }
-
-      if (!request.userAddress || request.userAddress.trim() === '') {
-        logger.warn('Missing or empty user address in request')
-        throw new InvalidUserAddressError()
-      }
-
-      // Owner/moderator gate, owner protection and community lookup issued together. Authorization
-      // is reported first on purpose: a caller with no role learns nothing about the community.
-      const [community, { actingUserRole, targetUserRole }] = await Promise.all([
-        communitiesDb.getCommunity(request.communityId, context.address),
-        validateCommunityVoiceChatModerator(
-          communitiesDb,
-          request.communityId,
-          context.address,
-          request.userAddress,
-          'reject speak requests'
-        )
-      ])
-
-      if (!community) {
-        throw new InvalidCommunityIdError()
-      }
-
-      // Public guests can raise a hand; a banned target stays rejectable since denying grants nothing.
-      validateCommunityVoiceChatTargetMembership(community, request.communityId, request.userAddress, targetUserRole)
-
-      logger.info('Permission check passed: moderator/owner rejecting speak request', {
-        communityId: request.communityId,
-        actingUserRole,
-        targetUserAddress: request.userAddress,
-        moderatorAddress: context.address
-      })
-
-      await commsGatekeeper.rejectSpeakRequestInCommunityVoiceChat(request.communityId, request.userAddress)
+      await rejectSpeakRequestInCommunityVoiceChat(
+        { logs, commsGatekeeper, communitiesDb },
+        request.communityId,
+        context.address,
+        request.userAddress
+      )
 
       logger.info('Speak request rejected successfully', {
         communityId: request.communityId,

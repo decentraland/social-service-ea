@@ -13,6 +13,7 @@ import { createMockProfile } from '../../mocks/profile'
 import {
   CommunityVoiceChatAlreadyActiveError,
   CommunityVoiceChatCreationError,
+  CommunityVoiceChatResourceNotFoundError,
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatPermissionError,
   UserNotCommunityMemberError,
@@ -169,6 +170,32 @@ describe('Community Voice Logic', () => {
             { id: 'place-1', title: 'Place 1', positions: ['1,1', '1,2'], owner: '0x123' },
             { id: 'place-2', title: 'Place 2', positions: ['2,1', '2,2'], owner: '0x123' }
           ])
+        })
+
+        describe('and profile enrichment is disabled', () => {
+          beforeEach(() => {
+            mockRegistry.getProfile.mockRejectedValue(new Error('Profile service unavailable'))
+          })
+
+          it('should return credentials without fetching a profile', async () => {
+            await expect(
+              communityVoice.startCommunityVoiceChat(communityId, creatorAddress, { includeProfile: false })
+            ).resolves.toEqual({ connectionUrl: 'test-connection-url' })
+            expect(mockRegistry.getProfile).not.toHaveBeenCalled()
+          })
+        })
+
+        describe('and Gatekeeper cannot find the resource', () => {
+          let error: CommunityVoiceChatResourceNotFoundError
+
+          beforeEach(() => {
+            error = new CommunityVoiceChatResourceNotFoundError(communityId)
+            mockCommsGatekeeper.createCommunityVoiceChatRoom.mockRejectedValueOnce(error)
+          })
+
+          it('should preserve the typed not-found error', async () => {
+            await expect(communityVoice.startCommunityVoiceChat(communityId, creatorAddress)).rejects.toBe(error)
+          })
         })
 
         describe('when profile data is available', () => {
@@ -703,6 +730,19 @@ describe('Community Voice Logic', () => {
           mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false)
           mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
             connectionUrl: 'test-connection-url'
+          })
+        })
+
+        describe('and profile enrichment is disabled', () => {
+          beforeEach(() => {
+            mockRegistry.getProfile.mockRejectedValue(new Error('Profile service unavailable'))
+          })
+
+          it('should return credentials without fetching a profile', async () => {
+            await expect(
+              communityVoice.joinCommunityVoiceChat(communityId, userAddress, { includeProfile: false })
+            ).resolves.toEqual({ connectionUrl: 'test-connection-url' })
+            expect(mockRegistry.getProfile).not.toHaveBeenCalled()
           })
         })
 
@@ -1612,6 +1652,36 @@ describe('Community Voice Logic', () => {
       mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false)
     })
 
+    describe('and the room or participant is already gone', () => {
+      beforeEach(() => {
+        mockCommsGatekeeper.requestToSpeakInCommunityVoiceChat.mockRejectedValueOnce(
+          new CommunityVoiceChatResourceNotFoundError(communityId)
+        )
+      })
+
+      it('should successfully lower the hand without checking membership', async () => {
+        await expect(
+          communityVoice.requestToSpeakInCommunityVoiceChat(communityId, userAddress, false)
+        ).resolves.toBeUndefined()
+        expect(mockCommunitiesDb.getCommunity).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and lowering the hand fails unexpectedly', () => {
+      let error: Error
+
+      beforeEach(() => {
+        error = new Error('Gatekeeper unavailable')
+        mockCommsGatekeeper.requestToSpeakInCommunityVoiceChat.mockRejectedValueOnce(error)
+      })
+
+      it('should propagate the failure', async () => {
+        await expect(communityVoice.requestToSpeakInCommunityVoiceChat(communityId, userAddress, false)).rejects.toBe(
+          error
+        )
+      })
+    })
+
     describe('and the user is a member of an active private community room', () => {
       beforeEach(() => {
         mockCommunitiesDb.getCommunity!.mockResolvedValue({
@@ -1623,6 +1693,20 @@ describe('Community Voice Logic', () => {
           visibility: CommunityVisibilityEnum.All,
           active: true,
           role: CommunityRole.Member
+        })
+      })
+
+      describe('and the room disappears while raising the hand', () => {
+        beforeEach(() => {
+          mockCommsGatekeeper.requestToSpeakInCommunityVoiceChat.mockRejectedValueOnce(
+            new CommunityVoiceChatResourceNotFoundError(communityId)
+          )
+        })
+
+        it('should preserve the not-found error', async () => {
+          await expect(
+            communityVoice.requestToSpeakInCommunityVoiceChat(communityId, userAddress, true)
+          ).rejects.toThrow(CommunityVoiceChatResourceNotFoundError)
         })
       })
 

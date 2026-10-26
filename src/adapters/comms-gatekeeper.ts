@@ -1,3 +1,5 @@
+import { CommunityVoiceChatResourceNotFoundError } from '../logic/community-voice/errors'
+import { isValidUUID } from '../utils/uuid'
 import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy, CommunityRole } from '../types'
 import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 import { CommunityVoiceChatStatus } from '../logic/community/types'
@@ -5,7 +7,22 @@ import { isErrorWithMessage } from '../utils/errors'
 import { discardResponseBody, fetchJson, fetchVoid } from '../utils/fetch'
 import { EthAddress } from '@dcl/schemas'
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function communityVoiceError(communityId: string, status: number): Error {
+  return status === 404
+    ? new CommunityVoiceChatResourceNotFoundError(communityId)
+    : new Error(`Server responded with status ${status}`)
+}
+
+async function fetchCommunityVoiceMutation(
+  communityId: string,
+  doFetch: Parameters<typeof fetchVoid>[0]
+): Promise<void> {
+  return fetchVoid(doFetch, (response) => communityVoiceError(communityId, response.status))
+}
+
+async function fetchCommunityVoiceJson<T>(communityId: string, doFetch: Parameters<typeof fetchJson>[0]): Promise<T> {
+  return fetchJson<T>(doFetch, (response) => communityVoiceError(communityId, response.status))
+}
 
 /** Error raised before a privileged Gatekeeper request when an identifier is not canonical. */
 export class InvalidGatekeeperIdentifierError extends Error {
@@ -22,7 +39,7 @@ function requireAddress(address: string): string {
 }
 
 function requireUuid(value: string, identifier: string): string {
-  if (!UUID_PATTERN.test(value)) {
+  if (!isValidUUID(value)) {
     throw new InvalidGatekeeperIdentifierError(identifier)
   }
   return value.toLowerCase()
@@ -222,7 +239,7 @@ export const createCommsGatekeeperComponent = async ({
         requestBody.profile_data = profileData
       }
 
-      const data = await fetchJson<{ connection_url: string }>(() =>
+      const data = await fetchCommunityVoiceJson<{ connection_url: string }>(normalizedCommunityId, () =>
         fetch(`${commsUrl}/community-voice-chat`, {
           method: 'POST',
           headers: {
@@ -275,7 +292,7 @@ export const createCommsGatekeeperComponent = async ({
         requestBody.profile_data = profileData
       }
 
-      const data = await fetchJson<{ connection_url: string }>(() =>
+      const data = await fetchCommunityVoiceJson<{ connection_url: string }>(normalizedCommunityId, () =>
         fetch(`${commsUrl}/community-voice-chat`, {
           method: 'POST',
           headers: {
@@ -303,7 +320,7 @@ export const createCommsGatekeeperComponent = async ({
     const normalizedCommunityId = requireUuid(communityId, 'community ID')
     const normalizedUserAddress = requireAddress(userAddress)
     try {
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(`${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}`, {
           method: 'DELETE',
           headers: {
@@ -341,7 +358,7 @@ export const createCommsGatekeeperComponent = async ({
     try {
       const method = isRaisingHand ? 'POST' : 'DELETE'
 
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(
           `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speak-request`,
           {
@@ -372,7 +389,7 @@ export const createCommsGatekeeperComponent = async ({
     const normalizedCommunityId = requireUuid(communityId, 'community ID')
     const normalizedUserAddress = requireAddress(userAddress)
     try {
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(
           `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speak-request`,
           {
@@ -401,7 +418,7 @@ export const createCommsGatekeeperComponent = async ({
     const normalizedCommunityId = requireUuid(communityId, 'community ID')
     const normalizedUserAddress = requireAddress(userAddress)
     try {
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(
           `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speaker`,
           {
@@ -430,7 +447,7 @@ export const createCommsGatekeeperComponent = async ({
     const normalizedCommunityId = requireUuid(communityId, 'community ID')
     const normalizedUserAddress = requireAddress(userAddress)
     try {
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(
           `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/speaker`,
           {
@@ -602,7 +619,7 @@ export const createCommsGatekeeperComponent = async ({
     const normalizedCommunityId = requireUuid(communityId, 'community ID')
     const normalizedUserAddress = requireAddress(userAddress)
     try {
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(
           `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}`,
           {
@@ -662,7 +679,7 @@ export const createCommsGatekeeperComponent = async ({
     const normalizedCommunityId = requireUuid(communityId, 'community ID')
     const normalizedUserAddress = requireAddress(userAddress)
     try {
-      await fetchVoid(() =>
+      await fetchCommunityVoiceMutation(normalizedCommunityId, () =>
         fetch(
           `${commsUrl}/community-voice-chat/${pathSegment(normalizedCommunityId)}/users/${pathSegment(normalizedUserAddress)}/mute`,
           {
