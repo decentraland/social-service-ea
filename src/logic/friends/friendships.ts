@@ -10,6 +10,7 @@ import { normalizeAddress } from '../../utils/address'
 import { parseProfileToFriend } from '.'
 import { getProfileUserId } from '../profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { FriendshipRequestWithoutProfile } from './types'
 
 // [to]: [from]
 export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = {
@@ -268,4 +269,13 @@ export function parseFriendshipRequestsToFriendshipRequestResponses(
       return parsedRequest
     })
     .filter((request) => !!request)
+}
+
+export function parseFriendshipRequestWithoutProfile(request: FriendshipRequest): FriendshipRequestWithoutProfile {
+  return {
+    id: request.id,
+    address: request.address,
+    createdAt: new Date(request.timestamp).getTime(),
+    ...(request.metadata?.message && { message: request.metadata.message })
+  }
 }

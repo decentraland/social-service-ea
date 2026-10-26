@@ -2,7 +2,6 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { removeFriendHandler } from '../../../../../src/controllers/handlers/http/remove-friend-handler'
 import { createFriendsMockedComponent } from '../../../../mocks/components/friends'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { createMockProfile } from '../../../../mocks/profile'
 import { InvalidFriendshipActionError } from '../../../../../src/logic/friends/errors'
 import { Action } from '../../../../../src/types'
 
@@ -27,9 +26,11 @@ beforeEach(() => {
 
 describe('when removing a friend', () => {
   beforeEach(() => {
-    friends.upsertFriendship.mockResolvedValue({
-      friendshipRequest: { id: 'friendship-id', address: FRIEND_ADDRESS, timestamp: '', metadata: null },
-      receiverProfile: createMockProfile(FRIEND_ADDRESS)
+    friends.upsertFriendshipWithoutProfiles.mockResolvedValue({
+      id: 'friendship-id',
+      address: FRIEND_ADDRESS,
+      timestamp: '',
+      metadata: null
     })
   })
 
@@ -40,21 +41,21 @@ describe('when removing a friend', () => {
   it('should record a delete action', async () => {
     await callHandler(FRIEND_ADDRESS)
 
-    expect(friends.upsertFriendship).toHaveBeenCalledWith(USER_ADDRESS, FRIEND_ADDRESS, Action.DELETE, null)
+    expect(friends.upsertFriendshipWithoutProfiles).toHaveBeenCalledWith(USER_ADDRESS, FRIEND_ADDRESS, Action.DELETE, null)
   })
 })
 
 describe('when the address is not valid', () => {
   it('should throw an InvalidRequestError without recording anything', async () => {
     await expect(callHandler('0x123')).rejects.toThrow(InvalidRequestError)
-    expect(friends.upsertFriendship).not.toHaveBeenCalled()
+    expect(friends.upsertFriendshipWithoutProfiles).not.toHaveBeenCalled()
   })
 })
 
 describe('when the address is the caller', () => {
   it('should throw an InvalidRequestError without recording anything', async () => {
     await expect(callHandler(USER_ADDRESS)).rejects.toThrow(InvalidRequestError)
-    expect(friends.upsertFriendship).not.toHaveBeenCalled()
+    expect(friends.upsertFriendshipWithoutProfiles).not.toHaveBeenCalled()
   })
 })
 
@@ -63,7 +64,7 @@ describe('when the users are not friends', () => {
 
   beforeEach(() => {
     error = new InvalidFriendshipActionError()
-    friends.upsertFriendship.mockRejectedValue(error)
+    friends.upsertFriendshipWithoutProfiles.mockRejectedValue(error)
   })
 
   it('should propagate the error for the friends error handler', async () => {

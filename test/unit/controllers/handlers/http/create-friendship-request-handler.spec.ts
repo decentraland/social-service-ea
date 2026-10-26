@@ -2,8 +2,6 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { createFriendshipRequestHandler } from '../../../../../src/controllers/handlers/http/create-friendship-request-handler'
 import { createFriendsMockedComponent } from '../../../../mocks/components/friends'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { createMockProfile } from '../../../../mocks/profile'
-import { parseFriendshipRequestToFriendshipRequestResponse } from '../../../../../src/logic/friends'
 import { BlockedUserError } from '../../../../../src/logic/friends/errors'
 import { Action } from '../../../../../src/types'
 
@@ -28,7 +26,6 @@ beforeEach(() => {
 
 describe('when sending a friendship request to another user', () => {
   let friendshipRequest: { id: string; address: string; timestamp: string; metadata: { message: string } | null }
-  let receiverProfile: ReturnType<typeof createMockProfile>
 
   beforeEach(() => {
     friendshipRequest = {
@@ -37,21 +34,20 @@ describe('when sending a friendship request to another user', () => {
       timestamp: new Date(0).toISOString(),
       metadata: { message: 'hi' }
     }
-    receiverProfile = createMockProfile(OTHER_ADDRESS)
-    friends.upsertFriendship.mockResolvedValue({ friendshipRequest, receiverProfile })
+    friends.upsertFriendshipWithoutProfiles.mockResolvedValue(friendshipRequest)
   })
 
-  it('should respond with a 201 and the created request', async () => {
+  it('should respond with a 201 and the created request, with the receiver address and no profile', async () => {
     await expect(callHandler({ address: OTHER_ADDRESS, message: 'hi' })).resolves.toEqual({
       status: 201,
-      body: { data: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, receiverProfile) }
+      body: { data: { id: 'friendship-id', address: OTHER_ADDRESS, createdAt: 0, message: 'hi' } }
     })
   })
 
   it('should record a request action with the message and the normalized address', async () => {
     await callHandler({ address: OTHER_ADDRESS.toUpperCase().replace('0X', '0x'), message: 'hi' })
 
-    expect(friends.upsertFriendship).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS, Action.REQUEST, {
+    expect(friends.upsertFriendshipWithoutProfiles).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS, Action.REQUEST, {
       message: 'hi'
     })
   })
@@ -60,7 +56,7 @@ describe('when sending a friendship request to another user', () => {
     it('should record the request without metadata', async () => {
       await callHandler({ address: OTHER_ADDRESS })
 
-      expect(friends.upsertFriendship).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS, Action.REQUEST, null)
+      expect(friends.upsertFriendshipWithoutProfiles).toHaveBeenCalledWith(USER_ADDRESS, OTHER_ADDRESS, Action.REQUEST, null)
     })
   })
 })
@@ -68,7 +64,7 @@ describe('when sending a friendship request to another user', () => {
 describe('when the address is not valid', () => {
   it('should throw an InvalidRequestError without recording anything', async () => {
     await expect(callHandler({ address: '0x123' })).rejects.toThrow(InvalidRequestError)
-    expect(friends.upsertFriendship).not.toHaveBeenCalled()
+    expect(friends.upsertFriendshipWithoutProfiles).not.toHaveBeenCalled()
   })
 })
 
@@ -77,7 +73,7 @@ describe('when the caller sends the request to themselves', () => {
     await expect(callHandler({ address: USER_ADDRESS })).rejects.toThrow(
       'You cannot send a friendship request to yourself'
     )
-    expect(friends.upsertFriendship).not.toHaveBeenCalled()
+    expect(friends.upsertFriendshipWithoutProfiles).not.toHaveBeenCalled()
   })
 })
 
@@ -86,7 +82,7 @@ describe('when the friendship is blocked', () => {
 
   beforeEach(() => {
     error = new BlockedUserError()
-    friends.upsertFriendship.mockRejectedValue(error)
+    friends.upsertFriendshipWithoutProfiles.mockRejectedValue(error)
   })
 
   it('should propagate the error for the friends error handler', async () => {

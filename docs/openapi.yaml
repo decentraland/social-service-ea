@@ -2180,11 +2180,13 @@ paths:
       tags:
         - User Mutes
 
-  /v1/friends:
+  /v2/friends:
     get:
-      operationId: getFriends
-      summary: Get friends
-      description: Returns a paginated list of the profiles of the authenticated user's friends.
+      operationId: getFriendsV2
+      summary: Get friends (addresses only)
+      description: |
+        Returns a paginated list of the addresses of the authenticated user's friends. The response has no
+        profile information: clients resolve the profiles themselves.
       security:
         - SignedFetch: []
       parameters:
@@ -2276,11 +2278,13 @@ paths:
       tags:
         - Friends
 
-  /v1/users/{address}/mutual-friends:
+  /v2/users/{address}/mutual-friends:
     get:
-      operationId: getMutualFriends
-      summary: Get mutual friends
-      description: Returns a paginated list of the friends the authenticated user and `address` have in common.
+      operationId: getMutualFriendsV2
+      summary: Get mutual friends (addresses only)
+      description: |
+        Returns a paginated list of the addresses of the friends the authenticated user and `address` have in
+        common, without profile information.
       security:
         - SignedFetch: []
       parameters:
@@ -2364,11 +2368,13 @@ paths:
       tags:
         - Friends
 
-  /v1/friendship-requests:
+  /v2/friendship-requests:
     get:
-      operationId: getFriendshipRequests
-      summary: Get pending friendship requests
-      description: Returns a paginated list of the pending friendship requests the authenticated user received or sent.
+      operationId: getFriendshipRequestsV2
+      summary: Get pending friendship requests (addresses only)
+      description: |
+        Returns a paginated list of the pending friendship requests the authenticated user received or sent.
+        Each request carries the other user's address instead of their profile.
       security:
         - SignedFetch: []
       parameters:
@@ -2417,6 +2423,7 @@ paths:
       tags:
         - Friends
 
+  /v1/friendship-requests:
     post:
       operationId: createFriendshipRequest
       summary: Send a friendship request
@@ -2438,16 +2445,19 @@ paths:
                   example: '0x0000000000000000000000000000000000000001'
                 message:
                   type: string
+                  maxLength: 256
                   description: Optional message sent along with the request
       responses:
         '201':
-          description: Friendship request sent
+          description: Friendship request sent, with the receiver's address
           content:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/FriendshipRequest200OkResponse'
         '400':
-          description: Invalid request or missing authentication
+          description: >-
+            Invalid request or missing authentication: invalid address, a request to yourself or a message
+            longer than 256 characters
           content:
             application/json:
               schema:
@@ -2510,7 +2520,7 @@ paths:
                   enum: [accepted, rejected, cancelled]
       responses:
         '200':
-          description: Friendship request updated
+          description: Friendship request updated, with the other user's address
           content:
             application/json:
               schema:

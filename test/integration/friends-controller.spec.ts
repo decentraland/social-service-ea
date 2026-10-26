@@ -31,11 +31,11 @@ test('Friends Controller', function ({ components, stubComponents }) {
   describe('when the request is not signed', () => {
     it('should respond with a 400 status code on every friends endpoint', async () => {
       const routes: [string, string][] = [
-        ['GET', '/v1/friends'],
+        ['GET', '/v2/friends'],
         ['DELETE', `/v1/friends/${otherAddress}`],
-        ['GET', `/v1/users/${otherAddress}/mutual-friends`],
+        ['GET', `/v2/users/${otherAddress}/mutual-friends`],
         ['GET', `/v1/users/${otherAddress}/friendship-status`],
-        ['GET', '/v1/friendship-requests?direction=received'],
+        ['GET', '/v2/friendship-requests?direction=received'],
         ['POST', '/v1/friendship-requests'],
         ['PATCH', `/v1/friendship-requests/${otherAddress}`]
       ]
@@ -47,18 +47,18 @@ test('Friends Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('when getting the friends (GET /v1/friends)', () => {
+  describe('when getting the friends (GET /v2/friends)', () => {
     describe('and the user has a friend', () => {
       beforeEach(async () => {
         await createOrUpsertActiveFriendship(components.friendsDb, [address, otherAddress])
       })
 
-      it('should respond with the friend profile and the pagination properties', async () => {
-        const response = await makeRequest(identity, '/v1/friends?limit=10')
+      it('should respond with the friend address and the pagination properties', async () => {
+        const response = await makeRequest(identity, '/v2/friends?limit=10')
 
         expect(response.status).toBe(200)
         expect((await response.json()).data).toEqual({
-          results: [expect.objectContaining({ address: otherAddress })],
+          results: [{ address: otherAddress }],
           total: 1,
           page: 1,
           pages: 1,
@@ -69,28 +69,30 @@ test('Friends Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no friends', () => {
       it('should respond with an empty page', async () => {
-        const response = await makeRequest(identity, '/v1/friends')
+        const response = await makeRequest(identity, '/v2/friends')
 
         expect(response.status).toBe(200)
         expect((await response.json()).data).toEqual({ results: [], total: 0, page: 1, pages: 0, limit: 100 })
       })
     })
 
-    describe('and the profiles lookup fails', () => {
+    describe('and the profiles service is down', () => {
       beforeEach(async () => {
         await createOrUpsertActiveFriendship(components.friendsDb, [address, otherAddress])
         stubComponents.registry.getProfiles.mockRejectedValue(new Error('catalyst down'))
       })
 
-      it('should respond with a 500 status code instead of an empty list', async () => {
-        const response = await makeRequest(identity, '/v1/friends')
+      it('should still respond with the friends, since no profile is resolved', async () => {
+        const response = await makeRequest(identity, '/v2/friends')
 
-        expect(response.status).toBe(500)
+        expect(response.status).toBe(200)
+        expect((await response.json()).data.results).toEqual([{ address: otherAddress }])
+        expect(stubComponents.registry.getProfiles).not.toHaveBeenCalled()
       })
     })
   })
 
-  describe('when getting the mutual friends (GET /v1/users/:address/mutual-friends)', () => {
+  describe('when getting the mutual friends (GET /v2/users/:address/mutual-friends)', () => {
     describe('and both users share a friend', () => {
       let mutualAddress: string
 
@@ -101,18 +103,18 @@ test('Friends Controller', function ({ components, stubComponents }) {
       })
 
       it('should respond with the shared friend', async () => {
-        const response = await makeRequest(identity, `/v1/users/${otherAddress}/mutual-friends`)
+        const response = await makeRequest(identity, `/v2/users/${otherAddress}/mutual-friends`)
 
         expect(response.status).toBe(200)
         const { data } = await response.json()
         expect(data.total).toBe(1)
-        expect(data.results).toEqual([expect.objectContaining({ address: mutualAddress })])
+        expect(data.results).toEqual([{ address: mutualAddress }])
       })
     })
 
     describe('and the address is not valid', () => {
       it('should respond with a 400 status code', async () => {
-        const response = await makeRequest(identity, '/v1/users/not-an-address/mutual-friends')
+        const response = await makeRequest(identity, '/v2/users/not-an-address/mutual-friends')
 
         expect(response.status).toBe(400)
       })
@@ -148,34 +150,34 @@ test('Friends Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('when getting the friendship requests (GET /v1/friendship-requests)', () => {
+  describe('when getting the friendship requests (GET /v2/friendship-requests)', () => {
     beforeEach(async () => {
       await createPendingFriendshipRequest(components.friendsDb, [otherAddress, address])
     })
 
     describe('and the direction is received', () => {
       it('should respond with the requests sent to the caller', async () => {
-        const response = await makeRequest(identity, '/v1/friendship-requests?direction=received')
+        const response = await makeRequest(identity, '/v2/friendship-requests?direction=received')
 
         expect(response.status).toBe(200)
         const { data } = await response.json()
         expect(data.total).toBe(1)
-        expect(data.results).toEqual([expect.objectContaining({ friend: expect.objectContaining({ address: otherAddress }) })])
+        expect(data.results).toEqual([{ id: expect.any(String), address: otherAddress, createdAt: expect.any(Number) }])
       })
     })
 
     describe('and the direction is sent', () => {
       it('should respond with the requests the caller sent', async () => {
-        const response = await makeRequest(otherIdentity, '/v1/friendship-requests?direction=sent')
+        const response = await makeRequest(otherIdentity, '/v2/friendship-requests?direction=sent')
 
         expect(response.status).toBe(200)
         const { data } = await response.json()
         expect(data.total).toBe(1)
-        expect(data.results).toEqual([expect.objectContaining({ friend: expect.objectContaining({ address }) })])
+        expect(data.results).toEqual([{ id: expect.any(String), address, createdAt: expect.any(Number) }])
       })
 
       it('should not include them in the requests the caller received', async () => {
-        const response = await makeRequest(otherIdentity, '/v1/friendship-requests?direction=received')
+        const response = await makeRequest(otherIdentity, '/v2/friendship-requests?direction=received')
 
         expect((await response.json()).data.total).toBe(0)
       })
@@ -183,7 +185,7 @@ test('Friends Controller', function ({ components, stubComponents }) {
 
     describe('and the direction is missing', () => {
       it('should respond with a 400 status code', async () => {
-        const response = await makeRequest(identity, '/v1/friendship-requests')
+        const response = await makeRequest(identity, '/v2/friendship-requests')
 
         expect(response.status).toBe(400)
       })
@@ -199,9 +201,12 @@ test('Friends Controller', function ({ components, stubComponents }) {
         })
 
         expect(response.status).toBe(201)
-        expect((await response.json()).data).toEqual(
-          expect.objectContaining({ friend: expect.objectContaining({ address: otherAddress }), message: 'hello' })
-        )
+        expect((await response.json()).data).toEqual({
+          id: expect.any(String),
+          address: otherAddress,
+          createdAt: expect.any(Number),
+          message: 'hello'
+        })
       })
 
       it('should leave the request pending for both users', async () => {
@@ -209,6 +214,31 @@ test('Friends Controller', function ({ components, stubComponents }) {
 
         expect(await getStatus(identity, otherAddress)).toBe(FriendshipStatus.REQUEST_SENT)
         expect(await getStatus(otherIdentity, address)).toBe(FriendshipStatus.REQUEST_RECEIVED)
+      })
+    })
+
+    describe('and the receiver has no profile', () => {
+      beforeEach(() => {
+        stubComponents.registry.getProfiles.mockResolvedValue([])
+      })
+
+      it('should still respond with a 201 and leave the request pending', async () => {
+        const response = await makeRequest(identity, '/v1/friendship-requests', 'POST', { address: otherAddress })
+
+        expect(response.status).toBe(201)
+        expect(await getStatus(otherIdentity, address)).toBe(FriendshipStatus.REQUEST_RECEIVED)
+      })
+    })
+
+    describe('and the message is longer than 256 characters', () => {
+      it('should respond with a 400 status code without recording the request', async () => {
+        const response = await makeRequest(identity, '/v1/friendship-requests', 'POST', {
+          address: otherAddress,
+          message: 'a'.repeat(257)
+        })
+
+        expect(response.status).toBe(400)
+        expect(await getStatus(identity, otherAddress)).toBe(FriendshipStatus.NONE)
       })
     })
 
@@ -267,8 +297,8 @@ test('Friends Controller', function ({ components, stubComponents }) {
         expect(response.status).toBe(200)
         expect(await getStatus(identity, otherAddress)).toBe(FriendshipStatus.ACCEPTED)
 
-        const friendsResponse = await makeRequest(otherIdentity, '/v1/friends')
-        expect((await friendsResponse.json()).data.results).toEqual([expect.objectContaining({ address })])
+        const friendsResponse = await makeRequest(otherIdentity, '/v2/friends')
+        expect((await friendsResponse.json()).data.results).toEqual([{ address }])
       })
     })
 
@@ -322,6 +352,20 @@ test('Friends Controller', function ({ components, stubComponents }) {
       })
 
       it('should respond with a 204 and end the friendship', async () => {
+        const response = await makeRequest(identity, `/v1/friends/${otherAddress}`, 'DELETE')
+
+        expect(response.status).toBe(204)
+        expect(await getStatus(otherIdentity, address)).toBe(FriendshipStatus.DELETED)
+      })
+    })
+
+    describe('and the friend has no profile', () => {
+      beforeEach(async () => {
+        await createOrUpsertActiveFriendship(components.friendsDb, [address, otherAddress])
+        stubComponents.registry.getProfiles.mockResolvedValue([])
+      })
+
+      it('should still respond with a 204 and end the friendship', async () => {
         const response = await makeRequest(identity, `/v1/friends/${otherAddress}`, 'DELETE')
 
         expect(response.status).toBe(204)

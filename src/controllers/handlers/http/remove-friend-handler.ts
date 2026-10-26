@@ -29,7 +29,7 @@ export async function removeFriendHandler(
       throw new InvalidRequestError('You cannot remove yourself as a friend')
     }
 
-    await friends.upsertFriendship(userAddress, friendAddress, Action.DELETE, null)
+    await friends.upsertFriendshipWithoutProfiles(userAddress, friendAddress, Action.DELETE, null)
 
     return { status: 204 }
   } catch (error) {

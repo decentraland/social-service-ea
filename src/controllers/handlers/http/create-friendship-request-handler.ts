@@ -1,10 +1,9 @@
 import { InvalidRequestError } from '@dcl/http-commons'
 import { EthAddress } from '@dcl/schemas'
-import { FriendshipRequestResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { parseFriendshipRequestToFriendshipRequestResponse } from '../../../logic/friends'
+import { FriendshipRequestWithoutProfile, parseFriendshipRequestWithoutProfile } from '../../../logic/friends'
 import { CreateFriendshipRequestRequestBody } from './schemas'
 
 export async function createFriendshipRequestHandler(
@@ -12,7 +11,7 @@ export async function createFriendshipRequestHandler(
     HandlerContextWithPath<'friends' | 'logs', '/v1/friendship-requests'>,
     'components' | 'request' | 'verification'
   >
-): Promise<HTTPResponse<FriendshipRequestResponse>> {
+): Promise<HTTPResponse<FriendshipRequestWithoutProfile>> {
   const {
     components: { friends, logs },
     request,
@@ -35,7 +34,7 @@ export async function createFriendshipRequestHandler(
       throw new InvalidRequestError('You cannot send a friendship request to yourself')
     }
 
-    const { friendshipRequest, receiverProfile } = await friends.upsertFriendship(
+    const friendshipRequest = await friends.upsertFriendshipWithoutProfiles(
       senderAddress,
       receiverAddress,
       Action.REQUEST,
@@ -45,7 +44,7 @@ export async function createFriendshipRequestHandler(
     return {
       status: 201,
       body: {
-        data: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, receiverProfile)
+        data: parseFriendshipRequestWithoutProfile(friendshipRequest)
       }
     }
   } catch (error) {

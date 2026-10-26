@@ -8,6 +8,7 @@ import { upsertFriendshipService } from '../../../../../src/controllers/handlers
 import { FriendshipRequest, RpcServerContext } from '../../../../../src/types'
 import { IFriendsComponent, parseFriendshipRequestToFriendshipRequestResponse } from '../../../../../src/logic/friends'
 import { createMockProfile } from '../../../../mocks/profile'
+import { InvalidRequestError as HttpInvalidRequestError } from '@dcl/http-commons'
 import { InvalidRequestError } from '../../../../../src/controllers/errors/rpc.errors'
 import { BlockedUserError, InvalidFriendshipActionError } from '../../../../../src/logic/friends/errors'
 
@@ -101,6 +102,31 @@ describe('when upserting a friendship', () => {
           invalidFriendshipAction: {
             message: 'This action is not allowed because either you blocked this user or this user blocked you'
           }
+        }
+      })
+    })
+  })
+
+  describe('and upserting the friendship fails because the message is too long', () => {
+    beforeEach(() => {
+      mockRequest = {
+        action: {
+          $case: 'request',
+          request: { user: { address: receiverAddress }, message }
+        }
+      }
+      upsertFriendshipMock.mockRejectedValueOnce(
+        new HttpInvalidRequestError('The friendship request message cannot be longer than 256 characters')
+      )
+    })
+
+    it('should return an invalid request error', async () => {
+      const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
+
+      expect(result).toEqual({
+        response: {
+          $case: 'invalidRequest',
+          invalidRequest: { message: 'The friendship request message cannot be longer than 256 characters' }
         }
       })
     })
