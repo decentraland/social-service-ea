@@ -477,6 +477,23 @@ test('Voice Chats Controller', function ({ components, spyComponents, stubCompon
       })
     })
 
+    describe('and the room or participant disappeared before lowering the hand', () => {
+      beforeEach(() => {
+        spyComponents.commsGatekeeper.requestToSpeakInCommunityVoiceChat.mockRejectedValueOnce(
+          new CommunityVoiceChatResourceNotFoundError(communityId)
+        )
+      })
+
+      it('should respond with a 204', async () => {
+        const response = await makeRequest(
+          otherIdentity,
+          `/v1/community-voice-chats/${communityId}/speak-requests/${otherAddress}`,
+          'DELETE'
+        )
+        expect(response.status).toBe(204)
+      })
+    })
+
     describe('and a member lowers their own hand', () => {
       beforeEach(() => {
         spyComponents.communityVoice.requestToSpeakInCommunityVoiceChat.mockResolvedValueOnce(undefined)

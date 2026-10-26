@@ -2132,6 +2132,12 @@ paths:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: The community voice chat resource was not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
         '409':
           description: The action conflicts with the current state
           content:
@@ -2504,7 +2510,8 @@ paths:
       summary: Lower the hand or reject a speak request
       description: |
         On the authenticated user's own address it lowers their hand. On someone else's it rejects their
-        request, which only owners and moderators can do.
+        request, which only owners and moderators can do. Lowering one's own hand is idempotent and
+        returns 204 even if the room or participant is already gone.
       security:
         - SignedFetch: []
       parameters:

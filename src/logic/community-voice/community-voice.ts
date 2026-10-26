@@ -641,7 +641,13 @@ export async function createCommunityVoiceComponent({
       await validateCommunityVoiceChatParticipation(communitiesDb, commsGatekeeper, communityId, userAddress)
     }
 
-    await commsGatekeeper.requestToSpeakInCommunityVoiceChat(communityId, userAddress, isRaisingHand)
+    try {
+      await commsGatekeeper.requestToSpeakInCommunityVoiceChat(communityId, userAddress, isRaisingHand)
+    } catch (error) {
+      // Lowering is idempotent and must not disclose whether a room or participant still exists.
+      if (!isRaisingHand && error instanceof CommunityVoiceChatResourceNotFoundError) return
+      throw error
+    }
   }
 
   return {

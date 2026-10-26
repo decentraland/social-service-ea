@@ -53,7 +53,9 @@ describe('when starting a community voice chat', () => {
         status: 201,
         body: { data: { connectionUrl: 'livekit:wss://voice?token=abc' } }
       })
-      expect(communityVoice.startCommunityVoiceChat).toHaveBeenCalledWith(COMMUNITY_ID, USER_ADDRESS, { includeProfile: false })
+      expect(communityVoice.startCommunityVoiceChat).toHaveBeenCalledWith(COMMUNITY_ID, USER_ADDRESS, {
+        includeProfile: false
+      })
     })
   })
 
@@ -90,6 +92,13 @@ describe('when joining a community voice chat', () => {
   describe('and the caller can join', () => {
     beforeEach(() => {
       communityVoice.joinCommunityVoiceChat.mockResolvedValue({ connectionUrl: 'livekit:wss://voice?token=abc' })
+    })
+
+    it('should request credentials without profile enrichment', async () => {
+      await callHandler()
+      expect(communityVoice.joinCommunityVoiceChat).toHaveBeenCalledWith(COMMUNITY_ID, USER_ADDRESS, {
+        includeProfile: false
+      })
     })
 
     it('should respond with a 201 and the credentials', async () => {
@@ -210,11 +219,7 @@ describe('when removing a speak request', () => {
   describe('and it is the request of the caller', () => {
     it('should lower their hand', async () => {
       await expect(callHandler(USER_ADDRESS)).resolves.toEqual({ status: 204 })
-      expect(communityVoice.requestToSpeakInCommunityVoiceChat).toHaveBeenCalledWith(
-        COMMUNITY_ID,
-        USER_ADDRESS,
-        false
-      )
+      expect(communityVoice.requestToSpeakInCommunityVoiceChat).toHaveBeenCalledWith(COMMUNITY_ID, USER_ADDRESS, false)
       expect(moderation.rejectSpeakRequestInCommunityVoiceChat).not.toHaveBeenCalled()
     })
   })
