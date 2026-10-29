@@ -39,6 +39,7 @@ Close codes:
 | `3005` | A newer socket of the same address replaced this one (see per-address limits below). Do not reconnect from a client that already has a newer socket. |
 | `1008` | A policy limit: the client is not reading fast enough, a subscription queue overflowed, or the message rate was exceeded. Updates cannot be replayed, so reconnect and resync. |
 | `1001` | The server is shutting down. |
+| `1011` | The server failed to attach a socket authenticated on the upgrade request. Reconnect with backoff. |
 
 ## Messages
 
@@ -70,7 +71,8 @@ Error codes: `invalid_message`, `unknown_stream`, `duplicate_subscription`, `unk
 `rate_limited`, `auth_in_progress`. Individual protocol errors keep the socket open; exceeding the message-rate limit
 closes it. An `error` with an `id` is final for that subscription: `rate_limited` answers a `subscribe` instead of
 `subscribed` when the address started subscriptions faster than its budget allows (retry it with backoff), and
-`stream_error` ends an acknowledged subscription. The `id` can be reused afterwards.
+`stream_error` ends an acknowledged subscription, or answers a `subscribe` the server could not start (for
+example on a socket that a newer one has just replaced). The `id` can be reused afterwards.
 
 ## Streams
 

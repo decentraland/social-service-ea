@@ -1,7 +1,7 @@
 import { LRUCache } from 'lru-cache'
-import { AppComponents } from '../../types'
+import { AppComponents, WsProtocol } from '../../types'
 import { normalizeAddress } from '../../utils/address'
-import { ConnectionClaim, IWsAdmissionComponent, WsProtocol } from './types'
+import { ConnectionClaim, IWsAdmissionComponent } from './types'
 import { SubscriptionRateLimitedError } from './errors'
 
 type Budget = { tokens: number; updatedAt: number }

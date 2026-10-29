@@ -3,11 +3,7 @@ import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
 import { AppComponents, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { STREAM_WS_PATH } from '../../../adapters/stream-sessions/constants'
 import { errorMessageOrDefault, isExpectedAuthRejection } from '../../../utils/errors'
-import { AuthChainHeaders } from '../../../utils/ws-auth'
-
-export { STREAM_WS_PATH }
-
-const AUTH_HEADER_PREFIX = 'x-identity-'
+import { AUTH_HEADER_PREFIX, AuthChainHeaders } from '../../../utils/ws-auth'
 
 /** Copies the `x-identity-*` headers; uWS invalidates the request once the handler returns or awaits. */
 function readAuthChainHeaders(req: {

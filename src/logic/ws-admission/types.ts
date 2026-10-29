@@ -1,6 +1,5 @@
 import { IBaseComponent } from '@well-known-components/interfaces'
-
-export type WsProtocol = 'rpc' | 'stream'
+import { WsProtocol } from '../../types/ws'
 
 export type ConnectionClaim = {
   /** The address's oldest connection, displaced to stay within the per-address cap; the caller ends it. */

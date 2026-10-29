@@ -3,7 +3,7 @@ import { RequestError, verify } from '@dcl/crypto-middleware'
 export type AuthChainHeaders = Parameters<typeof verify>[2]
 
 // Shared by the auth chain, timestamp and metadata headers (`x-identity-auth-chain-N`, ...).
-const AUTH_HEADER_PREFIX = 'x-identity-'
+export const AUTH_HEADER_PREFIX = 'x-identity-'
 
 /**
  * Parses the client's first frame into the auth chain headers `verify()` expects. A frame that is

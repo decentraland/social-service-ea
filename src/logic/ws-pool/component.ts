@@ -1,11 +1,10 @@
 import { WebSocket } from 'uWebSockets.js'
 import { STOP_COMPONENT } from '@well-known-components/interfaces'
-import { AppComponents, WsUserData } from '../../types'
+import { AppComponents, WsProtocol, WsUserData } from '../../types'
 import { isAuthenticated } from '../../utils/wsUserData'
 import { normalizeAddress } from '../../utils/address'
 import { IWsPoolComponent } from './types'
 import { WsPoolFullError } from './errors'
-import { WsProtocol } from '../ws-admission'
 
 export async function createWsPoolComponent(
   components: Pick<AppComponents, 'metrics' | 'logs' | 'config'>

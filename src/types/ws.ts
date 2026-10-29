@@ -2,7 +2,8 @@ import { Emitter } from 'mitt'
 import { WebSocket } from '@dcl/uws-http-server'
 import { IUWebSocketEventMap } from '../utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
-import { WsProtocol } from '../logic/ws-admission/types'
+
+export type WsProtocol = 'rpc' | 'stream'
 
 type WsBaseUserData = {
   isConnected: boolean

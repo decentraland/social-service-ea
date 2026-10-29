@@ -5,7 +5,7 @@ import { Action } from '../../src/types'
 import { VoiceChatStatus } from '../../src/logic/voice/types'
 import { createAuthHeaders, createTestIdentity, Identity } from './utils/auth'
 import { connectAuthenticatedRpcClient } from './utils/rpc-client'
-import { connectStreamClient, StreamClient, upgradeStatus } from './utils/stream-client'
+import { connectStreamClient, StreamClient, StreamMessage, upgradeStatus } from './utils/stream-client'
 import { STREAM_WS_PATH } from '../../src/adapters/stream-sessions/constants'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -47,6 +47,80 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
     clients.splice(0).forEach((client) => client.close())
     closers.splice(0).forEach((close) => close())
     await sleep(300)
+  })
+
+  describe('when an address starts subscriptions faster than its budget across stream sockets', () => {
+    const STREAMS = [
+      'block_updates',
+      'friendship_updates',
+      'friend_connectivity_updates',
+      'private_voice_chat_updates',
+      'community_member_connectivity_updates',
+      'community_voice_chat_updates'
+    ]
+    let replies: StreamMessage[]
+
+    beforeEach(async () => {
+      // 7 sockets × 6 streams, fired without waiting so the 2/s refill cannot keep up with the 24-token burst.
+      const sockets = await Promise.all(Array.from({ length: 7 }, () => open()))
+      sockets.forEach((client, socketIndex) =>
+        STREAMS.forEach((stream) => client.send({ type: 'subscribe', id: `${socketIndex}-${stream}`, stream }))
+      )
+      replies = (
+        await Promise.all(
+          sockets.flatMap((client) =>
+            STREAMS.map(() =>
+              client.waitFor((message) => message.type === 'subscribed' || message.type === 'error', 10000)
+            )
+          )
+        )
+      ).flat()
+    })
+
+    it('should answer the subscriptions over budget with rate_limited instead of subscribed', () => {
+      const limited = replies.filter((message) => message.type === 'error')
+      expect(limited.length).toBeGreaterThan(0)
+      expect(limited.every((message) => message.code === 'rate_limited')).toBe(true)
+      expect(new Set(replies.map((message) => message.id)).size).toBe(replies.length)
+    })
+
+    describe('and the same address subscribes over RPC', () => {
+      let rpcUpdate: Promise<unknown>
+
+      beforeEach(async () => {
+        const rpc = await connectAuthenticatedRpcClient(components, identity)
+        closers.push(rpc.close)
+        rpcUpdate = nextWithTimeout(rpc.client.subscribeToBlockUpdates({}))
+        await sleep(1000)
+        await publishBlock(address)
+      })
+
+      it('should not charge the RPC subscription to the spent budget', async () => {
+        await expect(rpcUpdate).resolves.toMatchObject({ address: BLOCKER, isBlocked: true })
+      })
+    })
+  })
+
+  describe('when an address exceeds its connection cap across RPC and stream sockets', () => {
+    let rpc: Awaited<ReturnType<typeof connectAuthenticatedRpcClient>>
+    let streams: StreamClient[]
+
+    beforeEach(async () => {
+      rpc = await connectAuthenticatedRpcClient(components, identity)
+      closers.push(rpc.close)
+      await sleep(300)
+      streams = []
+      for (let index = 0; index < 8; index++) streams.push(await open())
+    })
+
+    it('should close the oldest socket even when it is an RPC one', async () => {
+      await expect(rpc.closed).resolves.toBeUndefined()
+    })
+
+    it('should keep every stream socket open', async () => {
+      await sleep(300)
+      expect(streams.every((client) => client.socket.readyState === client.socket.OPEN)).toBe(true)
+    })
   })
 
   describe('when a client authenticates with headers on the upgrade request', () => {
