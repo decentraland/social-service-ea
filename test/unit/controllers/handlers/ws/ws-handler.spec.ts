@@ -5,6 +5,8 @@ import { mockLogs, mockMetrics, mockFetcher, mockUWs, mockConfig, mockRpcServer 
 import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
 import { mockTracing } from '../../../../mocks/components/tracing'
 import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
+import { createWsAdmissionMockedComponent } from '../../../../mocks/components/ws-admission'
+import { IWsAdmissionComponent } from '../../../../../src/logic/ws-admission'
 import { IWsPoolComponent } from '../../../../../src/logic/ws-pool'
 
 // Only `verify()` is replaced. `rejectIfSigner` has to stay real: it builds the metadata gate at
@@ -32,6 +34,7 @@ describe('ws-handler', () => {
   let mockReq: any
   let mockContext: any
   let mockWsPool: jest.Mocked<IWsPoolComponent>
+  let mockWsAdmission: jest.Mocked<IWsAdmissionComponent>
   let registerConnection: jest.MockedFunction<IWsPoolComponent['registerConnection']>
   let unregisterConnection: jest.MockedFunction<IWsPoolComponent['unregisterConnection']>
 
@@ -39,7 +42,8 @@ describe('ws-handler', () => {
     mockData = {
       isConnected: false,
       auth: false,
-      wsConnectionId: 'test-client-id'
+      wsConnectionId: 'test-client-id',
+      protocol: 'rpc'
     } as WsNotAuthenticatedUserData
     registerConnection = jest.fn()
     unregisterConnection = jest.fn()
@@ -52,6 +56,7 @@ describe('ws-handler', () => {
       getBufferedAmount: jest.fn()
     }
 
+    mockWsAdmission = createWsAdmissionMockedComponent()
     mockWsPool = createWsPoolMockedComponent({
       registerConnection,
       unregisterConnection
@@ -86,7 +91,8 @@ describe('ws-handler', () => {
       rpcServer: mockRpcServer,
       config: mockConfig,
       tracing: mockTracing,
-      wsPool: mockWsPool
+      wsPool: mockWsPool,
+      wsAdmission: mockWsAdmission
     })
 
     wsHandlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
@@ -106,6 +112,7 @@ describe('ws-handler', () => {
           isConnected: false,
           auth: false,
           wsConnectionId: expect.any(String),
+          protocol: 'rpc',
           transport: null
         }),
         'test-key',
@@ -171,6 +178,7 @@ describe('ws-handler', () => {
 
       beforeEach(() => {
         authData = {
+          protocol: 'rpc',
           isConnected: true,
           auth: true,
           address: '0x123',
@@ -243,8 +251,46 @@ describe('ws-handler', () => {
         mockWs.getUserData.mockReturnValue({
           isConnected: true,
           auth: false,
-          wsConnectionId: 'test-client-id'
+          wsConnectionId: 'test-client-id',
+          protocol: 'rpc'
         } as WsNotAuthenticatedUserData)
+      })
+
+      describe('and the credentials are valid', () => {
+        beforeEach(async () => {
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        })
+
+        it('should count the connection against its address as an RPC socket', () => {
+          expect(mockWsAdmission.claimConnection).toHaveBeenCalledWith('0x123', 'test-client-id', 'rpc')
+        })
+
+        it('should not end any other connection', () => {
+          expect(mockWsPool.endConnection).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the address is already at its connection cap', () => {
+        beforeEach(async () => {
+          mockWsAdmission.claimConnection.mockReturnValueOnce({ evictedConnectionId: 'oldest-connection' })
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        })
+
+        it('should end the displaced oldest connection', () => {
+          expect(mockWsPool.endConnection).toHaveBeenCalledWith(
+            'oldest-connection',
+            3005,
+            'Replaced by a newer connection'
+          )
+        })
+
+        it('should still attach the new connection', () => {
+          expect(mockRpcServer.attachUser).toHaveBeenCalledWith(
+            expect.objectContaining({ address: '0x123', wsConnectionId: 'test-client-id' })
+          )
+        })
       })
 
       it('should handle successful authentication', async () => {
@@ -307,6 +353,10 @@ describe('ws-handler', () => {
           await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
 
           expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors_by_protocol', {
+            protocol: 'rpc',
+            type: 'client_rejected'
+          })
         })
       })
 
@@ -327,6 +377,10 @@ describe('ws-handler', () => {
           await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
 
           expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors_by_protocol', {
+            protocol: 'rpc',
+            type: 'server_error'
+          })
         })
       })
 
@@ -363,6 +417,10 @@ describe('ws-handler', () => {
           await wsHandlers.message(mockWs, Buffer.from(frame))
 
           expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors_by_protocol', {
+            protocol: 'rpc',
+            type: 'client_rejected'
+          })
         })
 
         it('should log it at warn with a fixed message that does not echo the frame', async () => {
@@ -513,6 +571,7 @@ describe('ws-handler', () => {
   describe('close handler', () => {
     it('should cleanup authenticated connection', async () => {
       const authData: WsAuthenticatedUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         address: '0x123',
@@ -530,6 +589,7 @@ describe('ws-handler', () => {
       expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       expect(unregisterConnection).toHaveBeenCalledWith(authData)
+      expect(mockWsAdmission.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(authData.connectionStartTime).toBeDefined()
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
@@ -548,6 +608,7 @@ describe('ws-handler', () => {
 
     it('should handle cleanup errors gracefully', async () => {
       const authData: WsAuthenticatedUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         address: '0x123',
@@ -596,6 +657,7 @@ describe('ws-handler', () => {
 
       beforeEach(() => {
         authData = {
+          protocol: 'rpc',
           isConnected: true,
           auth: true,
           address: '0x123',

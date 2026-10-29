@@ -228,7 +228,6 @@ export function createSubscribersContext(
     addConnection(address: string, wsConnectionId: string): void {
       const normalizedAddress = normalizeAddress(address)
 
-      wsPool.claimAddress(normalizedAddress, wsConnectionId)
       ensureEmitter(normalizedAddress)
 
       let connectionIds = connectionsByAddress.get(normalizedAddress)
@@ -296,7 +295,6 @@ export function createSubscribersContext(
     },
 
     setActiveSubscription(wsConnectionId: string, eventName: string): void {
-      wsPool.admitSubscription(wsConnectionId)
       let events = activeSubscriptions.get(wsConnectionId)
       if (!events) {
         events = new Set()

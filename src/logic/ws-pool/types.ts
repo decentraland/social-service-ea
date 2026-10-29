@@ -7,11 +7,9 @@ export interface IWsPoolComponent extends IBaseComponent {
    * Registers a new WebSocket connection.
    * @throws {WsPoolFullError} When the configured connection limit is reached.
    */
-  registerConnection: (ws: WebSocket<WsUserData>, protocol?: 'rpc' | 'stream') => void
-  /** Reserve one authenticated address slot shared by RPC and JSON sockets. */
-  claimAddress: (address: string, connectionId: string) => void
-  /** Charge subscription starts across all sockets of the address, including reconnects. */
-  admitSubscription: (connectionId: string) => void
+  registerConnection: (ws: WebSocket<WsUserData>) => void
+  /** Ends a registered socket by id; a no-op when it is gone. */
+  endConnection: (wsConnectionId: string, code: number, reason: string) => void
   unregisterConnection: (data: WsUserData) => void
   getAuthenticatedAddresses: () => string[]
   /**

@@ -22,9 +22,14 @@ export const metricDeclarations = {
     help: 'Authentication failures by protocol and cause',
     labelNames: ['protocol', 'type']
   },
+  ws_admission_evictions: {
+    type: IMetricsComponent.CounterType,
+    help: 'Oldest WebSocket connections closed to keep an address within its connection cap',
+    labelNames: ['protocol']
+  },
   ws_admission_rejections: {
     type: IMetricsComponent.CounterType,
-    help: 'Shared per-address WebSocket admission rejections',
+    help: 'Subscription starts rejected by the per-address rate limit',
     labelNames: ['protocol', 'reason']
   },
   ws_active_connections: {

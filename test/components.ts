@@ -74,6 +74,7 @@ import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
+import { createWsAdmissionComponent } from '../src/logic/ws-admission'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
@@ -162,6 +163,7 @@ async function initComponents(): Promise<TestComponents> {
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const wsPool = await createWsPoolComponent({ logs, metrics, config })
+  const wsAdmission = await createWsAdmissionComponent({ config, metrics })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
@@ -293,7 +295,7 @@ async function initComponents(): Promise<TestComponents> {
     communitiesDb
   })
   const streamSessions = await createStreamSessionsComponent(
-    { logs, metrics, fetcher, voice, config, tracing: mockTracing, wsPool, subscribersContext },
+    { logs, metrics, fetcher, voice, config, tracing: mockTracing, wsPool, wsAdmission, subscribersContext },
     createStreamRegistry({ updateHandler, friendsDb, peersStats })
   )
 
@@ -412,6 +414,7 @@ async function initComponents(): Promise<TestComponents> {
     worldsStats,
     streamSessions,
     wsPool,
+    wsAdmission,
     schemaValidator
   }
 }

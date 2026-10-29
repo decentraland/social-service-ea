@@ -6,6 +6,7 @@ import { VoiceChatStatus } from '../../src/logic/voice/types'
 import { createAuthHeaders, createTestIdentity, Identity } from './utils/auth'
 import { connectAuthenticatedRpcClient } from './utils/rpc-client'
 import { connectStreamClient, StreamClient } from './utils/stream-client'
+import { STREAM_WS_PATH } from '../../src/adapters/stream-sessions/constants'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -46,6 +47,26 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
     clients.splice(0).forEach((client) => client.close())
     closers.splice(0).forEach((close) => close())
     await sleep(300)
+  })
+
+  describe('when an address opens more sockets than its connection cap', () => {
+    let first: StreamClient
+    let latest: StreamClient
+
+    beforeEach(async () => {
+      first = await open()
+      for (let index = 0; index < 7; index++) await open()
+      latest = await open()
+    })
+
+    it('should close the oldest socket as replaced', async () => {
+      await expect(first.closed).resolves.toEqual({ code: 3005, reason: 'Replaced by a newer connection' })
+    })
+
+    it('should keep serving the newest socket', async () => {
+      latest.send({ type: 'ping' })
+      await expect(latest.waitFor((message) => message.type === 'pong')).resolves.toBeDefined()
+    })
   })
 
   describe('when a subscribed connection overflows its event queue', () => {
@@ -133,10 +154,20 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
       })
     })
 
+    describe('and the chain was signed for the RPC socket path', () => {
+      it('should close the socket with the unauthorized code', async () => {
+        const client = await open(null)
+        client.send(createAuthHeaders('get', '/', {}, identity))
+
+        const { code } = await client.closed
+        expect(code).toBe(3003)
+      })
+    })
+
     describe('and the chain declares the scene signer', () => {
       it('should close the socket with the unauthorized code', async () => {
         const client = await open(null)
-        client.send(createAuthHeaders('get', '/', { signer: 'decentraland-kernel-scene' }, identity))
+        client.send(createAuthHeaders('get', STREAM_WS_PATH, { signer: 'decentraland-kernel-scene' }, identity))
 
         const { code } = await client.closed
         expect(code).toBe(3003)
@@ -146,7 +177,7 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
     describe('and a second frame arrives while the first one is still being verified', () => {
       it('should not break the connection', async () => {
         const client = await open(null)
-        client.send(createAuthHeaders('get', '/', {}, identity))
+        client.send(createAuthHeaders('get', STREAM_WS_PATH, {}, identity))
         client.send({ type: 'ping' })
 
         await client.waitFor((message) => message.type === 'ready')

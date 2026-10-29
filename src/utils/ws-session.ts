@@ -13,13 +13,17 @@ export async function getWsAuthSettings({
   }
 }
 
-/** Verify the shared wallet handshake, including the common scene-signer policy. */
+/**
+ * Verify the shared wallet handshake, including the common scene-signer policy. The chain must be signed for the
+ * socket's own path, so one signed for the RPC socket cannot open a stream socket.
+ */
 export function verifyWsIdentity(
   { fetcher }: Pick<AppComponents, 'fetcher'>,
   message: ArrayBuffer,
-  expiration: number
+  expiration: number,
+  path = '/'
 ): ReturnType<typeof verify> {
-  return verify('get', '/', parseAuthChainHeaders(new TextDecoder().decode(message)), {
+  return verify('get', path, parseAuthChainHeaders(new TextDecoder().decode(message)), {
     fetcher,
     expiration,
     metadataValidator: rejectSceneSigner

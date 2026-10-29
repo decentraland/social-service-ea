@@ -1,16 +1,18 @@
 import { STOP_COMPONENT } from '@well-known-components/interfaces'
-import { createStreamSessionsComponent } from '../../../../../src/adapters/stream-sessions'
-import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
+import { createStreamSessionsComponent } from '../../../src/adapters/stream-sessions'
+import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import mitt from 'mitt'
 import { verify } from '@dcl/crypto-middleware'
-import { registerStreamWsHandler, STREAM_WS_PATH } from '../../../../../src/controllers/handlers/uws/stream-ws-handler'
-import { StreamDefinition } from '../../../../../src/types/subscriptions'
-import { WsPoolFullError, WsAdmissionError } from '../../../../../src/logic/ws-pool'
-import { ISubscribersContext, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
-import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../../../src/utils/emitterToGenerator'
-import { mockConfig, mockFetcher, mockLogs, mockMetrics, mockUWs } from '../../../../mocks/components'
-import { mockTracing } from '../../../../mocks/components/tracing'
-import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
+import { registerStreamWsHandler, STREAM_WS_PATH } from '../../../src/controllers/handlers/uws/stream-ws-handler'
+import { StreamDefinition } from '../../../src/types/subscriptions'
+import { WsPoolFullError } from '../../../src/logic/ws-pool'
+import { SubscriptionRateLimitedError } from '../../../src/logic/ws-admission'
+import { createWsAdmissionMockedComponent } from '../../mocks/components/ws-admission'
+import { ISubscribersContext, WsNotAuthenticatedUserData, WsUserData } from '../../../src/types'
+import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../src/utils/emitterToGenerator'
+import { mockConfig, mockFetcher, mockLogs, mockMetrics, mockUWs } from '../../mocks/components'
+import { mockTracing } from '../../mocks/components/tracing'
+import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 
 jest.mock('@dcl/crypto-middleware', () => ({
   ...jest.requireActual('@dcl/crypto-middleware'),
@@ -25,12 +27,13 @@ const flush = () => new Promise((resolve) => setImmediate(resolve))
 
 type Events = { blockUpdate: { address: string } }
 
-describe('stream-ws-handler', () => {
+describe('when handling stream WebSocket sessions', () => {
   let sessions: Awaited<ReturnType<typeof createStreamSessionsComponent>>
   let handlers: any
   let ws: any
   let data: WsUserData
   let wsPool: ReturnType<typeof createWsPoolMockedComponent>
+  let wsAdmission: ReturnType<typeof createWsAdmissionMockedComponent>
   let subscribersContext: jest.Mocked<ISubscribersContext>
   let emitter: ReturnType<typeof mitt<Events>>
   let generators: Array<{ destroy: jest.Mock; real: { destroy(): void } }>
@@ -52,13 +55,15 @@ describe('stream-ws-handler', () => {
 
   beforeEach(async () => {
     sent = []
+    ;(verify as jest.Mock).mockReset()
     generators = []
     emitter = mitt<Events>()
     data = {
       isConnected: false,
       auth: false,
       authenticating: false,
-      wsConnectionId: 'conn-1'
+      wsConnectionId: 'conn-1',
+      protocol: 'stream'
     } as WsNotAuthenticatedUserData
     ws = {
       getUserData: jest.fn(() => data),
@@ -69,6 +74,7 @@ describe('stream-ws-handler', () => {
       end: jest.fn()
     }
     wsPool = createWsPoolMockedComponent()
+    wsAdmission = createWsAdmissionMockedComponent()
     subscribersContext = {
       addConnection: jest.fn(),
       removeConnection: jest.fn(),
@@ -116,6 +122,7 @@ describe('stream-ws-handler', () => {
         config: mockConfig,
         tracing: mockTracing,
         wsPool,
+        wsAdmission,
         subscribersContext
       },
       streams
@@ -157,9 +164,14 @@ describe('stream-ws-handler', () => {
       expect(data.isConnected).toBe(false)
     })
 
-    it('should ignore further messages on the closing socket', async () => {
-      await send({ type: 'ping' })
-      expect(sentOfType('pong')).toHaveLength(0)
+    describe('and the client keeps sending on the closing socket', () => {
+      beforeEach(async () => {
+        await send({ type: 'ping' })
+      })
+
+      it('should ignore further messages', () => {
+        expect(sentOfType('pong')).toHaveLength(0)
+      })
     })
   })
 
@@ -179,10 +191,10 @@ describe('stream-ws-handler', () => {
     describe('and the client exceeds the burst allowance', () => {
       beforeEach(async () => {
         for (let index = 0; index < 40; index++) await send({ type: 'ping' })
+        await send({ type: 'ping' })
       })
 
-      it('should close once without replying to the excess message', async () => {
-        await send({ type: 'ping' })
+      it('should close once without replying to the excess message', () => {
         expect(ws.end).toHaveBeenCalledTimes(1)
         expect(ws.end).toHaveBeenCalledWith(1008, 'Message rate exceeded; reconnect with backoff')
         expect(sentOfType('pong')).toHaveLength(39)
@@ -193,18 +205,21 @@ describe('stream-ws-handler', () => {
       beforeEach(async () => {
         for (let index = 0; index < 39; index++) await send({ type: 'ping' })
         now = 50
+        await send({ type: 'ping' })
       })
 
-      it('should allow the next message', async () => {
-        await send({ type: 'ping' })
+      it('should allow the next message', () => {
         expect(ws.end).not.toHaveBeenCalled()
         expect(sentOfType('pong')).toHaveLength(40)
       })
     })
 
     describe('and the client floods malformed messages', () => {
-      it('should enforce the same budget', async () => {
+      beforeEach(async () => {
         for (let index = 0; index < 40; index++) await send('invalid json')
+      })
+
+      it('should enforce the same budget', () => {
         expect(ws.end).toHaveBeenCalledWith(1008, 'Message rate exceeded; reconnect with backoff')
       })
     })
@@ -224,10 +239,15 @@ describe('stream-ws-handler', () => {
         expect(wsPool.unregisterConnection).toHaveBeenCalledTimes(1)
       })
 
-      it('should keep cleanup idempotent when the socket close callback follows shutdown', () => {
-        handlers.close(ws, 1001)
-        expect(subscribersContext.removeConnection).toHaveBeenCalledTimes(1)
-        expect(wsPool.unregisterConnection).toHaveBeenCalledTimes(1)
+      describe('and the socket close callback follows shutdown', () => {
+        beforeEach(() => {
+          handlers.close(ws, 1001)
+        })
+
+        it('should keep cleanup idempotent', () => {
+          expect(subscribersContext.removeConnection).toHaveBeenCalledTimes(1)
+          expect(wsPool.unregisterConnection).toHaveBeenCalledTimes(1)
+        })
       })
     })
 
@@ -343,17 +363,132 @@ describe('stream-ws-handler', () => {
     })
   })
 
-  describe('when the address already holds the maximum connections', () => {
+  describe('when a client authenticates', () => {
     beforeEach(async () => {
-      subscribersContext.addConnection.mockImplementationOnce(() => {
-        throw new WsAdmissionError('connections')
-      })
       await authenticate()
     })
 
-    it('should close with try again later instead of unauthorized', () => {
-      expect(ws.end).toHaveBeenCalledWith(1013, 'Address connection limit; retry with backoff')
-      expect(sentOfType('ready')).toHaveLength(0)
+    it('should verify a chain signed for the stream path', () => {
+      expect(verify).toHaveBeenCalledWith('get', STREAM_WS_PATH, expect.anything(), expect.anything())
+    })
+
+    it('should count the connection against its address as a stream socket', () => {
+      expect(wsAdmission.claimConnection).toHaveBeenCalledWith(
+        '0xabc0000000000000000000000000000000000001',
+        'conn-1',
+        'stream'
+      )
+    })
+
+    it('should not end any other connection', () => {
+      expect(wsPool.endConnection).not.toHaveBeenCalled()
+    })
+
+    describe('and the socket closes', () => {
+      beforeEach(() => {
+        handlers.close(ws, 1000)
+      })
+
+      it('should release the address slot', () => {
+        expect(wsAdmission.releaseConnection).toHaveBeenCalledWith('conn-1')
+      })
+
+      it('should label the close with the known code', () => {
+        expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_close_codes', { code: '1000' })
+      })
+    })
+
+    describe('and the socket closes with an arbitrary client code', () => {
+      beforeEach(() => {
+        handlers.close(ws, 4321)
+      })
+
+      it('should fold the code into a bounded label', () => {
+        expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_close_codes', { code: 'other' })
+      })
+    })
+  })
+
+  describe('when the authenticating address is already at its connection cap', () => {
+    beforeEach(async () => {
+      wsAdmission.claimConnection.mockReturnValueOnce({ evictedConnectionId: 'oldest-connection' })
+      await authenticate()
+    })
+
+    it('should end the displaced oldest connection', () => {
+      expect(wsPool.endConnection).toHaveBeenCalledWith('oldest-connection', 3005, 'Replaced by a newer connection')
+    })
+
+    it('should still accept the new connection', () => {
+      expect(sentOfType('ready')).toHaveLength(1)
+      expect(ws.end).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the address has spent its subscription budget', () => {
+    beforeEach(async () => {
+      await authenticate()
+      wsAdmission.admitSubscription.mockImplementationOnce(() => {
+        throw new SubscriptionRateLimitedError()
+      })
+      await send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+    })
+
+    it('should reject the subscription without acknowledging it first', () => {
+      expect(sentOfType('subscribed')).toHaveLength(0)
+      expect(lastSent()).toEqual({
+        type: 'error',
+        id: 'blocks',
+        code: 'rate_limited',
+        message: 'Subscription rate exceeded; retry with backoff'
+      })
+    })
+
+    it('should not open the stream', () => {
+      expect(emitter.all.get('blockUpdate') ?? []).toHaveLength(0)
+    })
+
+    it('should keep the socket open', () => {
+      expect(ws.end).not.toHaveBeenCalled()
+    })
+
+    describe('and the client retries the same id', () => {
+      beforeEach(async () => {
+        await send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+      })
+
+      it('should accept it once the budget allows', () => {
+        expect(sentOfType('subscribed')).toEqual([{ type: 'subscribed', id: 'blocks' }])
+      })
+    })
+  })
+
+  describe('when a socket whose connection slot was taken by a newer one subscribes', () => {
+    beforeEach(async () => {
+      await authenticate()
+      wsAdmission.admitSubscription.mockImplementationOnce(() => {
+        throw new Error('Connection conn-1 has no admission claim')
+      })
+      await send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+    })
+
+    it('should answer a stream error for that subscription instead of failing the frame', () => {
+      expect(lastSent()).toMatchObject({ type: 'error', id: 'blocks', code: 'stream_error' })
+      expect(sentOfType('subscribed')).toHaveLength(0)
+    })
+  })
+
+  describe('when a frame arrives while the auth chain is being verified', () => {
+    beforeEach(async () => {
+      ;(verify as jest.Mock).mockReturnValueOnce(new Promise(() => {}))
+      await handlers.open(ws)
+      void handlers.message(ws, AUTH_FRAME)
+      await send({ type: 'ping' })
+    })
+
+    it('should answer auth_in_progress and count it as a protocol error', () => {
+      expect(lastSent()).toMatchObject({ type: 'error', code: 'auth_in_progress' })
+      expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_errors', { type: 'auth_in_progress' })
     })
   })
 
@@ -411,61 +546,70 @@ describe('stream-ws-handler', () => {
     })
   })
 
-  describe('when upgrading a connection', () => {
-    it('should start unauthenticated with a unique connection id', () => {
+  describe('when upgrading two connections', () => {
+    let first: any
+    let second: any
+
+    beforeEach(() => {
       const res = { upgrade: jest.fn() }
       const req = { getMethod: () => 'GET', getHeader: () => 'x' }
-
       handlers.upgrade(res, req, {})
       handlers.upgrade(res, req, {})
+      ;[first, second] = res.upgrade.mock.calls.map((call: any[]) => call[0])
+    })
 
-      const [first, second] = res.upgrade.mock.calls.map((call: any[]) => call[0])
+    it('should start them unauthenticated with unique connection ids', () => {
       expect(first).toMatchObject({ isConnected: false, auth: false, authenticating: false })
       expect(first.wsConnectionId).not.toEqual(second.wsConnectionId)
     })
   })
 
   describe('when opening a connection', () => {
-    it('should register it in the pool', async () => {
-      await handlers.open(ws)
+    describe('and it registers successfully', () => {
+      beforeEach(async () => {
+        await handlers.open(ws)
+      })
 
-      expect(wsPool.registerConnection).toHaveBeenCalledWith(ws, 'stream')
-      expect(data.isConnected).toBe(true)
+      it('should register it in the pool', () => {
+        expect(wsPool.registerConnection).toHaveBeenCalledWith(ws)
+        expect(data.isConnected).toBe(true)
+      })
     })
 
-    it('should close it with the auth timeout code when no auth chain arrives', async () => {
-      jest.useFakeTimers()
-      await handlers.open(ws)
+    describe('and no auth chain arrives in time', () => {
+      beforeEach(async () => {
+        jest.useFakeTimers()
+        await handlers.open(ws)
+        jest.advanceTimersByTime(30000)
+      })
 
-      jest.advanceTimersByTime(30000)
-
-      expect(ws.end).toHaveBeenCalledWith(3004, 'Authorization timeout')
+      it('should close it with the auth timeout code', () => {
+        expect(ws.end).toHaveBeenCalledWith(3004, 'Authorization timeout')
+      })
     })
 
     describe('and the pool is full', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         wsPool.registerConnection.mockImplementation(() => {
           throw new WsPoolFullError(1)
         })
+        await handlers.open(ws)
       })
 
-      it('should close it with the try-again-later code', async () => {
-        await handlers.open(ws)
-
+      it('should close it with the try-again-later code', () => {
         expect(ws.end).toHaveBeenCalledWith(1013, 'Unable to acquire connection')
       })
     })
 
     describe('and registering fails unexpectedly', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         wsPool.registerConnection.mockImplementation(() => {
           throw new Error('unexpected')
         })
+        await handlers.open(ws)
       })
 
-      it('should report it and close the connection', async () => {
-        await handlers.open(ws)
-
+      it('should report it and close the connection', () => {
         expect(mockTracing.captureException).toHaveBeenCalled()
         expect(ws.end).toHaveBeenCalledWith(1013, 'Unable to acquire connection')
       })
@@ -475,7 +619,9 @@ describe('stream-ws-handler', () => {
   describe('when authenticating', () => {
     describe('and the auth chain is valid', () => {
       beforeEach(async () => {
+        jest.useFakeTimers()
         await authenticate()
+        jest.advanceTimersByTime(60000)
       })
 
       it('should answer ready', () => {
@@ -490,9 +636,6 @@ describe('stream-ws-handler', () => {
       })
 
       it('should clear the auth timeout', () => {
-        jest.useFakeTimers()
-        jest.advanceTimersByTime(60000)
-
         expect(ws.end).not.toHaveBeenCalled()
       })
     })
@@ -526,6 +669,10 @@ describe('stream-ws-handler', () => {
 
       it('should count it as a client rejection', () => {
         expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
+        expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors_by_protocol', {
+          protocol: 'stream',
+          type: 'client_rejected'
+        })
       })
     })
 
@@ -553,22 +700,28 @@ describe('stream-ws-handler', () => {
       it('should report it, count it as a server error and close', () => {
         expect(mockTracing.captureException).toHaveBeenCalled()
         expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+        expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors_by_protocol', {
+          protocol: 'stream',
+          type: 'server_error'
+        })
         expect(ws.end).toHaveBeenCalledWith(3003, 'Unauthorized')
       })
     })
 
     describe('and ending the socket throws because the client is already gone', () => {
-      beforeEach(() => {
+      let result: Promise<void>
+
+      beforeEach(async () => {
         ;(verify as jest.Mock).mockRejectedValueOnce(requestError('bad', 400))
         ws.end.mockImplementation(() => {
           throw new Error('closed')
         })
+        await handlers.open(ws)
+        result = handlers.message(ws, AUTH_FRAME)
       })
 
       it('should not propagate the error', async () => {
-        await handlers.open(ws)
-
-        await expect(handlers.message(ws, AUTH_FRAME)).resolves.toBeUndefined()
+        await expect(result).resolves.toBeUndefined()
       })
     })
 
@@ -615,81 +768,111 @@ describe('stream-ws-handler', () => {
       sent.length = 0
     })
 
-    it('should answer ping with pong', async () => {
-      await send({ type: 'ping' })
+    describe('and the client pings', () => {
+      beforeEach(async () => {
+        await send({ type: 'ping' })
+      })
 
-      expect(sent).toEqual([{ type: 'pong' }])
+      it('should answer with pong', () => {
+        expect(sent).toEqual([{ type: 'pong' }])
+      })
     })
 
-    it.each(['nope', '[]', 'null', '123', '"str"'])('should answer %s with an invalid_message error', async (raw) => {
-      await send(raw)
+    describe.each(['nope', '[]', 'null', '123', '"str"'])('and the client sends %s', (raw) => {
+      beforeEach(async () => {
+        await send(raw)
+      })
 
-      expect(lastSent()).toMatchObject({ type: 'error', code: 'invalid_message' })
+      it('should answer with an invalid_message error', () => {
+        expect(lastSent()).toMatchObject({ type: 'error', code: 'invalid_message' })
+      })
     })
 
-    it('should answer an unknown type with an invalid_message error', async () => {
-      await send({ type: 'unknown' })
+    describe('and the client sends an unknown type', () => {
+      beforeEach(async () => {
+        await send({ type: 'unknown' })
+      })
 
-      expect(lastSent()).toMatchObject({ type: 'error', code: 'invalid_message' })
+      it('should answer with an invalid_message error', () => {
+        expect(lastSent()).toMatchObject({ type: 'error', code: 'invalid_message' })
+      })
     })
 
     describe('and subscribing', () => {
-      it.each([
+      describe.each([
         [{ type: 'subscribe', stream: 'block_updates' }],
         [{ type: 'subscribe', id: '', stream: 'block_updates' }],
         [{ type: 'subscribe', id: 5, stream: 'block_updates' }],
         [{ type: 'subscribe', id: 'x'.repeat(65), stream: 'block_updates' }]
-      ])('should reject an invalid id %j', async (message) => {
-        await send(message)
+      ])('and the id is invalid in %j', (message) => {
+        beforeEach(async () => {
+          await send(message)
+        })
 
-        expect(lastSent()).toMatchObject({ type: 'error', code: 'invalid_message' })
+        it('should reject it', () => {
+          expect(lastSent()).toMatchObject({ type: 'error', code: 'invalid_message' })
+        })
       })
 
-      it.each(['missing', '', '__proto__', 'constructor', 'toString'])(
-        'should reject the stream "%s"',
-        async (stream) => {
+      describe.each(['missing', '', '__proto__', 'constructor', 'toString'])('and the stream is "%s"', (stream) => {
+        beforeEach(async () => {
           await send({ type: 'subscribe', id: 'a', stream })
+        })
 
+        it('should reject it as unknown', () => {
           expect(lastSent()).toMatchObject({ type: 'error', code: 'unknown_stream', id: 'a' })
-        }
-      )
-
-      it('should reject a non-string stream', async () => {
-        await send({ type: 'subscribe', id: 'a', stream: { a: 1 } })
-
-        expect(lastSent()).toMatchObject({ type: 'error', code: 'unknown_stream' })
+        })
       })
 
-      it('should acknowledge a valid subscription', async () => {
-        await send({ type: 'subscribe', id: 'a', stream: 'block_updates' })
+      describe('and the stream is not a string', () => {
+        beforeEach(async () => {
+          await send({ type: 'subscribe', id: 'a', stream: { a: 1 } })
+        })
 
-        expect(sent[0]).toEqual({ type: 'subscribed', id: 'a' })
+        it('should reject it as unknown', () => {
+          expect(lastSent()).toMatchObject({ type: 'error', code: 'unknown_stream' })
+        })
       })
 
-      it('should reject a second subscription to the same stream', async () => {
-        await send({ type: 'subscribe', id: 'a', stream: 'block_updates' })
-        await send({ type: 'subscribe', id: 'b', stream: 'block_updates' })
+      describe('and the subscription is valid', () => {
+        let open: jest.SpyInstance
 
-        expect(lastSent()).toMatchObject({ type: 'error', code: 'duplicate_subscription', id: 'b' })
-        expect(generators).toHaveLength(1)
-      })
+        beforeEach(async () => {
+          open = jest.spyOn(streams.block_updates, 'open')
+          await send({ type: 'subscribe', id: 'a', stream: 'block_updates' })
+        })
 
-      it('should reject reusing an id', async () => {
-        await send({ type: 'subscribe', id: 'a', stream: 'block_updates' })
-        await send({ type: 'subscribe', id: 'a', stream: 'finite_stream' })
+        it('should acknowledge it', () => {
+          expect(sent[0]).toEqual({ type: 'subscribed', id: 'a' })
+        })
 
-        expect(lastSent()).toMatchObject({ type: 'error', code: 'duplicate_subscription' })
-      })
+        it('should hand the stream the connection identity and a scoped subscribers context', () => {
+          expect(open).toHaveBeenCalledWith(
+            expect.objectContaining({ address: '0xabc0000000000000000000000000000000000001', wsConnectionId: 'conn-1' })
+          )
+          expect(subscribersContext.registerGenerator).toHaveBeenCalledWith('conn-1', expect.any(Object))
+        })
 
-      it('should hand the stream the connection identity and a scoped subscribers context', async () => {
-        const open = jest.spyOn(streams.block_updates, 'open')
+        describe('and a second subscription to the same stream arrives', () => {
+          beforeEach(async () => {
+            await send({ type: 'subscribe', id: 'b', stream: 'block_updates' })
+          })
 
-        await send({ type: 'subscribe', id: 'a', stream: 'block_updates' })
+          it('should reject it', () => {
+            expect(lastSent()).toMatchObject({ type: 'error', code: 'duplicate_subscription', id: 'b' })
+            expect(generators).toHaveLength(1)
+          })
+        })
 
-        expect(open).toHaveBeenCalledWith(
-          expect.objectContaining({ address: '0xabc0000000000000000000000000000000000001', wsConnectionId: 'conn-1' })
-        )
-        expect(subscribersContext.registerGenerator).toHaveBeenCalledWith('conn-1', expect.any(Object))
+        describe('and another subscription reuses the id', () => {
+          beforeEach(async () => {
+            await send({ type: 'subscribe', id: 'a', stream: 'finite_stream' })
+          })
+
+          it('should reject it', () => {
+            expect(lastSent()).toMatchObject({ type: 'error', code: 'duplicate_subscription' })
+          })
+        })
       })
     })
 
@@ -699,33 +882,46 @@ describe('stream-ws-handler', () => {
         sent.length = 0
       })
 
-      it('should send the update with the subscription id and stream', async () => {
-        emitter.emit('blockUpdate', { address: '0xblocker' })
-        await flush()
+      describe('and one update arrives', () => {
+        beforeEach(async () => {
+          emitter.emit('blockUpdate', { address: '0xblocker' })
+          await flush()
+        })
 
-        expect(sent).toEqual([{ type: 'event', id: 'a', stream: 'block_updates', data: { address: '0xblocker' } }])
-        expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_updates_sent', { event: 'block_updates' })
+        it('should send the update with the subscription id and stream', () => {
+          expect(sent).toEqual([{ type: 'event', id: 'a', stream: 'block_updates', data: { address: '0xblocker' } }])
+          expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_updates_sent', { event: 'block_updates' })
+        })
       })
 
-      it('should keep the order of consecutive updates', async () => {
-        for (let i = 0; i < 5; i++) emitter.emit('blockUpdate', { address: `0x${i}` })
-        await flush()
+      describe('and consecutive updates arrive', () => {
+        beforeEach(async () => {
+          for (let i = 0; i < 5; i++) emitter.emit('blockUpdate', { address: `0x${i}` })
+          await flush()
+        })
 
-        expect(sentOfType('event').map((message) => message.data.address)).toEqual(['0x0', '0x1', '0x2', '0x3', '0x4'])
+        it('should keep their order', () => {
+          expect(sentOfType('event').map((message) => message.data.address)).toEqual([
+            '0x0',
+            '0x1',
+            '0x2',
+            '0x3',
+            '0x4'
+          ])
+        })
       })
 
       describe('and the client is not draining the socket', () => {
-        beforeEach(() => {
+        beforeEach(async () => {
           ws.send.mockReset()
           ws.send.mockImplementation(() => 2)
-        })
-
-        it('should end the connection as a slow consumer and stop sending', async () => {
           emitter.emit('blockUpdate', { address: '0x1' })
           await flush()
           emitter.emit('blockUpdate', { address: '0x2' })
           await flush()
+        })
 
+        it('should end the connection as a slow consumer and stop sending', () => {
           expect(ws.end).toHaveBeenCalledTimes(1)
           expect(ws.end).toHaveBeenCalledWith(1008, 'Slow consumer')
           expect(ws.send).toHaveBeenCalledTimes(1)
@@ -735,16 +931,15 @@ describe('stream-ws-handler', () => {
       })
 
       describe('and the socket was already closed by the client', () => {
-        beforeEach(() => {
+        beforeEach(async () => {
           ws.send.mockImplementation(() => {
             throw new Error('Invalid access of closed uWS.WebSocket')
           })
-        })
-
-        it('should stop the subscription without throwing', async () => {
           emitter.emit('blockUpdate', { address: '0x1' })
           await flush()
+        })
 
+        it('should stop the subscription without throwing', () => {
           expect(generators[0].destroy).not.toHaveBeenCalled()
           expect(sentOfType('event')).toEqual([])
         })
@@ -757,70 +952,93 @@ describe('stream-ws-handler', () => {
         sent.length = 0
       })
 
-      it('should destroy only that subscription and confirm the end', async () => {
-        await send({ type: 'unsubscribe', id: 'a' })
-        await flush()
+      describe('and the subscription id is known', () => {
+        beforeEach(async () => {
+          await send({ type: 'unsubscribe', id: 'a' })
+          await flush()
+        })
 
-        expect(generators[0].destroy).toHaveBeenCalledTimes(1)
-        expect(sent).toEqual([{ type: 'end', id: 'a', reason: 'unsubscribed' }])
+        it('should destroy only that subscription and confirm the end', () => {
+          expect(generators[0].destroy).toHaveBeenCalledTimes(1)
+          expect(sent).toEqual([{ type: 'end', id: 'a', reason: 'unsubscribed' }])
+        })
+
+        describe('and an update arrives afterwards', () => {
+          beforeEach(async () => {
+            sent.length = 0
+            emitter.emit('blockUpdate', { address: '0x1' })
+            await flush()
+          })
+
+          it('should not deliver it', () => {
+            expect(sent).toEqual([])
+          })
+        })
+
+        describe('and the client subscribes to the same stream again', () => {
+          beforeEach(async () => {
+            sent.length = 0
+            await send({ type: 'subscribe', id: 'b', stream: 'block_updates' })
+          })
+
+          it('should acknowledge the new subscription', () => {
+            expect(sent[0]).toEqual({ type: 'subscribed', id: 'b' })
+          })
+        })
+
+        describe('and the client unsubscribes again', () => {
+          beforeEach(async () => {
+            await send({ type: 'unsubscribe', id: 'a' })
+          })
+
+          it('should reject it', () => {
+            expect(lastSent()).toMatchObject({ type: 'error', code: 'unknown_subscription' })
+          })
+        })
       })
 
-      it('should stop delivering updates', async () => {
-        await send({ type: 'unsubscribe', id: 'a' })
-        await flush()
-        sent.length = 0
+      describe('and the subscription id is unknown', () => {
+        beforeEach(async () => {
+          await send({ type: 'unsubscribe', id: 'zzz' })
+        })
 
-        emitter.emit('blockUpdate', { address: '0x1' })
-        await flush()
-
-        expect(sent).toEqual([])
+        it('should reject it echoing the id', () => {
+          expect(lastSent()).toMatchObject({ code: 'unknown_subscription', id: 'zzz' })
+        })
       })
 
-      it('should allow subscribing to the same stream again', async () => {
-        await send({ type: 'unsubscribe', id: 'a' })
-        await flush()
-        sent.length = 0
+      describe('and the subscription id is not a string', () => {
+        beforeEach(async () => {
+          await send({ type: 'unsubscribe', id: 42 })
+        })
 
-        await send({ type: 'subscribe', id: 'b', stream: 'block_updates' })
-
-        expect(sent[0]).toEqual({ type: 'subscribed', id: 'b' })
-      })
-
-      it('should reject unsubscribing twice', async () => {
-        await send({ type: 'unsubscribe', id: 'a' })
-        await flush()
-        await send({ type: 'unsubscribe', id: 'a' })
-
-        expect(lastSent()).toMatchObject({ type: 'error', code: 'unknown_subscription' })
-      })
-
-      it('should reject an unknown or non-string id', async () => {
-        await send({ type: 'unsubscribe', id: 'zzz' })
-        expect(lastSent()).toMatchObject({ code: 'unknown_subscription', id: 'zzz' })
-
-        await send({ type: 'unsubscribe', id: 42 })
-        expect(lastSent()).toMatchObject({ code: 'unknown_subscription' })
-        expect(lastSent().id).toBeUndefined()
+        it('should reject it without echoing the id', () => {
+          expect(lastSent()).toMatchObject({ code: 'unknown_subscription' })
+          expect(lastSent().id).toBeUndefined()
+        })
       })
     })
 
     describe('and the stream completes by itself', () => {
-      it('should send every update and then end with the completed reason', async () => {
+      beforeEach(async () => {
         await send({ type: 'subscribe', id: 'f', stream: 'finite_stream' })
         await flush()
+      })
 
+      it('should send every update and then end with the completed reason', () => {
         expect(sent.map((message) => message.type)).toEqual(['subscribed', 'event', 'event', 'end'])
         expect(lastSent()).toEqual({ type: 'end', id: 'f', reason: 'completed' })
       })
 
-      it('should let the client subscribe again afterwards', async () => {
-        await send({ type: 'subscribe', id: 'f', stream: 'finite_stream' })
-        await flush()
-        sent.length = 0
+      describe('and the client subscribes again', () => {
+        beforeEach(async () => {
+          sent.length = 0
+          await send({ type: 'subscribe', id: 'g', stream: 'finite_stream' })
+        })
 
-        await send({ type: 'subscribe', id: 'g', stream: 'finite_stream' })
-
-        expect(sent[0]).toEqual({ type: 'subscribed', id: 'g' })
+        it('should acknowledge the new subscription', () => {
+          expect(sent[0]).toEqual({ type: 'subscribed', id: 'g' })
+        })
       })
     })
 
@@ -837,11 +1055,15 @@ describe('stream-ws-handler', () => {
         expect(JSON.stringify(error)).not.toContain('boom')
       })
 
-      it('should keep the connection usable', async () => {
-        await send({ type: 'ping' })
+      describe('and the client keeps using the connection', () => {
+        beforeEach(async () => {
+          await send({ type: 'ping' })
+        })
 
-        expect(lastSent()).toEqual({ type: 'pong' })
-        expect(ws.end).not.toHaveBeenCalled()
+        it('should keep it usable', () => {
+          expect(lastSent()).toEqual({ type: 'pong' })
+          expect(ws.end).not.toHaveBeenCalled()
+        })
       })
     })
   })
@@ -868,21 +1090,27 @@ describe('stream-ws-handler', () => {
 
       it('should release the pool slot and record the close code', () => {
         expect(wsPool.unregisterConnection).toHaveBeenCalledWith(data)
-        expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_close_codes', { code: 1000 })
+        expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_close_codes', { code: '1000' })
       })
 
-      it('should not send anything to the closed socket', () => {
-        sent.length = 0
-        emitter.emit('blockUpdate', { address: '0x1' })
+      describe('and an update arrives afterwards', () => {
+        beforeEach(() => {
+          sent.length = 0
+          emitter.emit('blockUpdate', { address: '0x1' })
+        })
 
-        expect(sent).toEqual([])
+        it('should not send anything to the closed socket', () => {
+          expect(sent).toEqual([])
+        })
       })
     })
 
     describe('and it never authenticated', () => {
       beforeEach(async () => {
+        jest.useFakeTimers()
         await handlers.open(ws)
         await handlers.close(ws, 1006, Buffer.from(''))
+        jest.advanceTimersByTime(60000)
       })
 
       it('should not detach any user but still release the pool slot', () => {
@@ -891,9 +1119,6 @@ describe('stream-ws-handler', () => {
       })
 
       it('should cancel the auth timeout', () => {
-        jest.useFakeTimers()
-        jest.advanceTimersByTime(60000)
-
         expect(ws.end).not.toHaveBeenCalled()
       })
     })
@@ -904,11 +1129,10 @@ describe('stream-ws-handler', () => {
         subscribersContext.removeConnection.mockImplementationOnce(() => {
           throw new Error('detach failed')
         })
+        await handlers.close(ws, 1000, Buffer.from(''))
       })
 
-      it('should still release the pool slot and report the error', async () => {
-        await handlers.close(ws, 1000, Buffer.from(''))
-
+      it('should still release the pool slot and report the error', () => {
         expect(mockTracing.captureException).toHaveBeenCalled()
         expect(wsPool.unregisterConnection).toHaveBeenCalled()
       })
@@ -917,11 +1141,10 @@ describe('stream-ws-handler', () => {
     describe('and it closes twice', () => {
       beforeEach(async () => {
         await authenticate()
+        await handlers.close(ws, 1000, Buffer.from(''))
       })
 
-      it('should not throw', async () => {
-        await handlers.close(ws, 1000, Buffer.from(''))
-
+      it('should not throw on the second close', () => {
         expect(() => handlers.close(ws, 1000, Buffer.from(''))).not.toThrow()
       })
     })

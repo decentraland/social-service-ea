@@ -7,7 +7,7 @@ import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isRpcAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection } from '../../../utils/errors'
-import { WsPoolFullError, WsAdmissionError } from '../../../logic/ws-pool'
+import { WsPoolFullError } from '../../../logic/ws-pool'
 import { getWsAuthSettings, verifyWsIdentity } from '../../../utils/ws-session'
 
 const textDecoder = new TextDecoder()
@@ -22,10 +22,10 @@ const getAddress = (data: WsUserData) => {
 export async function registerWsHandler(
   components: Pick<
     AppComponents,
-    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool'
+    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool' | 'wsAdmission'
   >
 ) {
-  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool, wsAdmission } = components
   const logger = logs.getLogger('ws-handler')
 
   const { authTimeoutInMs, authSignatureExpirationInMs } = await getWsAuthSettings({ config })
@@ -96,6 +96,7 @@ export async function registerWsHandler(
       delete data.timeout
     }
 
+    wsAdmission.releaseConnection(wsConnectionId)
     wsPool.unregisterConnection(data)
 
     metrics.increment('ws_close_codes', { code })
@@ -188,14 +189,11 @@ export async function registerWsHandler(
         })
       })
 
+      const { evictedConnectionId } = wsAdmission.claimConnection(address, data.wsConnectionId, 'rpc')
+      if (evictedConnectionId) wsPool.endConnection(evictedConnectionId, 3005, 'Replaced by a newer connection')
+
       rpcServer.attachUser({ transport, address, wsConnectionId: data.wsConnectionId })
     } catch (error: any) {
-      if (error instanceof WsAdmissionError) {
-        try {
-          ws.end(1013, 'Address connection limit; retry with backoff')
-        } catch {}
-        return
-      }
       const expectedRejection = isExpectedAuthRejection(error)
 
       if (expectedRejection) {
@@ -300,6 +298,7 @@ export async function registerWsHandler(
           isConnected: false,
           auth: false,
           wsConnectionId,
+          protocol: 'rpc',
           transport: null
         },
         req.getHeader('sec-websocket-key'),
@@ -388,9 +387,8 @@ export async function registerWsHandler(
 
       if (isNotAuthenticated(data)) {
         await authenticateUser(ws, data, message)
-      } else {
-        // This route only ever holds RPC sockets; the stream sockets (`/v1/stream`) live on their own route.
-        forwardMessage(ws, data as WsAuthenticatedUserData, message)
+      } else if (isRpcAuthenticated(data)) {
+        forwardMessage(ws, data, message)
       }
     },
     close: (ws, code, message) => {

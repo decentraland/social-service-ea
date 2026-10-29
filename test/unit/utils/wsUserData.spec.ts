@@ -9,6 +9,7 @@ describe('wsUserData', () => {
   describe('isAuthenticated', () => {
     it('should return true if the user is authenticated and not authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: true,
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
@@ -24,6 +25,7 @@ describe('wsUserData', () => {
 
     it('should return false if the user is not authenticated', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: false,
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
@@ -37,6 +39,7 @@ describe('wsUserData', () => {
 
     it('should return false if the user is authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: true,
         isConnected: false,
         authenticating: true,
@@ -53,6 +56,7 @@ describe('wsUserData', () => {
 
     beforeEach(() => {
       data = {
+        protocol: 'stream',
         auth: true,
         authenticating: false,
         isConnected: true,
@@ -71,6 +75,7 @@ describe('wsUserData', () => {
   describe('isNotAuthenticated', () => {
     it('should return false if the user is authenticated and not authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: true,
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
@@ -86,6 +91,7 @@ describe('wsUserData', () => {
 
     it('should return true with the correct type if the user is not authenticated', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: false,
         isConnected: false,
         wsConnectionId,
@@ -98,6 +104,7 @@ describe('wsUserData', () => {
 
     it('should return true if the user is authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: false,
         isConnected: false,
         authenticating: true,

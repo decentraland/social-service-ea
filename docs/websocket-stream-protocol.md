@@ -14,7 +14,8 @@ the last connection of either kind closes.
 ## Handshake
 
 The first client frame is the Signed Fetch auth chain as a JSON object of `x-identity-*` headers, signed for method
-`get` and path `/` (the same frame the RPC socket expects). The server answers `{ "type": "ready" }`. Clients must
+`get` and path `/v1/stream`. A chain signed for the RPC socket (path `/`) is rejected, so a chain captured from one
+socket cannot open the other. The server answers `{ "type": "ready" }`. Clients must
 wait for `ready` before sending anything else: a frame sent while the auth chain is being verified is answered with
 `auth_in_progress` and discarded.
 
@@ -24,7 +25,8 @@ Close codes:
 | --- | --- |
 | `3003` | The auth chain was rejected. |
 | `3004` | No auth chain arrived within `WS_AUTH_TIMEOUT_IN_MS` (shared with the RPC socket). |
-| `1013` | The instance connection pool is full, or the address already holds `WS_MAX_CONNECTIONS_PER_ADDRESS` sockets. Retry with backoff. |
+| `1013` | The instance connection pool (`WS_MAX_CONCURRENT_CONNECTIONS`) is full. Retry with backoff. |
+| `3005` | A newer socket of the same address replaced this one (see per-address limits below). Do not reconnect from a client that already has a newer socket. |
 | `1008` | A policy limit: the client is not reading fast enough, a subscription queue overflowed, or the message rate was exceeded. Updates cannot be replayed, so reconnect and resync. |
 | `1001` | The server is shutting down. |
 
@@ -39,7 +41,8 @@ Client to server:
 ```
 
 `id` is chosen by the client (1 to 64 characters, unique on the connection) for both `subscribe` and `unsubscribe`;
-an invalid `id` is never echoed back. A connection can hold one subscription per stream. `unsubscribe` is
+an invalid `id` is never echoed back. A connection can hold one subscription per stream. A `subscribe` is answered
+with either `subscribed` or an `error` carrying its `id`, never both. `unsubscribe` is
 acknowledged right away with `end` (`reason: "unsubscribed"`): no event for that `id` follows it, even when its
 initial snapshot was still loading, and the `id` and stream can be subscribed again immediately.
 
@@ -55,8 +58,9 @@ Server to client:
 
 Error codes: `invalid_message`, `unknown_stream`, `duplicate_subscription`, `unknown_subscription`, `stream_error`,
 `rate_limited`, `auth_in_progress`. Individual protocol errors keep the socket open; exceeding the message-rate limit
-closes it. `rate_limited` ends that one subscription because the address started subscriptions faster than its
-shared budget allows; retry it with backoff.
+closes it. An `error` with an `id` is final for that subscription: `rate_limited` answers a `subscribe` instead of
+`subscribed` when the address started subscriptions faster than its budget allows (retry it with backoff), and
+`stream_error` ends an acknowledged subscription. The `id` can be reused afterwards.
 
 ## Streams
 
@@ -79,7 +83,7 @@ since the epoch.
 
 Both protocols are observable side by side: `rpc_procedure_call_total` and `rpc_updates_sent_on_subscription` count
 RPC traffic, the `stream_ws_*` metrics count this protocol. `ws_active_connections_by_protocol`,
-`ws_connection_duration_seconds_by_protocol`, `ws_auth_errors_by_protocol` and `ws_admission_rejections` split the
+`ws_connection_duration_seconds_by_protocol`, `ws_auth_errors_by_protocol` and `ws_admission_evictions` split the
 shared socket metrics by `protocol` (`rpc` or `stream`). When RPC traffic is negligible, `@dcl/rpc`,
 `src/adapters/rpc-server`, `src/controllers/handlers/rpc`, `src/controllers/handlers/uws/ws-handler.ts` and
 `src/utils/UWebSocketTransport.ts` can be removed.
@@ -99,12 +103,19 @@ ping/pong frames are unaffected. Incoming frames are capped by `STREAM_WS_MAX_PA
 for a Signed Fetch auth chain); uWS drops the connection on a larger frame. The RPC socket keeps
 `WS_MAX_PAYLOAD_LENGTH`.
 
-Some limits are per address and shared by RPC and JSON sockets, so opening more sockets does not multiply them. An
-address can hold `WS_MAX_CONNECTIONS_PER_ADDRESS` sockets (default 8) across both protocols. Subscription starts on
-either protocol draw from one token bucket per address: `WS_SUBSCRIPTIONS_PER_SECOND` (default 2) and
-`WS_SUBSCRIPTION_BURST` (default 24). The bucket survives reconnects, so reconnecting does not refill it. At most
-`WS_ADDRESS_BUDGET_CAPACITY` addresses (default 10,000) are tracked per instance; idle, fully refilled entries are
-reclaimed first, and new addresses get 1013 only when none can be.
+An address can hold `WS_MAX_CONNECTIONS_PER_ADDRESS` authenticated sockets (default 8) across both protocols.
+Authenticating one more closes the address's oldest socket with `3005` instead of refusing the new one, so sockets
+left half-open by a dropped network, or opened with a replayed auth chain, cannot lock the owner out.
+`ws_admission_evictions` counts these closes.
+
+Subscription starts on `/v1/stream` draw from one token bucket per address, shared by all of its stream sockets:
+`WS_SUBSCRIPTIONS_PER_SECOND` (default 2) and `WS_SUBSCRIPTION_BURST` (default 24). A subscribe over budget is
+answered with `rate_limited` and counted in `ws_admission_rejections`. The bucket survives reconnects, so reconnecting
+does not refill it; up to `WS_ADDRESS_BUDGET_CAPACITY` (default 10,000) disconnected, partly spent buckets are kept
+per instance, and the least recently used one is forgotten first (that address simply starts with a full bucket).
+Connected addresses do not count against that capacity, so it never refuses a connection. RPC subscriptions are not
+charged to the bucket: existing clients keep their current behaviour, already bounded by one subscription per stream
+per socket.
 
 ## RPC parity checks
 
@@ -133,5 +144,8 @@ the socket. Both paths are idempotent, so a connection is released once whicheve
 
 RPC and JSON reuse the subscription policies and online-friend lookup in `logic/subscriptions/policies.ts`,
 wallet verification and timeout settings in `utils/ws-session.ts`, and last-connection cleanup in
-`logic/subscriptions/lifecycle.ts`. Shared event names and context types live in `types/subscriptions.ts`.
+`logic/subscriptions/lifecycle.ts`. The per-address limits live in the `wsAdmission` logic component
+(`logic/ws-admission`): both socket handlers claim a slot after authenticating, end the socket it displaces through
+`wsPool.endConnection`, and release the slot on close. Each socket's user data records its `protocol` from the path it
+upgraded on. Shared event names and context types live in `types/subscriptions.ts`.
 Each transport retains its own serialization and profile-enrichment behavior.

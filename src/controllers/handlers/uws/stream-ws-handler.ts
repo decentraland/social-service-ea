@@ -2,7 +2,9 @@ import { randomUUID } from 'crypto'
 import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
 import { AppComponents, WsUserData } from '../../../types'
 
-export const STREAM_WS_PATH = '/v1/stream'
+import { STREAM_WS_PATH } from '../../../adapters/stream-sessions/constants'
+
+export { STREAM_WS_PATH }
 
 /** Register network callbacks; all session state belongs to the injected WKC component. */
 export async function registerStreamWsHandler({
@@ -27,7 +29,8 @@ export async function registerStreamWsHandler({
           isConnected: false,
           auth: false,
           authenticating: false,
-          wsConnectionId: randomUUID()
+          wsConnectionId: randomUUID(),
+          protocol: 'stream'
         },
         req.getHeader('sec-websocket-key'),
         req.getHeader('sec-websocket-protocol'),

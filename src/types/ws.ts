@@ -2,6 +2,7 @@ import { Emitter } from 'mitt'
 import { WebSocket } from '@dcl/uws-http-server'
 import { IUWebSocketEventMap } from '../utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
+import { WsProtocol } from '../logic/ws-admission/types'
 
 type WsBaseUserData = {
   isConnected: boolean
@@ -9,9 +10,12 @@ type WsBaseUserData = {
   authenticating: boolean
   wsConnectionId: string
   connectionStartTime: number
+  /** Set at upgrade from the path the client connected to. */
+  protocol: WsProtocol
 }
 
 export type WsAuthenticatedUserData = WsBaseUserData & {
+  protocol: 'rpc'
   eventEmitter: Emitter<IUWebSocketEventMap>
   address: string
   transport: Transport
@@ -22,6 +26,7 @@ export type WsAuthenticatedUserData = WsBaseUserData & {
  * no RPC transport; it shares the pool and the address-level fan-out with the RPC sockets.
  */
 export type WsStreamAuthenticatedUserData = WsBaseUserData & {
+  protocol: 'stream'
   address: string
 }
 

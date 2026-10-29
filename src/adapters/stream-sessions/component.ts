@@ -10,14 +10,18 @@ import {
 import { StreamDefinition } from '../../types/subscriptions'
 import { InternalWebSocket } from '../../types/ws'
 import { normalizeAddress } from '../../utils/address'
-import { isAuthenticated, isNotAuthenticated } from '../../utils/wsUserData'
+import { isAuthenticated, isNotAuthenticated, isStreamAuthenticated } from '../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection, errorMessageOrDefault } from '../../utils/errors'
-import { WsPoolFullError, WsAdmissionError } from '../../logic/ws-pool'
+import { WsPoolFullError } from '../../logic/ws-pool'
+import { SubscriptionRateLimitedError } from '../../logic/ws-admission'
 import { detachSubscriptionConnection } from '../../logic/subscriptions/lifecycle'
 import { getWsAuthSettings, verifyWsIdentity } from '../../utils/ws-session'
 import { parseStreamMessage, StreamClientMessage } from './messages'
+import { STREAM_WS_PATH } from './constants'
 
 const SEND_DROPPED = 2
+// Client-supplied close codes are folded into these to bound metric label cardinality.
+const KNOWN_CLOSE_CODES = new Set([1000, 1001, 1005, 1006, 1008, 1009, 1011, 1013, 3003, 3004, 3005])
 type Subscription = {
   id: string
   stream: string
@@ -43,10 +47,11 @@ export async function createStreamSessionsComponent(
     config,
     tracing,
     wsPool,
+    wsAdmission,
     subscribersContext
   }: Pick<
     AppComponents,
-    'logs' | 'metrics' | 'fetcher' | 'voice' | 'config' | 'tracing' | 'wsPool' | 'subscribersContext'
+    'logs' | 'metrics' | 'fetcher' | 'voice' | 'config' | 'tracing' | 'wsPool' | 'wsAdmission' | 'subscribersContext'
   >,
   streams: Record<string, StreamDefinition>
 ): Promise<IStreamSessionsComponent> {
@@ -187,8 +192,9 @@ export async function createStreamSessionsComponent(
     }
 
     subscriptionsByConnection.delete(wsConnectionId)
+    wsAdmission.releaseConnection(wsConnectionId)
     wsPool.unregisterConnection(data)
-    metrics.increment('stream_ws_close_codes', { code })
+    metrics.increment('stream_ws_close_codes', { code: KNOWN_CLOSE_CODES.has(code) ? String(code) : 'other' })
 
     Object.assign(data, { auth: false, isConnected: false, authenticating: false })
   }
@@ -197,7 +203,7 @@ export async function createStreamSessionsComponent(
     try {
       Object.assign(data, { authenticating: true })
 
-      const verifyResult = await verifyWsIdentity({ fetcher }, message, authSignatureExpirationInMs)
+      const verifyResult = await verifyWsIdentity({ fetcher }, message, authSignatureExpirationInMs, STREAM_WS_PATH)
 
       if ('timeout' in data && data.timeout) {
         clearTimeout(data.timeout)
@@ -214,16 +220,14 @@ export async function createStreamSessionsComponent(
 
       Object.assign(data, { auth: true, address, authenticating: false })
 
+      const { evictedConnectionId } = wsAdmission.claimConnection(address, data.wsConnectionId, 'stream')
+      if (evictedConnectionId) wsPool.endConnection(evictedConnectionId, 3005, 'Replaced by a newer connection')
       // Same registration the RPC sockets do on attach: the address-level fan-out starts here.
       subscribersContext.addConnection(address, data.wsConnectionId)
 
       logger.debug('Authenticated stream user', { address, wsConnectionId: data.wsConnectionId })
       safeSend(ws, { type: 'ready' })
     } catch (error) {
-      if (error instanceof WsAdmissionError) {
-        endSocket(ws, 1013, 'Address connection limit; retry with backoff')
-        return
-      }
       const expectedRejection = isExpectedAuthRejection(error)
 
       if (expectedRejection) {
@@ -307,12 +311,7 @@ export async function createStreamSessionsComponent(
         address: data.address
       })
       if (data.isConnected && !subscription.cancelled) {
-        sendError(
-          ws,
-          error instanceof WsAdmissionError ? 'rate_limited' : 'stream_error',
-          error instanceof WsAdmissionError ? error.message : 'The subscription ended unexpectedly',
-          id
-        )
+        sendError(ws, 'stream_error', 'The subscription ended unexpectedly', id)
       }
     } finally {
       if (subscriptions?.get(id) === subscription) subscriptions.delete(id)
@@ -344,6 +343,18 @@ export async function createStreamSessionsComponent(
       if (existing.stream === stream) {
         return sendError(ws, 'duplicate_subscription', 'Already subscribed to this stream on this connection', id)
       }
+    }
+
+    try {
+      wsAdmission.admitSubscription(data.wsConnectionId)
+    } catch (error) {
+      if (error instanceof SubscriptionRateLimitedError) return sendError(ws, 'rate_limited', error.message, id)
+      // A socket displaced by a newer one has no claim left; its close is already under way.
+      logger.warn('Subscription admission failed', {
+        wsConnectionId: data.wsConnectionId,
+        error: errorMessageOrDefault(error)
+      })
+      return sendError(ws, 'stream_error', 'The subscription could not be started', id)
     }
 
     const subscription: Subscription = {
@@ -384,7 +395,14 @@ export async function createStreamSessionsComponent(
     subscription.cancelled = true
     subscription.unsubscribed = true
     subscription.abort.abort()
-    subscription.destroy()
+    try {
+      subscription.destroy()
+    } catch (error) {
+      logger.error('Error destroying subscription', {
+        stream: subscription.stream,
+        error: errorMessageOrDefault(error)
+      })
+    }
     subscription.release()
     subscriptionsByConnection.get(data.wsConnectionId)?.delete(id)
     safeSend(ws, { type: 'end', id, reason: 'unsubscribed' })
@@ -414,7 +432,7 @@ export async function createStreamSessionsComponent(
       const data = ws.getUserData()
 
       try {
-        wsPool.registerConnection(ws, 'stream')
+        wsPool.registerConnection(ws)
         sockets.set(data.wsConnectionId, ws)
         Object.assign(data, {
           timeout: setTimeout(() => {
@@ -439,12 +457,12 @@ export async function createStreamSessionsComponent(
 
       if (!data.isConnected) return
       if (!consumeMessageBudget(data)) {
-        closeForPolicy(ws, 'rate_limited', 'Message rate exceeded; reconnect with backoff')
+        closeForPolicy(ws, 'message_rate', 'Message rate exceeded; reconnect with backoff')
         return
       }
 
       if (data.authenticating) {
-        safeSend(ws, { type: 'error', code: 'auth_in_progress', message: 'Authentication already in progress' })
+        sendError(ws, 'auth_in_progress', 'Authentication already in progress')
         return
       }
 
@@ -453,7 +471,7 @@ export async function createStreamSessionsComponent(
         return
       }
 
-      if (isAuthenticated(data)) handleMessage(ws, data, message)
+      if (isStreamAuthenticated(data)) handleMessage(ws, data, message)
     },
     close: (ws, code) => {
       sockets.delete(ws.getUserData().wsConnectionId)

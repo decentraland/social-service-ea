@@ -1,6 +1,7 @@
 import WebSocket from 'ws'
 import { createAuthHeaders, Identity } from './auth'
 import { TestComponents } from '../../../src/types'
+import { STREAM_WS_PATH } from '../../../src/adapters/stream-sessions/constants'
 
 export type StreamMessage = { type: string; [key: string]: any }
 
@@ -87,7 +88,7 @@ export async function connectStreamClient(
   }
 
   if (identity) {
-    client.send(createAuthHeaders('get', '/', {}, identity))
+    client.send(createAuthHeaders('get', STREAM_WS_PATH, {}, identity))
     await waitFor((message) => message.type === 'ready')
   }
 

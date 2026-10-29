@@ -14,5 +14,9 @@ export function isNotAuthenticated(data: WsUserData): data is WsNotAuthenticated
 }
 
 export function isRpcAuthenticated(data: WsUserData): data is WsAuthenticatedUserData {
-  return isAuthenticated(data) && 'transport' in data && 'eventEmitter' in data
+  return isAuthenticated(data) && data.protocol === 'rpc'
+}
+
+export function isStreamAuthenticated(data: WsUserData): data is WsStreamAuthenticatedUserData {
+  return isAuthenticated(data) && data.protocol === 'stream'
 }
