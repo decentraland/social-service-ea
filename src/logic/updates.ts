@@ -5,7 +5,7 @@ import {
   SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { Action, AppComponents, SubscriptionContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../utils/address'
@@ -23,7 +23,7 @@ type UpdateParser<T, U> = (update: U, ...args: any[]) => T | null
 export type UpdatesMessageHandler = (message: string) => void | Promise<void>
 
 export type SubscriptionHandlerParams<T, U> = {
-  rpcContext: RpcServerContext
+  rpcContext: SubscriptionContext
   eventName: keyof SubscriptionEventsEmitter
   shouldRetrieveProfile?: boolean
   getAddressFromUpdate: (update: U) => string

@@ -1,3 +1,4 @@
+import type { InternalWebSocket } from './ws'
 import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
 import { IPgComponent as IBasePgComponent } from '@dcl/pg-component'
 import { WebSocketServer } from 'ws'
@@ -506,4 +507,14 @@ export type IRewardComponent = IBaseComponent & {
 
 export type IEmailComponent = IBaseComponent & {
   sendEmail(email: string, subject: string, content: string): Promise<void>
+}
+
+/** Owns JSON WebSocket sessions independently of route registration. */
+export interface IStreamSessionsComponent extends IBaseComponent {
+  /** Acquire a pool slot and start the shared authentication deadline. */
+  open(socket: InternalWebSocket): void
+  /** Authenticate or process one validated protocol frame. */
+  message(socket: InternalWebSocket, frame: ArrayBuffer): Promise<void>
+  /** Release one connection and its subscriptions. */
+  close(socket: InternalWebSocket, code: number): void
 }

@@ -1,3 +1,4 @@
+import { createSubscriptionPolicies } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import {
@@ -60,11 +61,9 @@ export function subscribeToPrivateVoiceChatUpdatesService({
       >({
         rpcContext: context,
         eventName: 'privateVoiceChatUpdate',
+        ...createSubscriptionPolicies(context).privateVoiceChatUpdate,
         shouldRetrieveProfile: false,
-        getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToPrivateVoiceChatUpdate,
-        // Only handle updates that are known by the this subscription call
-        shouldHandleUpdate: (update) => Object.values(VoiceChatStatus).includes(update.status),
         // fromPartial fills the remaining fields with protobuf defaults so the final
         // "stream closed" message is safe to encode.
         buildStreamClosedUpdate: (streamClosed) => PrivateVoiceChatUpdate.fromPartial({ streamClosed })

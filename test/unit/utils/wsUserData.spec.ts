@@ -1,5 +1,5 @@
 import { WsUserData } from '../../../src/types'
-import { isAuthenticated, isNotAuthenticated } from '../../../src/utils/wsUserData'
+import { isAuthenticated, isNotAuthenticated, isRpcAuthenticated } from '../../../src/utils/wsUserData'
 import { IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
 import { Emitter } from 'mitt'
 
@@ -45,6 +45,26 @@ describe('wsUserData', () => {
       }
 
       expect(isAuthenticated(data)).toBe(false)
+    })
+  })
+
+  describe('when an authenticated socket uses the JSON protocol', () => {
+    let data: WsUserData
+
+    beforeEach(() => {
+      data = {
+        auth: true,
+        authenticating: false,
+        isConnected: true,
+        address: '0x123',
+        wsConnectionId,
+        connectionStartTime: 0
+      }
+    })
+
+    it('should recognize authentication without promising an RPC transport', () => {
+      expect(isAuthenticated(data)).toBe(true)
+      expect(isRpcAuthenticated(data)).toBe(false)
     })
   })
 

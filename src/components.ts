@@ -1,3 +1,5 @@
+import { createStreamSessionsComponent } from './adapters/stream-sessions'
+import { createStreamRegistry } from './controllers/handlers/uws/stream-registry'
 import { resolve } from 'path'
 import {
   createServerComponent,
@@ -306,6 +308,11 @@ export async function initComponents(): Promise<AppComponents> {
     peersStats
   })
 
+  const streamSessions = await createStreamSessionsComponent(
+    { logs, metrics, fetcher, voice, config, tracing, wsPool, subscribersContext },
+    createStreamRegistry({ updateHandler, friendsDb, peersStats })
+  )
+
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,
@@ -413,6 +420,7 @@ export async function initComponents(): Promise<AppComponents> {
     sns,
     statusChecks,
     storage,
+    streamSessions,
     subscribersContext,
     tracing,
     updateHandler,

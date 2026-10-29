@@ -96,3 +96,15 @@ targeted pubsub routing (friendships, blocks and private-call credentials), and 
 for all six streams. It does not replace the shared fan-out authorization tests for community visibility and friendship membership.
 Both files run in the existing unit/integration CI jobs. When changing either protocol, add fixtures for new variants
 and review snapshot changes; do not refresh snapshots to bypass an unexplained contract mismatch.
+
+## Implementation boundaries
+
+The `/v1/stream` controller only registers the uWS route and delegates callbacks to `streamSessions`.
+`createStreamSessionsComponent` is wired in `src/components.ts`, implements `IStreamSessionsComponent`, and owns
+message validation, authentication state, rate budgets, subscriptions and shutdown cleanup. Its WKC stop hook
+closes sockets, cancels authentication timers and releases subscriptions; close callbacks are idempotent.
+
+RPC and JSON reuse the subscription policies and online-friend lookup in `logic/subscriptions/policies.ts`,
+wallet verification and timeout settings in `utils/ws-session.ts`, and last-connection cleanup in
+`logic/subscriptions/lifecycle.ts`. Shared event names and context types live in `types/subscriptions.ts`.
+Each transport retains its own serialization and profile-enrichment behavior.

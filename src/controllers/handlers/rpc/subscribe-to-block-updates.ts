@@ -1,3 +1,4 @@
+import { createSubscriptionPolicies } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { BlockUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -14,11 +15,9 @@ export function subscribeToBlockUpdatesService({
       yield* updateHandler.handleSubscriptionUpdates<BlockUpdate, SubscriptionEventsEmitter['blockUpdate']>({
         rpcContext: context,
         eventName: 'blockUpdate',
+        ...createSubscriptionPolicies(context).blockUpdate,
         shouldRetrieveProfile: false,
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockerAddress,
         parser: parseEmittedUpdateToBlockUpdate,
-        shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) =>
-          update.blockedAddress === context.address,
         // fromPartial fills the remaining fields with protobuf defaults so the final
         // "stream closed" message is safe to encode.
         buildStreamClosedUpdate: (streamClosed) => BlockUpdate.fromPartial({ streamClosed })

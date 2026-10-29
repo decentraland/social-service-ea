@@ -1,9 +1,10 @@
+import { createSubscriptionPolicies, getOnlineFriendAddresses } from '../../../logic/subscriptions/policies'
 import {
   CommunityVoiceChatStatus,
   ConnectivityStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../../../types'
-import { StreamEvent } from '../../../adapters/rpc-server/metrics-wrapper'
+import { Action, AppComponents, SubscriptionEventsEmitter } from '../../../types'
+import { StreamEvent, StreamDefinition } from '../../../types/subscriptions'
 import { VoiceChatStatus } from '../../../logic/voice/types'
 
 /**
@@ -15,10 +16,7 @@ import { VoiceChatStatus } from '../../../logic/voice/types'
  * streams, the events carry addresses only: clients resolve the profiles themselves.
  */
 
-export type StreamDefinition = {
-  /** Opens the subscription. The returned generator ends when the subscription is destroyed. */
-  open: (context: RpcServerContext) => AsyncGenerator<unknown>
-}
+export type { StreamDefinition } from '../../../types/subscriptions'
 
 export type ConnectivityStatusName = 'online' | 'offline' | 'away'
 
@@ -149,8 +147,7 @@ export function createStreamRegistry({
         updateHandler.handleSubscriptionUpdates<FriendshipStreamEvent, SubscriptionEventsEmitter['friendshipUpdate']>({
           rpcContext: context,
           eventName: 'friendshipUpdate',
-          getAddressFromUpdate: (update) => update.from,
-          shouldHandleUpdate: (update) => update.from !== context.address && update.to === context.address,
+          ...createSubscriptionPolicies(context).friendshipUpdate,
           parser: toFriendshipStreamEvent
         })
     },
@@ -162,15 +159,13 @@ export function createStreamRegistry({
         >({
           rpcContext: context,
           eventName: 'friendConnectivityUpdate',
-          getAddressFromUpdate: (update) => update.address,
-          shouldHandleUpdate: (update) => update.address !== context.address,
+          ...createSubscriptionPolicies(context).friendConnectivityUpdate,
           parser: toFriendConnectivityStreamEvent,
           // The friends already online when the subscription starts, as with the RPC stream.
           getInitialUpdates: async () => {
-            const onlinePeers = await peersStats.getConnectedPeers()
-            const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
+            const onlineFriends = await getOnlineFriendAddresses({ friendsDb, peersStats }, context.address)
 
-            return onlineFriends.map(({ address }) => ({ address, status: 'online' as const }))
+            return onlineFriends.map((address) => ({ address, status: 'online' as const }))
           }
         })
     },
@@ -179,8 +174,7 @@ export function createStreamRegistry({
         updateHandler.handleSubscriptionUpdates<BlockStreamEvent, SubscriptionEventsEmitter['blockUpdate']>({
           rpcContext: context,
           eventName: 'blockUpdate',
-          getAddressFromUpdate: (update) => update.blockerAddress,
-          shouldHandleUpdate: (update) => update.blockedAddress === context.address,
+          ...createSubscriptionPolicies(context).blockUpdate,
           parser: toBlockStreamEvent
         })
     },
@@ -192,8 +186,7 @@ export function createStreamRegistry({
         >({
           rpcContext: context,
           eventName: 'privateVoiceChatUpdate',
-          getAddressFromUpdate: () => 'not-needed',
-          shouldHandleUpdate: (update) => Object.values(VoiceChatStatus).includes(update.status),
+          ...createSubscriptionPolicies(context).privateVoiceChatUpdate,
           parser: toPrivateVoiceChatStreamEvent
         })
     },
@@ -205,8 +198,7 @@ export function createStreamRegistry({
         >({
           rpcContext: context,
           eventName: 'communityMemberConnectivityUpdate',
-          getAddressFromUpdate: (update) => update.memberAddress,
-          shouldHandleUpdate: () => true,
+          ...createSubscriptionPolicies(context).communityMemberConnectivityUpdate,
           parser: toCommunityMemberConnectivityStreamEvent
         })
     },
@@ -218,8 +210,7 @@ export function createStreamRegistry({
         >({
           rpcContext: context,
           eventName: 'communityVoiceChatUpdate',
-          getAddressFromUpdate: () => 'not-needed',
-          shouldHandleUpdate: () => true,
+          ...createSubscriptionPolicies(context).communityVoiceChatUpdate,
           parser: toCommunityVoiceChatStreamEvent
         })
     }

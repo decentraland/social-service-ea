@@ -17,12 +17,13 @@ export function errorMessageOrDefault(error: unknown, defaultMessage: string = '
  * is the only side worth keeping out of Sentry. The check is structural rather than `instanceof`
  * so it still holds if a second copy of the middleware ends up in the dependency tree.
  */
-export function isExpectedAuthRejection(error: unknown): boolean {
+export function isExpectedAuthRejection(error: unknown): error is Error & { statusCode: number } {
   if (!isErrorWithMessage(error) || error.name !== 'RequestError') {
     return false
   }
 
-  const { statusCode } = error as Error & { statusCode?: unknown }
+  if (!('statusCode' in error)) return false
+  const { statusCode } = error
 
   return typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500
 }

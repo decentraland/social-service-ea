@@ -1,3 +1,5 @@
+import { createStreamSessionsComponent } from '../src/adapters/stream-sessions'
+import { createStreamRegistry } from '../src/controllers/handlers/uws/stream-registry'
 // This file is the "test-environment" analogous for src/components.ts
 // Here we define the test components to be used in the testing environment
 
@@ -290,6 +292,11 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     communitiesDb
   })
+  const streamSessions = await createStreamSessionsComponent(
+    { logs, metrics, fetcher, voice, config, tracing: mockTracing, wsPool, subscribersContext },
+    createStreamRegistry({ updateHandler, friendsDb, peersStats })
+  )
+
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,
@@ -403,6 +410,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     voiceDb,
     worldsStats,
+    streamSessions,
     wsPool,
     schemaValidator
   }

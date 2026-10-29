@@ -2,15 +2,13 @@ import mitt from 'mitt'
 import { randomUUID } from 'crypto'
 import { WebSocket } from 'uWebSockets.js'
 import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
-import { verify } from '@dcl/crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
-import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
+import { isRpcAuthenticated as isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection } from '../../../utils/errors'
 import { WsPoolFullError } from '../../../logic/ws-pool'
-import { rejectSceneSigner } from '../../../utils/auth-metadata'
-import { parseAuthChainHeaders } from '../../../utils/ws-auth'
+import { getWsAuthSettings, verifyWsIdentity } from '../../../utils/ws-session'
 
 const textDecoder = new TextDecoder()
 
@@ -30,8 +28,7 @@ export async function registerWsHandler(
   const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 5 minutes in ms
-  const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000 // 5 minutes in ms
+  const { authTimeoutInMs, authSignatureExpirationInMs } = await getWsAuthSettings({ config })
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
@@ -114,16 +111,7 @@ export async function registerWsHandler(
     try {
       changeStage(data, { authenticating: true })
 
-      const authChainMessage = textDecoder.decode(message)
-
-      const verifyResult = await verify('get', '/', parseAuthChainHeaders(authChainMessage), {
-        fetcher,
-        expiration: authSignatureExpirationInMs,
-        // Scene signers are not accepted on this surface, matching the HTTP routes. Runs before
-        // signature verification, and the rejection it raises leaves through the catch below as a
-        // 3003 close — there is no weaker check for it to fall back to.
-        metadataValidator: rejectSceneSigner
-      })
+      const verifyResult = await verifyWsIdentity({ fetcher }, message, authSignatureExpirationInMs)
 
       if (data.timeout) {
         clearTimeout(data.timeout)

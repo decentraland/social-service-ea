@@ -1,3 +1,5 @@
+import { StreamEvent } from '../../types/subscriptions'
+export { StreamEvent } from '../../types/subscriptions'
 import * as Sentry from '@sentry/node'
 import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
 import { withoutTracing } from '../../utils/tracing'
@@ -21,15 +23,6 @@ export enum ServiceType {
   CALL = 'call',
   STREAM = 'stream',
   COMMUNITIES = 'communities'
-}
-
-export enum StreamEvent {
-  FRIENDSHIP_UPDATES = 'friendship_updates',
-  FRIEND_CONNECTIVITY_UPDATES = 'friend_connectivity_updates',
-  BLOCK_UPDATES = 'block_updates',
-  PRIVATE_VOICE_CHAT_UPDATES = 'private_voice_chat_updates',
-  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES = 'community_member_connectivity_updates',
-  COMMUNITY_VOICE_CHAT_UPDATES = 'community_voice_chat_updates'
 }
 
 type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (

@@ -169,6 +169,7 @@ describe('when comparing RPC and JSON subscription contracts', () => {
         const [rpcResult, jsonResult] = await Promise.all([rpcNext, jsonNext])
         expect(jsonResult.value).toEqual(normalizeRpc(stream, rpcResult.value))
         expect(jsonResult.value).toMatchObject({ address: ACTOR })
+        if (stream === 'friendship_updates') expect(jsonResult.value).toMatchObject({ id: 'request-1' })
       })
     }
   )

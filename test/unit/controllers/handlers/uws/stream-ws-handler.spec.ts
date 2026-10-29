@@ -1,3 +1,6 @@
+import { STOP_COMPONENT } from '@well-known-components/interfaces'
+import { createStreamSessionsComponent } from '../../../../../src/adapters/stream-sessions'
+import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import mitt from 'mitt'
 import { verify } from '@dcl/crypto-middleware'
 import { registerStreamWsHandler, STREAM_WS_PATH } from '../../../../../src/controllers/handlers/uws/stream-ws-handler'
@@ -5,7 +8,7 @@ import { StreamDefinition } from '../../../../../src/controllers/handlers/uws/st
 import { WsPoolFullError } from '../../../../../src/logic/ws-pool'
 import { ISubscribersContext, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
 import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../../../src/utils/emitterToGenerator'
-import { mockConfig, mockFetcher, mockLogs, mockMetrics, mockRpcServer, mockUWs } from '../../../../mocks/components'
+import { mockConfig, mockFetcher, mockLogs, mockMetrics, mockUWs } from '../../../../mocks/components'
 import { mockTracing } from '../../../../mocks/components/tracing'
 import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
 
@@ -23,6 +26,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve))
 type Events = { blockUpdate: { address: string } }
 
 describe('stream-ws-handler', () => {
+  let sessions: Awaited<ReturnType<typeof createStreamSessionsComponent>>
   let handlers: any
   let ws: any
   let data: WsUserData
@@ -103,13 +107,12 @@ describe('stream-ws-handler', () => {
     )
     ;(mockUWs.app.ws as jest.Mock).mockClear()
 
-    await registerStreamWsHandler(
+    sessions = await createStreamSessionsComponent(
       {
         logs: mockLogs,
-        uwsServer: mockUWs,
         metrics: mockMetrics,
         fetcher: mockFetcher,
-        rpcServer: mockRpcServer,
+        voice: createVoiceMockedComponent({}),
         config: mockConfig,
         tracing: mockTracing,
         wsPool,
@@ -117,11 +120,18 @@ describe('stream-ws-handler', () => {
       },
       streams
     )
+    await registerStreamWsHandler({
+      uwsServer: mockUWs,
+      config: mockConfig,
+      metrics: mockMetrics,
+      streamSessions: sessions
+    })
 
     handlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await sessions[STOP_COMPONENT]?.()
     jest.clearAllMocks()
     jest.useRealTimers()
   })
@@ -196,6 +206,42 @@ describe('stream-ws-handler', () => {
       it('should enforce the same budget', async () => {
         for (let index = 0; index < 40; index++) await send('invalid json')
         expect(ws.end).toHaveBeenCalledWith(1008, 'Message rate exceeded; reconnect with backoff')
+      })
+    })
+  })
+
+  describe('when the session component stops', () => {
+    describe('and a connection has active subscriptions', () => {
+      beforeEach(async () => {
+        await authenticate()
+        await send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+        await sessions[STOP_COMPONENT]?.()
+      })
+
+      it('should close the socket and release its subscription and pool slot', () => {
+        expect(ws.end).toHaveBeenCalledWith(1001, 'Server shutting down')
+        expect(emitter.all.get('blockUpdate') ?? []).toHaveLength(0)
+        expect(wsPool.unregisterConnection).toHaveBeenCalledTimes(1)
+      })
+
+      it('should keep cleanup idempotent when the socket close callback follows shutdown', () => {
+        handlers.close(ws, 1001)
+        expect(subscribersContext.removeConnection).toHaveBeenCalledTimes(1)
+        expect(wsPool.unregisterConnection).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and a connection is waiting for authentication', () => {
+      beforeEach(async () => {
+        jest.useFakeTimers()
+        await handlers.open(ws)
+        await sessions[STOP_COMPONENT]?.()
+        jest.advanceTimersByTime(60000)
+      })
+
+      it('should clear its authentication timer', () => {
+        expect(ws.end).toHaveBeenCalledTimes(1)
+        expect(ws.end).toHaveBeenCalledWith(1001, 'Server shutting down')
       })
     })
   })
@@ -283,6 +329,22 @@ describe('stream-ws-handler', () => {
         jest.advanceTimersByTime(60000)
 
         expect(ws.end).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the ready frame is dropped by the socket', () => {
+      beforeEach(async () => {
+        ws.send.mockReturnValueOnce(2)
+        ws.end.mockImplementation((_code: number) => handlers.close(ws, 1008))
+        await authenticate()
+      })
+
+      it('should detach the newly authenticated subscriber', () => {
+        expect(subscribersContext.removeConnection).toHaveBeenCalledWith(
+          '0xabc0000000000000000000000000000000000001',
+          'conn-1'
+        )
+        expect(wsPool.unregisterConnection).toHaveBeenCalledTimes(1)
       })
     })
 
@@ -629,7 +691,10 @@ describe('stream-ws-handler', () => {
       })
 
       it('should detach the user from the fan-out with its connection id', () => {
-        expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0xabc0000000000000000000000000000000000001', 'conn-1')
+        expect(subscribersContext.removeConnection).toHaveBeenCalledWith(
+          '0xabc0000000000000000000000000000000000001',
+          'conn-1'
+        )
       })
 
       it('should destroy the subscription generators', () => {
@@ -656,7 +721,7 @@ describe('stream-ws-handler', () => {
       })
 
       it('should not detach any user but still release the pool slot', () => {
-        expect(mockRpcServer.detachUser).not.toHaveBeenCalled()
+        expect(subscribersContext.removeConnection).not.toHaveBeenCalled()
         expect(wsPool.unregisterConnection).toHaveBeenCalled()
       })
 
@@ -671,7 +736,7 @@ describe('stream-ws-handler', () => {
     describe('and detaching the user throws', () => {
       beforeEach(async () => {
         await authenticate()
-        mockRpcServer.detachUser.mockImplementationOnce(() => {
+        subscribersContext.removeConnection.mockImplementationOnce(() => {
           throw new Error('detach failed')
         })
       })

@@ -1,3 +1,4 @@
+import { createSubscriptionPolicies, getOnlineFriendAddresses } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext } from '../../../types'
 import {
@@ -19,10 +20,8 @@ export function subscribeToFriendConnectivityUpdatesService({
       >({
         rpcContext: context,
         eventName: 'friendConnectivityUpdate',
+        ...createSubscriptionPolicies(context).friendConnectivityUpdate,
         shouldRetrieveProfile: true,
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
-        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
-          update.address !== context.address,
         parser: parseEmittedUpdateToFriendConnectivityUpdate,
         // fromPartial fills the remaining fields with protobuf defaults so the final
         // "stream closed" message is safe to encode.
@@ -32,10 +31,9 @@ export function subscribeToFriendConnectivityUpdatesService({
         // run are queued rather than lost. Best-effort: a DB/registry hiccup is logged there
         // and the subscription continues with live updates only.
         getInitialUpdates: async () => {
-          const onlinePeers = await peersStats.getConnectedPeers()
-          const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
+          const onlineFriends = await getOnlineFriendAddresses({ friendsDb, peersStats }, context.address)
 
-          const profiles = await registry.getProfiles(onlineFriends.map((friend) => friend.address))
+          const profiles = await registry.getProfiles(onlineFriends)
           return parseProfilesToFriends(profiles).map((friend) => ({
             friend,
             status: ConnectivityStatus.ONLINE

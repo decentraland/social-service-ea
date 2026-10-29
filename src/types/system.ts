@@ -32,7 +32,8 @@ import {
   IRewardComponent,
   IEmailComponent,
   ICdnCacheInvalidatorComponent,
-  IRegistryComponent
+  IRegistryComponent,
+  IStreamSessionsComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -137,6 +138,7 @@ export type BaseComponents = {
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
   worldsStats: IWorldsStatsComponent
+  streamSessions: IStreamSessionsComponent
   wsPool: IWsPoolComponent
   cdnCacheInvalidator: ICdnCacheInvalidatorComponent
   friends: IFriendsComponent
