@@ -1,6 +1,6 @@
 import { createSubscriptionPolicies, getOnlineFriendAddresses } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionEventsEmitter, SubscriptionContext, RPCServiceContext } from '../../../types'
 import {
   FriendConnectivityUpdate,
   ConnectivityStatus
@@ -12,7 +12,7 @@ export function subscribeToFriendConnectivityUpdatesService({
 }: RPCServiceContext<'logs' | 'friendsDb' | 'registry' | 'peersStats' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
-  return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
+  return async function* (_request: Empty, context: SubscriptionContext): AsyncGenerator<FriendConnectivityUpdate> {
     try {
       yield* updateHandler.handleSubscriptionUpdates<
         FriendConnectivityUpdate,

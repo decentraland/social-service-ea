@@ -16,8 +16,6 @@ import { VoiceChatStatus } from '../../../logic/voice/types'
  * streams, the events carry addresses only: clients resolve the profiles themselves.
  */
 
-export type { StreamDefinition } from '../../../types/subscriptions'
-
 export type ConnectivityStatusName = 'online' | 'offline' | 'away'
 
 export type FriendshipStreamEvent =

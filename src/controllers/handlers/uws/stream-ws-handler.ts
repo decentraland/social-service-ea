@@ -11,10 +11,13 @@ export async function registerStreamWsHandler({
   metrics,
   streamSessions
 }: Pick<AppComponents, 'uwsServer' | 'config' | 'metrics' | 'streamSessions'>): Promise<void> {
+  const maxPayloadLength = (await config.getNumber('STREAM_WS_MAX_PAYLOAD_LENGTH')) ?? 16 * 1024
+  if (!Number.isSafeInteger(maxPayloadLength) || maxPayloadLength < 1)
+    throw new Error('STREAM_WS_MAX_PAYLOAD_LENGTH must be a positive integer')
   uwsServer.app.ws<WsUserData>(STREAM_WS_PATH, {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 300,
     sendPingsAutomatically: true,
-    maxPayloadLength: (await config.getNumber('WS_MAX_PAYLOAD_LENGTH')) ?? 1024 * 1024,
+    maxPayloadLength: maxPayloadLength,
     maxBackpressure: (await config.getNumber('WS_MAX_BACKPRESSURE')) ?? 128 * 1024,
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), STREAM_WS_PATH)
@@ -36,6 +39,7 @@ export async function registerStreamWsHandler({
     },
     open: streamSessions.open,
     message: streamSessions.message,
-    close: streamSessions.close
+    close: streamSessions.close,
+    drain: streamSessions.drain
   })
 }

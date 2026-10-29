@@ -1,7 +1,7 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/controllers/handlers/rpc/get-friends'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseExpectedFriends } from '../../../../mocks/friend'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
@@ -12,7 +12,7 @@ describe('when getting friends', () => {
   let friendsComponent: IFriendsComponent
   let getFriendsProfiles: jest.MockedFunction<typeof friendsComponent.getFriendsProfiles>
 
-  const rpcContext: RpcServerContext = {
+  const rpcContext: SubscriptionContext = {
     address: '0x123',
     subscribersContext: undefined
   }

@@ -1,3 +1,4 @@
+import { abortable } from '../utils/abortable'
 import {
   CommunityVoiceChatUpdate,
   ConnectivityStatus,
@@ -513,8 +514,10 @@ export function createUpdateHandlerComponent(
       // churning (and re-running these queries every time).
       if (getInitialUpdates) {
         try {
-          const initialUpdates = await getInitialUpdates()
+          const initialUpdates = await abortable(getInitialUpdates(), rpcContext.signal)
+          if (!initialUpdates || rpcContext.signal?.aborted) return
           for (const initialUpdate of initialUpdates) {
+            if (rpcContext.signal?.aborted) return
             yield initialUpdate
           }
         } catch (error: any) {
@@ -526,6 +529,7 @@ export function createUpdateHandlerComponent(
       }
 
       for await (const update of updatesGenerator) {
+        if (rpcContext.signal?.aborted) return
         if (!shouldHandleUpdate(update as U)) {
           continue
         }

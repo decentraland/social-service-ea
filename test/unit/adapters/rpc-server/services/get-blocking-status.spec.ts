@@ -1,6 +1,6 @@
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getBlockingStatusService } from '../../../../../src/controllers/handlers/rpc/get-blocking-status'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
 describe('when getting blocking status', () => {
@@ -8,7 +8,7 @@ describe('when getting blocking status', () => {
   let friendsComponent: IFriendsComponent
   let getBlockingStatusMethod: jest.MockedFunction<typeof friendsComponent.getBlockingStatus>
 
-  const rpcContext: RpcServerContext = {
+  const rpcContext: SubscriptionContext = {
     address: '0x123',
     subscribersContext: undefined
   }

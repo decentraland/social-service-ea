@@ -49,7 +49,7 @@ import {
   CommunityPrivacyEnum
 } from '../logic/community'
 import { Pagination } from './entities'
-import { Subscribers, SubscriptionEventsEmitter } from './rpc'
+import { Subscribers, SubscriptionEventsEmitter } from './subscriptions'
 import { RpcServiceCreators } from '../controllers/routes/rpc.routes'
 import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updates'
 import { PlacesApiResponse } from '../adapters/places-api'
@@ -517,4 +517,6 @@ export interface IStreamSessionsComponent extends IBaseComponent {
   message(socket: InternalWebSocket, frame: ArrayBuffer): Promise<void>
   /** Release one connection and its subscriptions. */
   close(socket: InternalWebSocket, code: number): void
+  /** Resume event delivery once uWS has drained buffered output. */
+  drain(socket: InternalWebSocket): void
 }

@@ -1,6 +1,6 @@
 import { createSubscriptionPolicies } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
+import { SubscriptionContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import {
   PrivateVoiceChatCredentials,
   PrivateVoiceChatStatus,
@@ -53,7 +53,7 @@ export function subscribeToPrivateVoiceChatUpdatesService({
 }: RPCServiceContext<'logs' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-private-voice-chat-updates-service')
 
-  return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<PrivateVoiceChatUpdate> {
+  return async function* (_request: Empty, context: SubscriptionContext): AsyncGenerator<PrivateVoiceChatUpdate> {
     try {
       yield* updateHandler.handleSubscriptionUpdates<
         PrivateVoiceChatUpdate,

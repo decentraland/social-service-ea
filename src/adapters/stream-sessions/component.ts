@@ -1,3 +1,4 @@
+import { abortable } from '../../utils/abortable'
 import { STOP_COMPONENT } from '@well-known-components/interfaces'
 import {
   AppComponents,
@@ -11,13 +12,21 @@ import { InternalWebSocket } from '../../types/ws'
 import { normalizeAddress } from '../../utils/address'
 import { isAuthenticated, isNotAuthenticated } from '../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection, errorMessageOrDefault } from '../../utils/errors'
-import { WsPoolFullError } from '../../logic/ws-pool'
+import { WsPoolFullError, WsAdmissionError } from '../../logic/ws-pool'
 import { detachSubscriptionConnection } from '../../logic/subscriptions/lifecycle'
 import { getWsAuthSettings, verifyWsIdentity } from '../../utils/ws-session'
 import { parseStreamMessage, StreamClientMessage } from './messages'
 
 const SEND_DROPPED = 2
-type Subscription = { id: string; stream: string; cancelled: boolean; unsubscribed: boolean; destroy: () => void }
+type Subscription = {
+  id: string
+  stream: string
+  cancelled: boolean
+  unsubscribed: boolean
+  destroy: () => void
+  release: () => void
+  abort: AbortController
+}
 
 /**
  * Own JSON socket authentication, subscription lifetime and backpressure/rate policies.
@@ -44,6 +53,11 @@ export async function createStreamSessionsComponent(
   const logger = logs.getLogger('stream-sessions')
   const { authTimeoutInMs, authSignatureExpirationInMs } = await getWsAuthSettings({ config })
   const sockets = new Map<string, InternalWebSocket>()
+  const drainWaiters = new Map<string, { promise: Promise<void>; resolve: () => void }>()
+  function resume(connectionId: string): void {
+    drainWaiters.get(connectionId)?.resolve()
+    drainWaiters.delete(connectionId)
+  }
   const cleanedConnections = new WeakSet<WsUserData>()
   const messagesPerSecond = (await config.getNumber('STREAM_WS_MESSAGES_PER_SECOND')) ?? 20
   const messageBurst = (await config.getNumber('STREAM_WS_MESSAGE_BURST')) ?? 40
@@ -96,6 +110,13 @@ export async function createStreamSessionsComponent(
         closeForPolicy(ws, 'slow_consumer', 'Slow consumer')
         return false
       }
+      if (result === 0 && !drainWaiters.has(ws.getUserData().wsConnectionId)) {
+        let resolveDrain = () => {}
+        const promise = new Promise<void>((resolve) => {
+          resolveDrain = resolve
+        })
+        drainWaiters.set(ws.getUserData().wsConnectionId, { promise, resolve: resolveDrain })
+      }
       return true
     } catch {
       // ws.send throws on an already-closed socket.
@@ -119,6 +140,8 @@ export async function createStreamSessionsComponent(
     if (!subscriptions) return
     for (const subscription of subscriptions.values()) {
       subscription.cancelled = true
+      subscription.abort.abort()
+      subscription.release()
       try {
         subscription.destroy()
       } catch (error) {
@@ -138,6 +161,7 @@ export async function createStreamSessionsComponent(
     const { wsConnectionId } = data
 
     data.isConnected = false
+    resume(wsConnectionId)
 
     if (isAuthenticated(data)) {
       // Each step is independent, a failure in one must not skip the others.
@@ -196,9 +220,13 @@ export async function createStreamSessionsComponent(
       logger.debug('Authenticated stream user', { address, wsConnectionId: data.wsConnectionId })
       safeSend(ws, { type: 'ready' })
     } catch (error) {
+      if (error instanceof WsAdmissionError) {
+        endSocket(ws, 1013, 'Address connection limit; retry with backoff')
+        return
+      }
       const expectedRejection = isExpectedAuthRejection(error)
 
-      if (isExpectedAuthRejection(error)) {
+      if (expectedRejection) {
         logger.warn(`Rejected auth chain: ${errorMessageOrDefault(error)}`, {
           statusCode: error.statusCode,
           wsConnectionId: data.wsConnectionId
@@ -210,6 +238,10 @@ export async function createStreamSessionsComponent(
         tracing.captureException(error, { wsConnectionId: data.wsConnectionId })
       }
 
+      metrics.increment('ws_auth_errors_by_protocol', {
+        protocol: 'stream',
+        type: expectedRejection ? 'client_rejected' : 'server_error'
+      })
       metrics.increment('ws_auth_errors', { type: expectedRejection ? 'client_rejected' : 'server_error' })
       endSocket(ws, 3003, 'Unauthorized')
     } finally {
@@ -230,6 +262,13 @@ export async function createStreamSessionsComponent(
     // with the subscribers context, and the connection-level teardown is otherwise all-or-nothing.
     const scopedContext: ISubscribersContext = {
       ...subscribersContext,
+      setActiveSubscription: (connectionId, event) => {
+        subscribersContext.setActiveSubscription(connectionId, event)
+        subscription.release = () => subscribersContext.clearActiveSubscription(connectionId, event)
+      },
+      clearActiveSubscription: (connectionId, event) => {
+        if (!subscription.cancelled) subscribersContext.clearActiveSubscription(connectionId, event)
+      },
       registerGenerator: (wsConnectionId, generator) => {
         subscription.destroy = () => generator.destroy()
         if (subscription.cancelled) {
@@ -244,12 +283,14 @@ export async function createStreamSessionsComponent(
         address: data.address,
         wsConnectionId: data.wsConnectionId,
         subscribersContext: scopedContext,
+        signal: subscription.abort.signal,
         onSubscriptionOverflow: () =>
           closeForPolicy(ws, 'subscription_overflow', 'Subscription overflow; reconnect and resync')
       })
 
       for await (const update of generator) {
-        if (!data.isConnected) break
+        await abortable(drainWaiters.get(data.wsConnectionId)?.promise ?? Promise.resolve(), subscription.abort.signal)
+        if (!data.isConnected || subscription.cancelled) break
 
         const sent = safeSend(ws, { type: 'event', id, stream, data: update })
         if (!sent) break
@@ -257,7 +298,7 @@ export async function createStreamSessionsComponent(
         metrics.increment('stream_ws_updates_sent', { event: stream })
       }
 
-      if (data.isConnected) {
+      if (data.isConnected && !subscription.cancelled) {
         safeSend(ws, { type: 'end', id, reason: subscription.unsubscribed ? 'unsubscribed' : 'completed' })
       }
     } catch (error) {
@@ -265,11 +306,16 @@ export async function createStreamSessionsComponent(
         wsConnectionId: data.wsConnectionId,
         address: data.address
       })
-      if (data.isConnected) {
-        sendError(ws, 'stream_error', 'The subscription ended unexpectedly', id)
+      if (data.isConnected && !subscription.cancelled) {
+        sendError(
+          ws,
+          error instanceof WsAdmissionError ? 'rate_limited' : 'stream_error',
+          error instanceof WsAdmissionError ? error.message : 'The subscription ended unexpectedly',
+          id
+        )
       }
     } finally {
-      subscriptions?.delete(id)
+      if (subscriptions?.get(id) === subscription) subscriptions.delete(id)
     }
   }
 
@@ -300,7 +346,15 @@ export async function createStreamSessionsComponent(
       }
     }
 
-    const subscription: Subscription = { id, stream, cancelled: false, unsubscribed: false, destroy: () => {} }
+    const subscription: Subscription = {
+      id,
+      stream,
+      cancelled: false,
+      unsubscribed: false,
+      destroy: () => {},
+      release: () => {},
+      abort: new AbortController()
+    }
     subscriptions.set(id, subscription)
 
     if (!safeSend(ws, { type: 'subscribed', id })) return
@@ -329,7 +383,11 @@ export async function createStreamSessionsComponent(
 
     subscription.cancelled = true
     subscription.unsubscribed = true
+    subscription.abort.abort()
     subscription.destroy()
+    subscription.release()
+    subscriptionsByConnection.get(data.wsConnectionId)?.delete(id)
+    safeSend(ws, { type: 'end', id, reason: 'unsubscribed' })
   }
 
   function handleMessage(ws: InternalWebSocket, data: WsStreamAuthenticatedUserData, rawMessage: ArrayBuffer) {
@@ -356,7 +414,7 @@ export async function createStreamSessionsComponent(
       const data = ws.getUserData()
 
       try {
-        wsPool.registerConnection(ws)
+        wsPool.registerConnection(ws, 'stream')
         sockets.set(data.wsConnectionId, ws)
         Object.assign(data, {
           timeout: setTimeout(() => {
@@ -401,7 +459,11 @@ export async function createStreamSessionsComponent(
       sockets.delete(ws.getUserData().wsConnectionId)
       cleanupConnection(ws.getUserData(), code)
     },
+    drain: (ws) => {
+      if (ws.getBufferedAmount() === 0) resume(ws.getUserData().wsConnectionId)
+    },
     [STOP_COMPONENT]: async () => {
+      // wsPool normally ends the sockets first; this releases any still open and is idempotent with close.
       for (const ws of sockets.values()) {
         try {
           cleanupConnection(ws.getUserData(), 1001)

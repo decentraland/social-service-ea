@@ -1,6 +1,6 @@
 import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
 import { GetIncomingPrivateVoiceChatRequestResponse } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { IncomingVoiceChatNotFoundError } from '../../../logic/voice/errors'
 
@@ -11,7 +11,7 @@ export function getIncomingPrivateVoiceChatRequestsService({
 
   return async function (
     _request: Empty,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<GetIncomingPrivateVoiceChatRequestResponse> {
     try {
       const privateVoiceChat = await voice.getIncomingPrivateVoiceChat(context.address)

@@ -3,7 +3,8 @@ import {
   EndCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import {
   UserNotCommunityMemberError,
   CommunityVoiceChatPermissionError,
@@ -19,7 +20,7 @@ export function endCommunityVoiceChatService({
 
   return async function (
     request: EndCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<EndCommunityVoiceChatResponse> {
     try {
       logger.info('Ending community voice chat', {

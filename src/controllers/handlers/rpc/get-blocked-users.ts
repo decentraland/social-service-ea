@@ -1,5 +1,5 @@
 import { parseProfilesToBlockedUsers } from '../../../logic/friends'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
 import { normalizeBlockedUsersPagination } from '../../../utils/friendship-pagination'
 import {
@@ -10,7 +10,10 @@ import {
 export function getBlockedUsersService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('get-blocked-users-service')
 
-  return async function (request: GetBlockedUsersPayload, context: RpcServerContext): Promise<GetBlockedUsersResponse> {
+  return async function (
+    request: GetBlockedUsersPayload,
+    context: SubscriptionContext
+  ): Promise<GetBlockedUsersResponse> {
     const pagination = normalizeBlockedUsersPagination(request.pagination)
     const { address: loggedUserAddress } = context
 

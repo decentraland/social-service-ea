@@ -12,7 +12,7 @@ import {
   toPrivateVoiceChatStreamEvent
 } from '../../../../../src/controllers/handlers/uws/stream-registry'
 import { VoiceChatStatus } from '../../../../../src/logic/voice/types'
-import { Action, RpcServerContext } from '../../../../../src/types'
+import { Action, SubscriptionContext } from '../../../../../src/types'
 
 const USER_ADDRESS = '0x1234567890123456789012345678901234567890'
 const OTHER_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -64,15 +64,17 @@ describe('when mapping a friend connectivity update', () => {
   })
 
   it('should drop an unknown status', () => {
-    expect(toFriendConnectivityStreamEvent({ address: OTHER_ADDRESS, status: ConnectivityStatus.UNRECOGNIZED })).toBeNull()
+    expect(
+      toFriendConnectivityStreamEvent({ address: OTHER_ADDRESS, status: ConnectivityStatus.UNRECOGNIZED })
+    ).toBeNull()
   })
 })
 
 describe('when mapping a block update', () => {
   it('should carry who blocked the user and whether the block is on', () => {
-    expect(toBlockStreamEvent({ blockerAddress: OTHER_ADDRESS, blockedAddress: USER_ADDRESS, isBlocked: false })).toEqual(
-      { address: OTHER_ADDRESS, isBlocked: false }
-    )
+    expect(
+      toBlockStreamEvent({ blockerAddress: OTHER_ADDRESS, blockedAddress: USER_ADDRESS, isBlocked: false })
+    ).toEqual({ address: OTHER_ADDRESS, isBlocked: false })
   })
 })
 
@@ -159,7 +161,7 @@ describe('when mapping a community voice chat update', () => {
 describe('when opening the streams', () => {
   let handleSubscriptionUpdates: jest.Mock
   let streams: ReturnType<typeof createStreamRegistry>
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let friendsDb: { getOnlineFriends: jest.Mock }
   let peersStats: { getConnectedPeers: jest.Mock }
 

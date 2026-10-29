@@ -5,9 +5,9 @@ import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
-import { isRpcAuthenticated as isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
+import { isRpcAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection } from '../../../utils/errors'
-import { WsPoolFullError } from '../../../logic/ws-pool'
+import { WsPoolFullError, WsAdmissionError } from '../../../logic/ws-pool'
 import { getWsAuthSettings, verifyWsIdentity } from '../../../utils/ws-session'
 
 const textDecoder = new TextDecoder()
@@ -16,7 +16,7 @@ export const FIVE_MINUTES_IN_SECONDS = 300
 export const THREE_MINUTES_IN_MS = 180000
 
 const getAddress = (data: WsUserData) => {
-  return isAuthenticated(data) ? data.address : 'Not authenticated'
+  return isRpcAuthenticated(data) ? data.address : 'Not authenticated'
 }
 
 export async function registerWsHandler(
@@ -82,7 +82,7 @@ export async function registerWsHandler(
     // path — otherwise it would rely on ws.end() throwing on the already-closing socket.
     data.isConnected = false
 
-    if (isAuthenticated(data)) {
+    if (isRpcAuthenticated(data)) {
       // Each step is independent — a failure in one must not prevent the others.
       // Previously these were in a single try/catch, so a throw in transport.close()
       // would skip detachUser() and emitter.clear(), permanently leaking the subscriber.
@@ -151,6 +151,7 @@ export async function registerWsHandler(
 
       changeStage(data, {
         auth: true,
+        authenticating: false,
         address,
         eventEmitter,
         isConnected: true,
@@ -189,6 +190,12 @@ export async function registerWsHandler(
 
       rpcServer.attachUser({ transport, address, wsConnectionId: data.wsConnectionId })
     } catch (error: any) {
+      if (error instanceof WsAdmissionError) {
+        try {
+          ws.end(1013, 'Address connection limit; retry with backoff')
+        } catch {}
+        return
+      }
       const expectedRejection = isExpectedAuthRejection(error)
 
       if (expectedRejection) {
@@ -210,6 +217,10 @@ export async function registerWsHandler(
         })
       }
 
+      metrics.increment('ws_auth_errors_by_protocol', {
+        protocol: 'rpc',
+        type: expectedRejection ? 'client_rejected' : 'server_error'
+      })
       metrics.increment('ws_auth_errors', { type: expectedRejection ? 'client_rejected' : 'server_error' })
       // The client may have disconnected while verify() was in flight; end() on an
       // already-closed socket throws and would escape the async message handler as an
@@ -276,7 +287,7 @@ export async function registerWsHandler(
 
       // Let the transport retry queued messages now that the socket drained, instead of
       // waiting for its backoff timer.
-      if (isAuthenticated(data)) {
+      if (isRpcAuthenticated(data)) {
         data.eventEmitter.emit('drain')
       }
     },
@@ -388,7 +399,7 @@ export async function registerWsHandler(
       const messageText = textDecoder.decode(message)
       // Captured before cleanup: cleanupConnection resets the auth flag, so the type guard
       // never matches afterwards.
-      const address = isAuthenticated(data) ? data.address : undefined
+      const address = isRpcAuthenticated(data) ? data.address : undefined
 
       cleanupConnection(data, code)
 

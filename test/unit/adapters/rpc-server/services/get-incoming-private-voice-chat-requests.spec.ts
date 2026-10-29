@@ -1,6 +1,6 @@
 import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
 import { getIncomingPrivateVoiceChatRequestsService } from '../../../../../src/controllers/handlers/rpc/get-incoming-private-voice-chat-requests'
-import { RpcServerContext, RPCServiceContext, PrivateVoiceChat } from '../../../../../src/types'
+import { SubscriptionContext, RPCServiceContext, PrivateVoiceChat } from '../../../../../src/types'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
@@ -15,7 +15,7 @@ describe('getIncomingPrivateVoiceChatRequestsService', () => {
   let getIncomingPrivateVoiceChatMock: jest.MockedFn<IVoiceComponent['getIncomingPrivateVoiceChat']>
   let errorLogMock: jest.MockedFn<ReturnType<ILoggerComponent['getLogger']>['error']>
   let request: Empty
-  let context: RpcServerContext
+  let context: SubscriptionContext
   const address = '0x1234567890abcdef'
   const callId = 'test-call-id-123'
   const callerAddress = '0xabcdef1234567890'
@@ -45,7 +45,7 @@ describe('getIncomingPrivateVoiceChatRequestsService', () => {
 
     context = {
       address
-    } as RpcServerContext
+    } as SubscriptionContext
   })
 
   describe('when getting incoming private voice chat requests successfully', () => {

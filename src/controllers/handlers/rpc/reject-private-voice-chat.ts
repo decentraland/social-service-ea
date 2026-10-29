@@ -3,7 +3,7 @@ import {
   RejectPrivateVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatNotFoundError } from '../../../logic/voice/errors'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 export function rejectPrivateVoiceChatService({ components: { logs, voice } }: RPCServiceContext<'logs' | 'voice'>) {
@@ -11,7 +11,7 @@ export function rejectPrivateVoiceChatService({ components: { logs, voice } }: R
 
   return async function (
     request: RejectPrivateVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<RejectPrivateVoiceChatResponse> {
     try {
       await voice.rejectPrivateVoiceChat(request.callId, context.address)

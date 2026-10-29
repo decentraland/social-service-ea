@@ -2,7 +2,8 @@ import {
   RequestToSpeakInCommunityVoiceChatPayload,
   RequestToSpeakInCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import { NotAuthorizedError } from '@dcl/http-commons'
 import {
   UserNotCommunityMemberError,
@@ -20,7 +21,7 @@ export function requestToSpeakInCommunityVoiceChatService({
 
   return async function (
     request: RequestToSpeakInCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<RequestToSpeakInCommunityVoiceChatResponse> {
     const userAddress = context.address.toLowerCase()
 

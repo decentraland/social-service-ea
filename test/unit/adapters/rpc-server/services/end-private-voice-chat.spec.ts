@@ -1,6 +1,6 @@
 import { endPrivateVoiceChatService } from '../../../../../src/controllers/handlers/rpc/end-private-voice-chat'
 import { EndPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, RPCServiceContext } from '../../../../../src/types'
+import { SubscriptionContext, RPCServiceContext } from '../../../../../src/types'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
@@ -15,7 +15,7 @@ describe('endPrivateVoiceChatService', () => {
   let endPrivateVoiceChatMock: jest.MockedFn<IVoiceComponent['endPrivateVoiceChat']>
   let errorLogMock: jest.MockedFn<ReturnType<ILoggerComponent['getLogger']>['error']>
   let request: EndPrivateVoiceChatPayload
-  let context: RpcServerContext
+  let context: SubscriptionContext
   const callId = 'test-call-id-123'
   const address = '0x1234567890abcdef'
 
@@ -46,7 +46,7 @@ describe('endPrivateVoiceChatService', () => {
 
     context = {
       address
-    } as RpcServerContext
+    } as SubscriptionContext
   })
 
   describe('when ending a private voice chat successfully', () => {

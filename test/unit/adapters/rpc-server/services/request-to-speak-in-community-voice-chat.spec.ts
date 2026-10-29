@@ -12,7 +12,7 @@ import {
   CommunityVoiceChatNotFoundError
 } from '../../../../../src/logic/community-voice/errors'
 import { ICommunityVoiceComponent } from '../../../../../src/logic/community-voice'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 
 describe('when requesting to speak in a community voice chat', () => {
   let requestToSpeakMock: jest.MockedFn<ICommunityVoiceComponent['requestToSpeakInCommunityVoiceChat']>
@@ -21,7 +21,7 @@ describe('when requesting to speak in a community voice chat', () => {
   let communityId: string
   let userAddress: string
   let payload: RequestToSpeakInCommunityVoiceChatPayload
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let service: ReturnType<typeof requestToSpeakInCommunityVoiceChatService>
   let result: RequestToSpeakInCommunityVoiceChatResponse
 

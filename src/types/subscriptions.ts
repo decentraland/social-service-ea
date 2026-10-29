@@ -80,6 +80,8 @@ export type SubscriptionContext = {
   subscribersContext: ISubscribersContext
   /** Optional transport policy when a subscription loses queued updates. */
   onSubscriptionOverflow?: () => void
+  /** Cancels pending snapshot delivery without waiting for the data source. */
+  signal?: AbortSignal
 }
 
 export enum StreamEvent {

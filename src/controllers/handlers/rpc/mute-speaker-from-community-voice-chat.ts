@@ -1,4 +1,5 @@
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import { NotAuthorizedError } from '@dcl/http-commons'
 import {
   CommunityVoiceChatNotFoundError,
@@ -21,7 +22,7 @@ export function muteSpeakerFromCommunityVoiceChatService({
 
   return async function (
     request: MuteSpeakerFromCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<MuteSpeakerFromCommunityVoiceChatResponse> {
     try {
       logger.info('Muting/unmuting speaker from community voice chat', {

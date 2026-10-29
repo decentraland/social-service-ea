@@ -4,8 +4,8 @@ import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import mitt from 'mitt'
 import { verify } from '@dcl/crypto-middleware'
 import { registerStreamWsHandler, STREAM_WS_PATH } from '../../../../../src/controllers/handlers/uws/stream-ws-handler'
-import { StreamDefinition } from '../../../../../src/controllers/handlers/uws/stream-registry'
-import { WsPoolFullError } from '../../../../../src/logic/ws-pool'
+import { StreamDefinition } from '../../../../../src/types/subscriptions'
+import { WsPoolFullError, WsAdmissionError } from '../../../../../src/logic/ws-pool'
 import { ISubscribersContext, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
 import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../../../src/utils/emitterToGenerator'
 import { mockConfig, mockFetcher, mockLogs, mockMetrics, mockUWs } from '../../../../mocks/components'
@@ -246,6 +246,171 @@ describe('stream-ws-handler', () => {
     })
   })
 
+  describe('when unsubscribing during a pending snapshot', () => {
+    let resolveFirst: (value: { n: number }) => void
+    let resolveSecond: (value: { n: number }) => void
+    let opens: number
+
+    beforeEach(async () => {
+      opens = 0
+      streams.delayed_snapshot = {
+        open: async function* (context) {
+          context.subscribersContext.setActiveSubscription('conn-1', 'snapshot')
+          opens += 1
+          try {
+            yield await new Promise<{ n: number }>((resolve) => {
+              if (opens === 1) resolveFirst = resolve
+              else resolveSecond = resolve
+            })
+          } finally {
+            context.subscribersContext.clearActiveSubscription('conn-1', 'snapshot')
+          }
+        }
+      }
+      await authenticate()
+      await send({ type: 'subscribe', id: 'same', stream: 'delayed_snapshot' })
+      await send({ type: 'unsubscribe', id: 'same' })
+      await send({ type: 'subscribe', id: 'same', stream: 'delayed_snapshot' })
+      resolveFirst({ n: 1 })
+      await flush()
+    })
+
+    afterEach(async () => {
+      resolveSecond({ n: 2 })
+      await flush()
+    })
+
+    it('should acknowledge cancellation immediately and allow reusing the id', () => {
+      expect(sentOfType('subscribed')).toHaveLength(2)
+      expect(sentOfType('end')).toEqual([{ type: 'end', id: 'same', reason: 'unsubscribed' }])
+      expect(sentOfType('event')).toEqual([])
+    })
+
+    it('should not let the cancelled generator clear the replacement subscription', () => {
+      expect(subscribersContext.clearActiveSubscription).toHaveBeenCalledTimes(1)
+    })
+
+    describe('and the client subscribes to the same stream again', () => {
+      beforeEach(async () => {
+        await send({ type: 'subscribe', id: 'other', stream: 'delayed_snapshot' })
+      })
+
+      it('should still track the replacement subscription', () => {
+        expect(lastSent()).toMatchObject({ code: 'duplicate_subscription' })
+      })
+    })
+  })
+
+  describe('when a snapshot is buffered by the socket', () => {
+    beforeEach(async () => {
+      await authenticate()
+      ws.getBufferedAmount = jest.fn().mockReturnValue(0)
+      // The acknowledgement succeeds; the first snapshot event is buffered, not dropped.
+      ws.send.mockReturnValueOnce(1).mockImplementationOnce((payload: string) => {
+        sent.push(JSON.parse(payload))
+        return 0
+      })
+      await send({ type: 'subscribe', id: 'finite', stream: 'finite_stream' })
+      await flush()
+    })
+
+    it('should pause event delivery until the socket drains', () => {
+      expect(sentOfType('event').map((event) => event.data.n)).toEqual([1])
+    })
+
+    describe('and the socket drains', () => {
+      beforeEach(async () => {
+        handlers.drain(ws)
+        await flush()
+      })
+
+      it('should resume delivery without duplicating the buffered event', () => {
+        expect(sentOfType('event').map((event) => event.data.n)).toEqual([1, 2])
+        expect(ws.end).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe.each([0, 65, 16384])('when an unsubscribe id has invalid length %s', (length) => {
+    beforeEach(async () => {
+      await authenticate()
+      await send({ type: 'unsubscribe', id: 'x'.repeat(length) })
+    })
+
+    it('should reject the id without reflecting it', () => {
+      expect(lastSent()).toMatchObject({ type: 'error', code: 'unknown_subscription' })
+      expect(lastSent().id).toBeUndefined()
+    })
+  })
+
+  describe('when the address already holds the maximum connections', () => {
+    beforeEach(async () => {
+      subscribersContext.addConnection.mockImplementationOnce(() => {
+        throw new WsAdmissionError('connections')
+      })
+      await authenticate()
+    })
+
+    it('should close with try again later instead of unauthorized', () => {
+      expect(ws.end).toHaveBeenCalledWith(1013, 'Address connection limit; retry with backoff')
+      expect(sentOfType('ready')).toHaveLength(0)
+    })
+  })
+
+  describe('when registering the stream route', () => {
+    let options: any
+
+    describe('and no payload limit is configured', () => {
+      beforeEach(() => {
+        options = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
+      })
+
+      it('should cap incoming frames at 16 KiB, below the RPC socket limit', () => {
+        expect(options.maxPayloadLength).toBe(16 * 1024)
+      })
+    })
+
+    describe('and the payload limit is configured', () => {
+      beforeEach(async () => {
+        mockConfig.getNumber.mockImplementation(
+          async (key) => (({ STREAM_WS_MAX_PAYLOAD_LENGTH: 4096 }) as any)[key] ?? undefined
+        )
+        ;(mockUWs.app.ws as jest.Mock).mockClear()
+        await registerStreamWsHandler({
+          uwsServer: mockUWs,
+          config: mockConfig,
+          metrics: mockMetrics,
+          streamSessions: sessions
+        })
+        options = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
+      })
+
+      it('should use it', () => {
+        expect(options.maxPayloadLength).toBe(4096)
+      })
+    })
+
+    describe.each([0, -1, 1.5])('and the payload limit is %s', (value) => {
+      let registration: Promise<void>
+
+      beforeEach(() => {
+        mockConfig.getNumber.mockImplementation(
+          async (key) => (({ STREAM_WS_MAX_PAYLOAD_LENGTH: value }) as any)[key] ?? undefined
+        )
+        registration = registerStreamWsHandler({
+          uwsServer: mockUWs,
+          config: mockConfig,
+          metrics: mockMetrics,
+          streamSessions: sessions
+        })
+      })
+
+      it('should refuse to register the route', async () => {
+        await expect(registration).rejects.toThrow('STREAM_WS_MAX_PAYLOAD_LENGTH must be a positive integer')
+      })
+    })
+  })
+
   describe('when upgrading a connection', () => {
     it('should start unauthenticated with a unique connection id', () => {
       const res = { upgrade: jest.fn() }
@@ -264,7 +429,7 @@ describe('stream-ws-handler', () => {
     it('should register it in the pool', async () => {
       await handlers.open(ws)
 
-      expect(wsPool.registerConnection).toHaveBeenCalledWith(ws)
+      expect(wsPool.registerConnection).toHaveBeenCalledWith(ws, 'stream')
       expect(data.isConnected).toBe(true)
     })
 

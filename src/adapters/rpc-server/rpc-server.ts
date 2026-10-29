@@ -1,7 +1,7 @@
 import { detachSubscriptionConnection } from '../../logic/subscriptions/lifecycle'
 import { createRpcServer } from '@dcl/rpc'
 import { registerService } from '@dcl/rpc/dist/codegen'
-import { AppComponents, IRPCServerComponent, RpcServerContext } from '../../types'
+import { AppComponents, IRPCServerComponent, SubscriptionContext } from '../../types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   BLOCK_UPDATES_CHANNEL,
@@ -31,7 +31,7 @@ export async function createRpcServerComponent({
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
-  const rpcServer = createRpcServer<RpcServerContext>({
+  const rpcServer = createRpcServer<SubscriptionContext>({
     logger: logs.getLogger('rpc-server')
   })
 

@@ -1,4 +1,4 @@
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,
   GetFriendshipRequestsPayload
@@ -14,7 +14,7 @@ export function getPendingFriendshipRequestsService({
 
   return async function (
     request: GetFriendshipRequestsPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
       const pagination = normalizeFriendshipRequestsPagination(request.pagination)

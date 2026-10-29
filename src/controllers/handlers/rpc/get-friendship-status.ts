@@ -4,7 +4,7 @@ import {
   GetFriendshipStatusResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getFriendshipRequestStatus } from '../../../logic/friends'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 
 export function getFriendshipStatusService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
@@ -12,7 +12,7 @@ export function getFriendshipStatusService({ components: { logs, friends } }: RP
 
   return async function (
     request: GetFriendshipStatusPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<GetFriendshipStatusResponse> {
     try {
       const { address: loggedUserAddress } = context

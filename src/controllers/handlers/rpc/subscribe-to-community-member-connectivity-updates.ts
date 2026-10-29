@@ -1,6 +1,6 @@
 import { createSubscriptionPolicies } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
+import { SubscriptionContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { CommunityMemberConnectivityUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 /**
@@ -28,7 +28,7 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
 
   return async function* (
     _request: Empty,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): AsyncGenerator<CommunityMemberConnectivityUpdate> {
     try {
       yield* updateHandler.handleSubscriptionUpdates<

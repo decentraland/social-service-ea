@@ -2,7 +2,8 @@ import {
   RejectSpeakRequestInCommunityVoiceChatPayload,
   RejectSpeakRequestInCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError,
@@ -24,7 +25,7 @@ export function rejectSpeakRequestInCommunityVoiceChatService({
 
   return async function (
     request: RejectSpeakRequestInCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<RejectSpeakRequestInCommunityVoiceChatResponse> {
     try {
       logger.info('Rejecting speak request in community voice chat', {

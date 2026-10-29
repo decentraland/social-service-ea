@@ -10,7 +10,7 @@ import { CommunityVoiceChatNotFoundError } from '../../../../../src/logic/commun
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { CommunityRole } from '../../../../../src/types/entities'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../../../src/logic/community/types'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 
 describe('when promoting a speaker in a community voice chat', () => {
   let promoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['promoteSpeakerInCommunityVoiceChat']>
@@ -27,7 +27,7 @@ describe('when promoting a speaker in a community voice chat', () => {
   let actingUserAddress: string
   let targetUserAddress: string
   let payload: PromoteSpeakerInCommunityVoiceChatPayload
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let service: ReturnType<typeof promoteSpeakerInCommunityVoiceChatService>
   let result: PromoteSpeakerInCommunityVoiceChatResponse
 

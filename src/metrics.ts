@@ -6,6 +6,27 @@ import { IMetricsComponent } from '@well-known-components/interfaces'
 export const metricDeclarations = {
   ...getDefaultHttpMetrics(),
   ...logsMetricsDeclarations,
+  ws_active_connections_by_protocol: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Active WebSocket connections by protocol',
+    labelNames: ['protocol']
+  },
+  ws_connection_duration_seconds_by_protocol: {
+    type: IMetricsComponent.HistogramType,
+    help: 'WebSocket connection duration by protocol',
+    labelNames: ['protocol'],
+    buckets: [1, 5, 10, 30, 60, 300, 600, 1800, 3600, 7200, 14400]
+  },
+  ws_auth_errors_by_protocol: {
+    type: IMetricsComponent.CounterType,
+    help: 'Authentication failures by protocol and cause',
+    labelNames: ['protocol', 'type']
+  },
+  ws_admission_rejections: {
+    type: IMetricsComponent.CounterType,
+    help: 'Shared per-address WebSocket admission rejections',
+    labelNames: ['protocol', 'reason']
+  },
   ws_active_connections: {
     type: IMetricsComponent.GaugeType,
     help: 'Number of WebSocket active connections'

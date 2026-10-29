@@ -17,7 +17,7 @@ jest.mock('@sentry/node', () => {
     suppressTracing: jest.fn((callback: (...args: unknown[]) => unknown) => callback())
   }
 })
-import { RpcServerContext } from '../../../src/types'
+import { SubscriptionContext } from '../../../src/types'
 import { mockLogs } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components'
 import { createMockConfigComponent } from '../../mocks/components/config'
@@ -36,7 +36,7 @@ describe('RPC Server Metrics Component', () => {
           config
         }
       }),
-      mockContext: { address: '0x123' } as RpcServerContext,
+      mockContext: { address: '0x123' } as SubscriptionContext,
       config
     }
   }
@@ -511,7 +511,11 @@ describe('RPC Server Metrics Component', () => {
           yield 1
         }
         const wrappedService = wrapper.withMetrics({
-          testStream: { creator: jest.fn().mockImplementation(testGenerator), type: ServiceType.STREAM, event: 'testStream' }
+          testStream: {
+            creator: jest.fn().mockImplementation(testGenerator),
+            type: ServiceType.STREAM,
+            event: 'testStream'
+          }
         })
 
         for await (const _ of wrappedService.testStream({}, mockContext)) {
@@ -569,7 +573,11 @@ describe('RPC Server Metrics Component', () => {
           yield 1
         }
         const wrappedService = wrapper.withMetrics({
-          testStream: { creator: jest.fn().mockImplementation(testGenerator), type: ServiceType.STREAM, event: 'testStream' }
+          testStream: {
+            creator: jest.fn().mockImplementation(testGenerator),
+            type: ServiceType.STREAM,
+            event: 'testStream'
+          }
         })
 
         const results = []
@@ -628,7 +636,11 @@ describe('RPC Server Metrics Component', () => {
           throw testError
         }
         const wrappedService = wrapper.withMetrics({
-          errorStream: { creator: jest.fn().mockImplementation(errorGenerator), type: ServiceType.STREAM, event: 'errorStream' }
+          errorStream: {
+            creator: jest.fn().mockImplementation(errorGenerator),
+            type: ServiceType.STREAM,
+            event: 'errorStream'
+          }
         })
 
         const iterator = wrappedService.errorStream({}, mockContext)

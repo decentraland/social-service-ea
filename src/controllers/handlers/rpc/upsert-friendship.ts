@@ -4,7 +4,7 @@ import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
+import { Action, SubscriptionContext, RPCServiceContext } from '../../../types'
 import { parseUpsertFriendshipRequest, parseFriendshipRequestToFriendshipRequestResponse } from '../../../logic/friends'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { BlockedUserError, FriendshipRateLimitError, InvalidFriendshipActionError } from '../../../logic/friends/errors'
@@ -14,7 +14,7 @@ export function upsertFriendshipService({ components: { logs, friends } }: RPCSe
 
   return async function (
     request: UpsertFriendshipPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<UpsertFriendshipResponse> {
     try {
       const parsedRequest = parseUpsertFriendshipRequest(request)

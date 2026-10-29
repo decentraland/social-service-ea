@@ -13,14 +13,14 @@ import {
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
-  RpcServerContext,
+  SubscriptionContext,
   ICommsGatekeeperComponent
 } from '../../../../../src/types'
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 
 describe('upsertSocialSettingsService', () => {
   const testAddress = '0x1234567890abcdef'
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let upsertSocialSettingsMock: jest.MockedFunction<IFriendsDatabaseComponent['upsertSocialSettings']>
   let upsertSocialSettings: ReturnType<typeof upsertSocialSettingsService>
   let commsGatekeeperMock: jest.MockedFunction<ICommsGatekeeperComponent['updateUserPrivateMessagePrivacyMetadata']>

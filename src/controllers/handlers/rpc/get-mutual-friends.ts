@@ -1,5 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import {
   GetMutualFriendsPayload,
   PaginatedFriendsProfilesResponse
@@ -15,7 +15,7 @@ export function getMutualFriendsService({ components: { logs, friends } }: RPCSe
 
   return async function (
     request: GetMutualFriendsPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<PaginatedFriendsProfilesResponse> {
     try {
       const { address: requester } = context

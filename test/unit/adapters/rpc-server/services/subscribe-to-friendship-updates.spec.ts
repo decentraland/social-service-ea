@@ -4,7 +4,7 @@ import {
   SubscriptionStreamClosed,
   SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Action, RpcServerContext } from '../../../../../src/types'
+import { Action, SubscriptionContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
@@ -17,7 +17,7 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to friendship updates', () => {
   let subscribeToFriendshipUpdates: ReturnType<typeof subscribeToFriendshipUpdatesService>
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
   let mockFriendProfile: any
@@ -33,7 +33,10 @@ describe('when subscribing to friendship updates', () => {
 
   beforeEach(() => {
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext(
+      { logs, metrics: mockMetrics, config: mockConfig },
+      createWsPoolMockedComponent()
+    )
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockFriendProfile = createMockProfile('0x456')
 

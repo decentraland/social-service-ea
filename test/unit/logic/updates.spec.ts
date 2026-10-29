@@ -13,7 +13,7 @@ import {
   IUpdateHandlerComponent,
   ISubscribersContext,
   SubscriptionEventsEmitter,
-  RpcServerContext
+  SubscriptionContext
 } from '../../../src/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { sleep } from '../../../src/utils/timer'
@@ -1541,7 +1541,7 @@ describe('Updates Handlers', () => {
 
   describe('when handling subscription updates', () => {
     let parser: jest.Mock
-    let rpcContext: RpcServerContext
+    let rpcContext: SubscriptionContext
     let subscribersContext: ISubscribersContext
     let blockUpdate: SubscriptionEventsEmitter['blockUpdate']
     let friendshipUpdate: SubscriptionEventsEmitter['friendshipUpdate']
@@ -1581,7 +1581,10 @@ describe('Updates Handlers', () => {
           getAddressFromUpdate: () => '0x456',
           shouldHandleUpdate: () => true,
           parser,
-          getInitialUpdates: () => new Promise<unknown[]>((resolve) => { resolveSnapshot = resolve })
+          getInitialUpdates: () =>
+            new Promise<unknown[]>((resolve) => {
+              resolveSnapshot = resolve
+            })
         })
         first = generator.next()
         for (let index = 0; index < 1001; index++) {
@@ -1597,7 +1600,9 @@ describe('Updates Handlers', () => {
 
       it('should notify the transport instead of only counting the dropped update', () => {
         expect(onOverflow).toHaveBeenCalledTimes(1)
-        expect(mockMetrics.increment).toHaveBeenCalledWith('subscription_updates_dropped_total', { event: 'blockUpdate' })
+        expect(mockMetrics.increment).toHaveBeenCalledWith('subscription_updates_dropped_total', {
+          event: 'blockUpdate'
+        })
       })
     })
 
@@ -1686,8 +1691,8 @@ describe('Updates Handlers', () => {
         mockMetrics.increment.mockClear()
         parser.mockResolvedValue({ parsed: true })
 
-        const contextA: RpcServerContext = { address: '0x123', wsConnectionId: 'conn-A', subscribersContext }
-        const contextB: RpcServerContext = { address: '0x123', wsConnectionId: 'conn-B', subscribersContext }
+        const contextA: SubscriptionContext = { address: '0x123', wsConnectionId: 'conn-A', subscribersContext }
+        const contextB: SubscriptionContext = { address: '0x123', wsConnectionId: 'conn-B', subscribersContext }
 
         const generatorA = updateHandler.handleSubscriptionUpdates({
           rpcContext: contextA,
@@ -1805,7 +1810,7 @@ describe('Updates Handlers', () => {
 
     describe('and the connection identity is missing', () => {
       it('should not start the subscription and should log an error', async () => {
-        const contextWithoutConnId: RpcServerContext = { address: '0x123', subscribersContext }
+        const contextWithoutConnId: SubscriptionContext = { address: '0x123', subscribersContext }
 
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext: contextWithoutConnId,
@@ -1827,7 +1832,7 @@ describe('Updates Handlers', () => {
 
     describe('and the address has no emitter (connection no longer attached)', () => {
       it('should throw so the client backs off instead of hot-looping, and should log a warning', async () => {
-        const contextWithoutEmitter: RpcServerContext = {
+        const contextWithoutEmitter: SubscriptionContext = {
           address: '0xnoemitter',
           wsConnectionId: 'conn-detached',
           subscribersContext

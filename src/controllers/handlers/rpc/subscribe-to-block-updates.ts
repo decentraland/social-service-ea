@@ -1,6 +1,6 @@
 import { createSubscriptionPolicies } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
+import { SubscriptionContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { BlockUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { parseEmittedUpdateToBlockUpdate } from '../../../logic/friends'
 
@@ -9,7 +9,7 @@ export function subscribeToBlockUpdatesService({
 }: RPCServiceContext<'logs' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-block-updates-service')
 
-  return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<BlockUpdate> {
+  return async function* (_request: Empty, context: SubscriptionContext): AsyncGenerator<BlockUpdate> {
     // The blocked/unblocked user should know who blocked/unblocked them
     try {
       yield* updateHandler.handleSubscriptionUpdates<BlockUpdate, SubscriptionEventsEmitter['blockUpdate']>({

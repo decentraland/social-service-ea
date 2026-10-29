@@ -1,5 +1,5 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import {
   mockFriendsDB,
   createMockPeersStatsComponent,
@@ -24,7 +24,7 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to friend connectivity updates', () => {
   let subscribeToFriendConnectivityUpdates: ReturnType<typeof subscribeToFriendConnectivityUpdatesService>
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let mockUpdateHandler: jest.Mocked<any>
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let subscribersContext: any

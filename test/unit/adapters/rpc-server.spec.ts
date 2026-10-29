@@ -3,7 +3,7 @@ import {
   IRPCServerComponent,
   ISubscribersContext,
   IUpdateHandlerComponent,
-  RpcServerContext
+  SubscriptionContext
 } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import { mockConfig, mockFriendsDB, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
@@ -33,7 +33,7 @@ jest.mock('@dcl/rpc', () => ({
 
 describe('createRpcServerComponent', () => {
   let rpcServer: IRPCServerComponent
-  let rpcServerMock: jest.Mocked<RpcServer<RpcServerContext>>
+  let rpcServerMock: jest.Mocked<RpcServer<SubscriptionContext>>
   let setHandlerMock: jest.Mock, attachTransportMock: jest.Mock
   let mockTransport: Transport
   let subscribersContext: ISubscribersContext
@@ -45,11 +45,14 @@ describe('createRpcServerComponent', () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
     mockLogs = createLogsMockedComponent()
 
-    subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext(
+      { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+      createWsPoolMockedComponent()
+    )
 
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')
-    }) as jest.Mocked<RpcServer<RpcServerContext>>
+    }) as jest.Mocked<RpcServer<SubscriptionContext>>
 
     setHandlerMock = rpcServerMock.setHandler as jest.Mock
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock

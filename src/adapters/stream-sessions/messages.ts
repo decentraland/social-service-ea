@@ -37,7 +37,7 @@ export function parseStreamMessage(raw: ArrayBuffer): ParseResult {
         return { ok: false, code: 'unknown_stream', message: 'Unknown stream', id: value.id, receivedType: 'subscribe' }
       return { ok: true, message: { type: 'subscribe', id: value.id, stream: value.stream } }
     case 'unsubscribe':
-      if (typeof value.id !== 'string')
+      if (typeof value.id !== 'string' || value.id.length === 0 || value.id.length > 64)
         return {
           ok: false,
           code: 'unknown_subscription',
