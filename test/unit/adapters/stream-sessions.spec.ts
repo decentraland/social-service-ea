@@ -128,6 +128,7 @@ describe('when handling stream WebSocket sessions', () => {
       streams
     )
     await registerStreamWsHandler({
+      logs: mockLogs,
       uwsServer: mockUWs,
       config: mockConfig,
       metrics: mockMetrics,
@@ -384,6 +385,10 @@ describe('when handling stream WebSocket sessions', () => {
       expect(wsPool.endConnection).not.toHaveBeenCalled()
     })
 
+    it('should count the first-frame handshake', () => {
+      expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_authentications', { method: 'first_frame' })
+    })
+
     describe('and the socket closes', () => {
       beforeEach(() => {
         handlers.close(ws, 1000)
@@ -512,6 +517,7 @@ describe('when handling stream WebSocket sessions', () => {
         )
         ;(mockUWs.app.ws as jest.Mock).mockClear()
         await registerStreamWsHandler({
+          logs: mockLogs,
           uwsServer: mockUWs,
           config: mockConfig,
           metrics: mockMetrics,
@@ -533,6 +539,7 @@ describe('when handling stream WebSocket sessions', () => {
           async (key) => (({ STREAM_WS_MAX_PAYLOAD_LENGTH: value }) as any)[key] ?? undefined
         )
         registration = registerStreamWsHandler({
+          logs: mockLogs,
           uwsServer: mockUWs,
           config: mockConfig,
           metrics: mockMetrics,
@@ -546,13 +553,185 @@ describe('when handling stream WebSocket sessions', () => {
     })
   })
 
+  describe('when upgrading a connection', () => {
+    let res: any
+    let req: any
+    let requestHeaders: Record<string, string>
+    let upgraded: any
+
+    const runUpgrade = async () => {
+      handlers.upgrade(res, req, {})
+      await flush()
+      upgraded = res.upgrade.mock.calls[0]?.[0]
+    }
+
+    beforeEach(() => {
+      requestHeaders = {
+        'sec-websocket-key': 'key',
+        'sec-websocket-protocol': '',
+        'sec-websocket-extensions': '',
+        'x-identity-auth-chain-0': '{"type":"SIGNER"}',
+        'x-identity-timestamp': '1',
+        'x-identity-metadata': '{}',
+        'user-agent': 'unity'
+      }
+      res = {
+        upgrade: jest.fn(),
+        onAborted: jest.fn(),
+        cork: jest.fn((callback: () => void) => callback()),
+        writeStatus: jest.fn().mockReturnThis(),
+        end: jest.fn()
+      }
+      req = {
+        getMethod: () => 'GET',
+        getHeader: (key: string) => requestHeaders[key] ?? '',
+        forEach: (callback: (key: string, value: string) => void) =>
+          Object.entries(requestHeaders).forEach(([key, value]) => callback(key, value))
+      }
+    })
+
+    describe('and the request carries a valid auth chain in its headers', () => {
+      beforeEach(async () => {
+        ;(verify as jest.Mock).mockResolvedValueOnce({ auth: '0xAbC0000000000000000000000000000000000001' })
+        await runUpgrade()
+      })
+
+      it('should verify only the auth headers, signed for the stream path', () => {
+        expect(verify).toHaveBeenCalledWith(
+          'get',
+          STREAM_WS_PATH,
+          {
+            'x-identity-auth-chain-0': '{"type":"SIGNER"}',
+            'x-identity-timestamp': '1',
+            'x-identity-metadata': '{}'
+          },
+          expect.anything()
+        )
+      })
+
+      it('should upgrade inside a cork with the verified address', () => {
+        expect(res.cork).toHaveBeenCalled()
+        expect(upgraded).toMatchObject({
+          auth: false,
+          protocol: 'stream',
+          verifiedAddress: '0xabc0000000000000000000000000000000000001'
+        })
+      })
+
+      describe('and the socket opens', () => {
+        beforeEach(async () => {
+          jest.useFakeTimers()
+          data = upgraded
+          await handlers.open(ws)
+          jest.advanceTimersByTime(60000)
+        })
+
+        it('should be authenticated and ready without an auth frame', () => {
+          expect(data).toMatchObject({
+            auth: true,
+            address: '0xabc0000000000000000000000000000000000001',
+            isConnected: true
+          })
+          expect(sentOfType('ready')).toHaveLength(1)
+        })
+
+        it('should claim its address slot and join the fan-out', () => {
+          expect(wsAdmission.claimConnection).toHaveBeenCalledWith(
+            '0xabc0000000000000000000000000000000000001',
+            data.wsConnectionId,
+            'stream'
+          )
+          expect(subscribersContext.addConnection).toHaveBeenCalledWith(
+            '0xabc0000000000000000000000000000000000001',
+            data.wsConnectionId
+          )
+        })
+
+        it('should not start the first-frame deadline', () => {
+          expect(ws.end).not.toHaveBeenCalled()
+        })
+
+        it('should not keep the verified address on the socket data', () => {
+          expect(data).not.toHaveProperty('verifiedAddress')
+        })
+
+        it('should count the handshake method', () => {
+          expect(mockMetrics.increment).toHaveBeenCalledWith('stream_ws_authentications', {
+            method: 'upgrade_headers'
+          })
+        })
+      })
+    })
+
+    describe('and the auth chain in its headers is rejected', () => {
+      beforeEach(async () => {
+        ;(verify as jest.Mock).mockRejectedValueOnce(requestError('Invalid signature', 401))
+        await runUpgrade()
+      })
+
+      it('should answer 401 without upgrading', () => {
+        expect(res.writeStatus).toHaveBeenCalledWith('401 Unauthorized')
+        expect(res.end).toHaveBeenCalled()
+        expect(res.upgrade).not.toHaveBeenCalled()
+      })
+
+      it('should count a client rejection on the stream protocol', () => {
+        expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors_by_protocol', {
+          protocol: 'stream',
+          type: 'client_rejected'
+        })
+      })
+    })
+
+    describe('and verifying the headers fails on the server side', () => {
+      beforeEach(async () => {
+        ;(verify as jest.Mock).mockRejectedValueOnce(requestError('Catalyst unreachable', 503))
+        await runUpgrade()
+      })
+
+      it('should answer 503 without upgrading', () => {
+        expect(res.writeStatus).toHaveBeenCalledWith('503 Service Unavailable')
+        expect(res.upgrade).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the client goes away while the headers are verified', () => {
+      beforeEach(async () => {
+        ;(verify as jest.Mock).mockResolvedValueOnce({ auth: '0xAbC0000000000000000000000000000000000001' })
+        res.onAborted.mockImplementation((onAbort: () => void) => onAbort())
+        await runUpgrade()
+      })
+
+      it('should not touch the aborted response', () => {
+        expect(res.upgrade).not.toHaveBeenCalled()
+        expect(res.writeStatus).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the request carries no auth headers', () => {
+      beforeEach(async () => {
+        delete requestHeaders['x-identity-auth-chain-0']
+        delete requestHeaders['x-identity-timestamp']
+        delete requestHeaders['x-identity-metadata']
+        await runUpgrade()
+      })
+
+      it('should upgrade right away for a first-frame handshake', () => {
+        expect(verify).not.toHaveBeenCalled()
+        expect(res.onAborted).not.toHaveBeenCalled()
+        expect(upgraded).toMatchObject({ auth: false, protocol: 'stream' })
+        expect(upgraded).not.toHaveProperty('verifiedAddress')
+      })
+    })
+  })
+
   describe('when upgrading two connections', () => {
     let first: any
     let second: any
 
     beforeEach(() => {
       const res = { upgrade: jest.fn() }
-      const req = { getMethod: () => 'GET', getHeader: () => 'x' }
+      const req = { getMethod: () => 'GET', getHeader: () => 'x', forEach: jest.fn() }
       handlers.upgrade(res, req, {})
       handlers.upgrade(res, req, {})
       ;[first, second] = res.upgrade.mock.calls.map((call: any[]) => call[0])

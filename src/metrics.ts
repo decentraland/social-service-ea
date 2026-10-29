@@ -129,6 +129,11 @@ export const metricDeclarations = {
     help: 'Number of errors reported on the plain WebSocket stream protocol',
     labelNames: ['type']
   },
+  stream_ws_authentications: {
+    type: IMetricsComponent.CounterType,
+    help: 'Successful plain WebSocket stream authentications by handshake method',
+    labelNames: ['method'] // 'upgrade_headers', 'first_frame'
+  },
   stream_ws_close_codes: {
     type: IMetricsComponent.CounterType,
     help: 'Number of plain WebSocket stream protocol close codes',

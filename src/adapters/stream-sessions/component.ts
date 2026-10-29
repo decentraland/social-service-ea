@@ -4,6 +4,7 @@ import {
   AppComponents,
   ISubscribersContext,
   IStreamSessionsComponent,
+  WsNotAuthenticatedUserData,
   WsStreamAuthenticatedUserData,
   WsUserData
 } from '../../types'
@@ -15,7 +16,7 @@ import { isErrorWithMessage, isExpectedAuthRejection, errorMessageOrDefault } fr
 import { WsPoolFullError } from '../../logic/ws-pool'
 import { SubscriptionRateLimitedError } from '../../logic/ws-admission'
 import { detachSubscriptionConnection } from '../../logic/subscriptions/lifecycle'
-import { getWsAuthSettings, verifyWsIdentity } from '../../utils/ws-session'
+import { getWsAuthSettings, verifyWsAuthChain, verifyWsIdentity } from '../../utils/ws-session'
 import { parseStreamMessage, StreamClientMessage } from './messages'
 import { STREAM_WS_PATH } from './constants'
 
@@ -199,6 +200,45 @@ export async function createStreamSessionsComponent(
     Object.assign(data, { auth: false, isConnected: false, authenticating: false })
   }
 
+  function recordAuthFailure(error: unknown, wsConnectionId?: string): void {
+    const expectedRejection = isExpectedAuthRejection(error)
+
+    if (expectedRejection) {
+      logger.warn(`Rejected auth chain: ${errorMessageOrDefault(error)}`, {
+        statusCode: error.statusCode,
+        ...(wsConnectionId && { wsConnectionId })
+      })
+    } else {
+      logger.error(`Error verifying auth chain: ${errorMessageOrDefault(error)}`, {
+        ...(wsConnectionId && { wsConnectionId })
+      })
+      tracing.captureException(error, wsConnectionId ? { wsConnectionId } : {})
+    }
+
+    const type = expectedRejection ? 'client_rejected' : 'server_error'
+    metrics.increment('ws_auth_errors_by_protocol', { protocol: 'stream', type })
+    metrics.increment('ws_auth_errors', { type })
+  }
+
+  // Synchronous, so no client frame can interleave between the claim and `ready`.
+  function completeAuthentication(
+    ws: InternalWebSocket,
+    data: WsUserData,
+    address: string,
+    method: 'upgrade_headers' | 'first_frame'
+  ): void {
+    Object.assign(data, { auth: true, address, authenticating: false })
+
+    const { evictedConnectionId } = wsAdmission.claimConnection(address, data.wsConnectionId, 'stream')
+    if (evictedConnectionId) wsPool.endConnection(evictedConnectionId, 3005, 'Replaced by a newer connection')
+    // Same registration the RPC sockets do on attach: the address-level fan-out starts here.
+    subscribersContext.addConnection(address, data.wsConnectionId)
+
+    metrics.increment('stream_ws_authentications', { method })
+    logger.debug('Authenticated stream user', { address, wsConnectionId: data.wsConnectionId, method })
+    safeSend(ws, { type: 'ready' })
+  }
+
   async function authenticateUser(ws: InternalWebSocket, data: WsUserData, message: ArrayBuffer) {
     try {
       Object.assign(data, { authenticating: true })
@@ -210,43 +250,15 @@ export async function createStreamSessionsComponent(
         delete data.timeout
       }
 
-      const address = normalizeAddress(verifyResult.auth)
-
       // The socket may have closed while verify() was in flight.
       if (!data.isConnected) {
         metrics.increment('ws_auth_race_condition_aborted')
         return
       }
 
-      Object.assign(data, { auth: true, address, authenticating: false })
-
-      const { evictedConnectionId } = wsAdmission.claimConnection(address, data.wsConnectionId, 'stream')
-      if (evictedConnectionId) wsPool.endConnection(evictedConnectionId, 3005, 'Replaced by a newer connection')
-      // Same registration the RPC sockets do on attach: the address-level fan-out starts here.
-      subscribersContext.addConnection(address, data.wsConnectionId)
-
-      logger.debug('Authenticated stream user', { address, wsConnectionId: data.wsConnectionId })
-      safeSend(ws, { type: 'ready' })
+      completeAuthentication(ws, data, normalizeAddress(verifyResult.auth), 'first_frame')
     } catch (error) {
-      const expectedRejection = isExpectedAuthRejection(error)
-
-      if (expectedRejection) {
-        logger.warn(`Rejected auth chain: ${errorMessageOrDefault(error)}`, {
-          statusCode: error.statusCode,
-          wsConnectionId: data.wsConnectionId
-        })
-      } else {
-        logger.error(`Error verifying auth chain: ${errorMessageOrDefault(error)}`, {
-          wsConnectionId: data.wsConnectionId
-        })
-        tracing.captureException(error, { wsConnectionId: data.wsConnectionId })
-      }
-
-      metrics.increment('ws_auth_errors_by_protocol', {
-        protocol: 'stream',
-        type: expectedRejection ? 'client_rejected' : 'server_error'
-      })
-      metrics.increment('ws_auth_errors', { type: expectedRejection ? 'client_rejected' : 'server_error' })
+      recordAuthFailure(error, data.wsConnectionId)
       endSocket(ws, 3003, 'Unauthorized')
     } finally {
       Object.assign(data, { authenticating: false })
@@ -434,13 +446,6 @@ export async function createStreamSessionsComponent(
       try {
         wsPool.registerConnection(ws)
         sockets.set(data.wsConnectionId, ws)
-        Object.assign(data, {
-          timeout: setTimeout(() => {
-            logger.warn('Closing stream connection, no auth chain received', { wsConnectionId: data.wsConnectionId })
-            endSocket(ws, 3004, 'Authorization timeout')
-          }, authTimeoutInMs)
-        })
-
         Object.assign(data, { isConnected: true, connectionStartTime: Date.now() })
       } catch (error) {
         if (error instanceof WsPoolFullError) {
@@ -450,6 +455,39 @@ export async function createStreamSessionsComponent(
           tracing.captureException(error, { wsConnectionId: data.wsConnectionId })
         }
         endSocket(ws, 1013, 'Unable to acquire connection')
+        return
+      }
+
+      const verifiedAddress = 'verifiedAddress' in data ? data.verifiedAddress : undefined
+      if (verifiedAddress) {
+        delete (data as WsNotAuthenticatedUserData).verifiedAddress
+        try {
+          completeAuthentication(ws, data, verifiedAddress, 'upgrade_headers')
+        } catch (error) {
+          logger.error('Failed to attach a stream connection authenticated on upgrade', {
+            wsConnectionId: data.wsConnectionId,
+            error: errorMessageOrDefault(error)
+          })
+          tracing.captureException(error, { wsConnectionId: data.wsConnectionId })
+          endSocket(ws, 1011, 'Internal error')
+        }
+        return
+      }
+
+      Object.assign(data, {
+        timeout: setTimeout(() => {
+          logger.warn('Closing stream connection, no auth chain received', { wsConnectionId: data.wsConnectionId })
+          endSocket(ws, 3004, 'Authorization timeout')
+        }, authTimeoutInMs)
+      })
+    },
+    verifyUpgrade: async (headers) => {
+      try {
+        const { auth } = await verifyWsAuthChain({ fetcher }, headers, authSignatureExpirationInMs, STREAM_WS_PATH)
+        return normalizeAddress(auth)
+      } catch (error) {
+        recordAuthFailure(error)
+        throw error
       }
     },
     message: async (ws, message) => {

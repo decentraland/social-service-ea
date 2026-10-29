@@ -24,16 +24,19 @@ export function streamUrl(port: string | undefined): string {
 }
 
 /**
- * Opens a socket on the plain-JSON stream protocol. When `identity` is given the auth chain is sent
- * as the first frame and the promise resolves after the server's `ready`; otherwise the raw socket is
- * returned and the test drives the handshake itself.
+ * Opens a socket on the plain-JSON stream protocol. When `identity` is given the auth chain is sent, as the
+ * first frame or as upgrade request headers, and the promise resolves after the server's `ready`; otherwise the
+ * raw socket is returned and the test drives the handshake itself.
  */
 export async function connectStreamClient(
   { config }: Pick<TestComponents, 'config'>,
-  identity?: Identity | null
+  identity?: Identity | null,
+  { handshake = 'first_frame' }: { handshake?: 'first_frame' | 'upgrade_headers' } = {}
 ): Promise<StreamClient> {
   const port = await config.getString('RPC_SERVER_PORT')
-  const socket = new WebSocket(streamUrl(port))
+  const socket = new WebSocket(streamUrl(port), {
+    headers: identity && handshake === 'upgrade_headers' ? createAuthHeaders('get', STREAM_WS_PATH, {}, identity) : {}
+  })
 
   const received: StreamMessage[] = []
   const consumed = new Set<StreamMessage>()
@@ -88,9 +91,29 @@ export async function connectStreamClient(
   }
 
   if (identity) {
-    client.send(createAuthHeaders('get', STREAM_WS_PATH, {}, identity))
+    if (handshake === 'first_frame') client.send(createAuthHeaders('get', STREAM_WS_PATH, {}, identity))
     await waitFor((message) => message.type === 'ready')
   }
 
   return client
+}
+
+/** Opens the stream upgrade with the given headers and resolves with the HTTP status the server answered. */
+export async function upgradeStatus(
+  { config }: Pick<TestComponents, 'config'>,
+  headers: Record<string, string>
+): Promise<number> {
+  const port = await config.getString('RPC_SERVER_PORT')
+  const socket = new WebSocket(streamUrl(port), { headers })
+  return new Promise((resolve, reject) => {
+    socket.once('open', () => {
+      socket.close()
+      resolve(101)
+    })
+    socket.once('unexpected-response', (_request, response) => {
+      resolve(response.statusCode ?? 0)
+      socket.terminate()
+    })
+    socket.once('error', reject)
+  })
 }

@@ -32,6 +32,8 @@ export type WsStreamAuthenticatedUserData = WsBaseUserData & {
 
 export type WsNotAuthenticatedUserData = WsBaseUserData & {
   timeout?: NodeJS.Timeout
+  /** Set by a stream upgrade whose request headers carried a verified auth chain; consumed on open. */
+  verifiedAddress?: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsStreamAuthenticatedUserData | WsNotAuthenticatedUserData

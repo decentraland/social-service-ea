@@ -5,7 +5,7 @@ import { Action } from '../../src/types'
 import { VoiceChatStatus } from '../../src/logic/voice/types'
 import { createAuthHeaders, createTestIdentity, Identity } from './utils/auth'
 import { connectAuthenticatedRpcClient } from './utils/rpc-client'
-import { connectStreamClient, StreamClient } from './utils/stream-client'
+import { connectStreamClient, StreamClient, upgradeStatus } from './utils/stream-client'
 import { STREAM_WS_PATH } from '../../src/adapters/stream-sessions/constants'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -47,6 +47,36 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
     clients.splice(0).forEach((client) => client.close())
     closers.splice(0).forEach((close) => close())
     await sleep(300)
+  })
+
+  describe('when a client authenticates with headers on the upgrade request', () => {
+    let client: StreamClient
+
+    beforeEach(async () => {
+      client = await connectStreamClient(components, identity, { handshake: 'upgrade_headers' })
+      clients.push(client)
+      client.send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+      await client.waitFor((message) => message.type === 'subscribed')
+      await sleep(500)
+      await publishBlock(address)
+    })
+
+    it('should be ready without an auth frame and receive its updates', async () => {
+      const event = await client.waitFor((message) => message.type === 'event')
+      expect(event).toMatchObject({ id: 'blocks', data: { address: BLOCKER, isBlocked: true } })
+    })
+  })
+
+  describe('when the upgrade request carries an auth chain signed for another path', () => {
+    let status: number
+
+    beforeEach(async () => {
+      status = await upgradeStatus(components, createAuthHeaders('get', '/', {}, identity))
+    })
+
+    it('should refuse the upgrade with 401', () => {
+      expect(status).toBe(401)
+    })
   })
 
   describe('when an address opens more sockets than its connection cap', () => {

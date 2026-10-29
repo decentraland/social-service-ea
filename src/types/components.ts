@@ -1,4 +1,5 @@
 import type { InternalWebSocket } from './ws'
+import type { AuthChainHeaders } from '../utils/ws-auth'
 import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
 import { IPgComponent as IBasePgComponent } from '@dcl/pg-component'
 import { WebSocketServer } from 'ws'
@@ -512,7 +513,13 @@ export type IEmailComponent = IBaseComponent & {
 
 /** Owns JSON WebSocket sessions independently of route registration. */
 export interface IStreamSessionsComponent extends IBaseComponent {
-  /** Acquire a pool slot and start the shared authentication deadline. */
+  /**
+   * Verify an auth chain sent as headers of the upgrade request, before any socket exists.
+   * @returns The normalized wallet address.
+   * @throws The `@dcl/crypto-middleware` error; a `RequestError` with a 4xx status when the chain is rejected.
+   */
+  verifyUpgrade(headers: AuthChainHeaders): Promise<string>
+  /** Acquire a pool slot, then finish an upgrade-verified handshake or start the first-frame deadline. */
   open(socket: InternalWebSocket): void
   /** Authenticate or process one validated protocol frame. */
   message(socket: InternalWebSocket, frame: ArrayBuffer): Promise<void>

@@ -13,18 +13,28 @@ the last connection of either kind closes.
 
 ## Handshake
 
-The first client frame is the Signed Fetch auth chain as a JSON object of `x-identity-*` headers, signed for method
-`get` and path `/v1/stream`. A chain signed for the RPC socket (path `/`) is rejected, so a chain captured from one
-socket cannot open the other. The server answers `{ "type": "ready" }`. Clients must
-wait for `ready` before sending anything else: a frame sent while the auth chain is being verified is answered with
-`auth_in_progress` and discarded.
+Clients authenticate with Signed Fetch: the auth chain headers (`x-identity-auth-chain-N`, `x-identity-timestamp`,
+`x-identity-metadata`), signed for method `get` and path `/v1/stream`. A chain signed for the RPC socket (path `/`) is
+rejected, so a chain captured from one socket cannot open the other. They can be sent in one of two ways:
+
+- **On the upgrade request (preferred).** Send them as HTTP headers of the `GET /v1/stream` request, exactly as
+  `signedFetch` does for the HTTP API. The server verifies them before accepting the upgrade: a rejected chain gets
+  `401` and a failure on the server side (e.g. the catalyst is unreachable) gets `503`, with no socket opened. On
+  success the socket opens already authenticated and the server sends `{ "type": "ready" }` right away.
+- **As the first frame (fallback for browsers, whose `WebSocket` API cannot set request headers).** Open the socket
+  without them and send them as a JSON object in the first frame. The server answers `{ "type": "ready" }`. Clients
+  must wait for `ready` before sending anything else: a frame sent while the chain is being verified is answered with
+  `auth_in_progress` and discarded.
+
+When the upgrade request carries any `x-identity-*` header the server uses them and never expects an auth frame.
+`stream_ws_authentications{method}` counts which handshake clients use (`upgrade_headers` or `first_frame`).
 
 Close codes:
 
 | Code | Reason |
 | --- | --- |
-| `3003` | The auth chain was rejected. |
-| `3004` | No auth chain arrived within `WS_AUTH_TIMEOUT_IN_MS` (shared with the RPC socket). |
+| `3003` | The auth chain sent as the first frame was rejected. |
+| `3004` | No first-frame auth chain arrived within `WS_AUTH_TIMEOUT_IN_MS` (shared with the RPC socket). |
 | `1013` | The instance connection pool (`WS_MAX_CONCURRENT_CONNECTIONS`) is full. Retry with backoff. |
 | `3005` | A newer socket of the same address replaced this one (see per-address limits below). Do not reconnect from a client that already has a newer socket. |
 | `1008` | A policy limit: the client is not reading fast enough, a subscription queue overflowed, or the message rate was exceeded. Updates cannot be replayed, so reconnect and resync. |
