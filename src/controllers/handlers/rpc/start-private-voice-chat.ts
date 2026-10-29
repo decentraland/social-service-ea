@@ -6,13 +6,12 @@ import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 import {
   UserAlreadyInVoiceChatError,
+  UserInCommunityVoiceChatError,
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError
 } from '../../../logic/voice/errors'
 
-export function startPrivateVoiceChatService({
-  components: { logs, voice, commsGatekeeper }
-}: RPCServiceContext<'logs' | 'voice' | 'commsGatekeeper'>) {
+export function startPrivateVoiceChatService({ components: { logs, voice } }: RPCServiceContext<'logs' | 'voice'>) {
   const logger = logs.getLogger('start-private-voice-chat-service')
 
   return async function (
@@ -25,24 +24,6 @@ export function startPrivateVoiceChatService({
           response: {
             $case: 'invalidRequest',
             invalidRequest: { message: 'Callee address is missing in the request payload' }
-          }
-        }
-      }
-
-      const [isCallerInCommunityCall, isCalleeInCommunityCall] = await Promise.all([
-        commsGatekeeper.isUserInCommunityVoiceChat(context.address),
-        commsGatekeeper.isUserInCommunityVoiceChat(request.callee.address)
-      ])
-
-      if (isCallerInCommunityCall || isCalleeInCommunityCall) {
-        return {
-          response: {
-            $case: 'conflictingError',
-            conflictingError: {
-              message: isCallerInCommunityCall
-                ? 'Cannot start private voice chat while in a community voice chat'
-                : 'Cannot start private voice chat: the callee is in a community voice chat'
-            }
           }
         }
       }
@@ -79,7 +60,7 @@ export function startPrivateVoiceChatService({
             }
           }
         }
-      } else if (error instanceof UserAlreadyInVoiceChatError) {
+      } else if (error instanceof UserAlreadyInVoiceChatError || error instanceof UserInCommunityVoiceChatError) {
         return {
           response: {
             $case: 'conflictingError',

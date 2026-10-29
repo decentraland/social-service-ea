@@ -3,14 +3,15 @@ import {
   GetPrivateMessagesSettingsResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { SubscriptionContext, RPCServiceContext } from '../../../types'
-import { buildPrivateMessagesRPCSettingsForAddresses } from '../../../logic/settings/utils'
+import {
+  convertDBPrivateMessagesPrivacyToRPCSetting,
+  MAX_PRIVATE_MESSAGES_SETTINGS_ADDRESSES
+} from '../../../logic/settings'
 import { isErrorWithMessage } from '../../../utils/errors'
 
-const MAX_USER_ADDRESSES = 50
-
 export function getPrivateMessagesSettingsService({
-  components: { logs, friendsDb }
-}: RPCServiceContext<'logs' | 'friendsDb'>) {
+  components: { logs, settings }
+}: RPCServiceContext<'logs' | 'settings'>) {
   const logger = logs.getLogger('get-private-messages-settings-service')
 
   return async function (
@@ -18,9 +19,9 @@ export function getPrivateMessagesSettingsService({
     context: SubscriptionContext
   ): Promise<GetPrivateMessagesSettingsResponse> {
     try {
-      const userAddresses = request.user.map((user) => user.address.toLowerCase())
+      const userAddresses = request.user.map((user) => user.address)
 
-      if (userAddresses.length > MAX_USER_ADDRESSES) {
+      if (userAddresses.length > MAX_PRIVATE_MESSAGES_SETTINGS_ADDRESSES) {
         logger.warn(`Too many user private messages settings requested: ${userAddresses.length}`)
         return {
           response: {
@@ -32,29 +33,17 @@ export function getPrivateMessagesSettingsService({
         }
       }
 
-      const [settings, friendsOfConnectedAddress] =
-        userAddresses.length > 0
-          ? await Promise.all([
-              friendsDb.getSocialSettings(userAddresses),
-              friendsDb.getFriendsFromList(context.address, userAddresses)
-            ])
-          : [[], []]
-
-      const privacyInformation = buildPrivateMessagesRPCSettingsForAddresses(
-        userAddresses,
-        settings,
-        friendsOfConnectedAddress
-      )
+      const privateMessagesSettings = await settings.getPrivateMessagesSettings(context.address, userAddresses)
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            settings: Object.entries(privacyInformation).map(([address, { privacy, isFriend }]) => ({
+            settings: privateMessagesSettings.map(({ address, privateMessagesPrivacy, isFriend }) => ({
               user: {
                 address
               },
-              privateMessagesPrivacy: privacy,
+              privateMessagesPrivacy: convertDBPrivateMessagesPrivacyToRPCSetting(privateMessagesPrivacy),
               isFriend
             }))
           }

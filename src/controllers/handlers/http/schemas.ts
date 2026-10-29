@@ -1,6 +1,14 @@
+import { UUID_PATTERN } from '../../../utils/uuid'
 import { Schema } from 'ajv'
-import { CommunityRole } from '../../../types/entities'
+import {
+  BlockedUsersMessagesVisibilitySetting,
+  CommunityRole,
+  PrivateMessagesPrivacy,
+  SituationReactionsVisibility
+} from '../../../types/entities'
 import { CommunityRequestType, CommunityRequestStatus } from '../../../logic/community/types'
+import { HTTPSocialSettings } from '../../../logic/settings'
+import { FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH } from '../../../logic/friends/constants'
 
 // TypeScript types derived from schemas
 export type UpdateMemberRoleRequestBody = {
@@ -57,6 +65,69 @@ export const UpdateCommunityPartiallySchema: Schema = {
   additionalProperties: false,
   properties: {
     editorsChoice: {
+      type: 'boolean'
+    }
+  }
+}
+
+export type StartPrivateVoiceChatRequestBody = {
+  calleeAddress: string
+}
+
+export type UpdatePrivateVoiceChatRequestBody = {
+  intention: 'accepted' | 'rejected'
+}
+
+export type StartCommunityVoiceChatRequestBody = {
+  communityId: string
+}
+
+export type UpdateCommunityVoiceChatSpeakerRequestBody = {
+  muted: boolean
+}
+
+export const StartPrivateVoiceChatSchema: Schema = {
+  type: 'object',
+  required: ['calleeAddress'],
+  additionalProperties: false,
+  properties: {
+    calleeAddress: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    }
+  }
+}
+
+export const UpdatePrivateVoiceChatSchema: Schema = {
+  type: 'object',
+  required: ['intention'],
+  additionalProperties: false,
+  properties: {
+    intention: {
+      type: 'string',
+      enum: ['accepted', 'rejected']
+    }
+  }
+}
+
+export const StartCommunityVoiceChatSchema: Schema = {
+  type: 'object',
+  required: ['communityId'],
+  additionalProperties: false,
+  properties: {
+    communityId: {
+      type: 'string',
+      pattern: UUID_PATTERN
+    }
+  }
+}
+
+export const UpdateCommunityVoiceChatSpeakerSchema: Schema = {
+  type: 'object',
+  required: ['muted'],
+  additionalProperties: false,
+  properties: {
+    muted: {
       type: 'boolean'
     }
   }
@@ -146,7 +217,28 @@ export const UpdateCommunityRequestStatusSchema: Schema = {
   }
 }
 
-const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+export type UpdateSocialSettingsRequestBody = Partial<HTTPSocialSettings>
+
+export const UpdateSocialSettingsSchema: Schema = {
+  type: 'object',
+  minProperties: 1,
+  additionalProperties: false,
+  properties: {
+    privateMessagesPrivacy: {
+      type: 'string',
+      enum: Object.values(PrivateMessagesPrivacy)
+    },
+    blockedUsersMessagesVisibility: {
+      type: 'string',
+      enum: Object.values(BlockedUsersMessagesVisibilitySetting)
+    },
+    showSituationReactions: {
+      type: 'string',
+      enum: Object.values(SituationReactionsVisibility)
+    }
+  }
+}
+
 const MAX_COMMUNITY_IDS = 50
 
 export type GetMemberCommunitiesByIdsRequestBody = {
@@ -166,6 +258,61 @@ export const GetMemberCommunitiesByIdsSchema: Schema = {
       },
       minItems: 1,
       maxItems: MAX_COMMUNITY_IDS
+    }
+  }
+}
+
+export type CreateFriendshipRequestRequestBody = {
+  address: string
+  message?: string
+}
+
+export type FriendshipRequestIntention = 'accepted' | 'rejected' | 'cancelled'
+
+export type UpdateFriendshipRequestRequestBody = {
+  intention: FriendshipRequestIntention
+}
+
+export const CreateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
+    },
+    message: {
+      type: 'string',
+      maxLength: FRIENDSHIP_REQUEST_MESSAGE_MAX_LENGTH
+    }
+  }
+}
+
+export const UpdateFriendshipRequestSchema: Schema = {
+  type: 'object',
+  required: ['intention'],
+  additionalProperties: false,
+  properties: {
+    intention: {
+      type: 'string',
+      enum: ['accepted', 'rejected', 'cancelled']
+    }
+  }
+}
+
+export type BlockUserRequestBody = {
+  address: string
+}
+
+export const BlockUserSchema: Schema = {
+  type: 'object',
+  required: ['address'],
+  additionalProperties: false,
+  properties: {
+    address: {
+      type: 'string',
+      pattern: '^0x[a-fA-F0-9]{40}$'
     }
   }
 }

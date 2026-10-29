@@ -687,6 +687,16 @@ describe('friendsDb', () => {
     })
   })
 
+  describe.each([0, 1])('when unblocking deletes %s rows', (rowCount) => {
+    beforeEach(() => {
+      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount })
+    })
+
+    it('should report whether a block was actually removed', async () => {
+      await expect(dbComponent.unblockUser('0x123', '0x456')).resolves.toBe(rowCount > 0)
+    })
+  })
+
   describe('blockUsers', () => {
     it('should block multiple users', async () => {
       await dbComponent.blockUsers('0x123', ['0x456', '0x789'])

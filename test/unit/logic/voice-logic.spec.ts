@@ -3,6 +3,7 @@ import { IAnalyticsComponent } from '@dcl/analytics-component'
 import { createVoiceComponent, IVoiceComponent, VoiceChatStatus } from '../../../src/logic/voice'
 import {
   UserAlreadyInVoiceChatError,
+  UserInCommunityVoiceChatError,
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError,
   VoiceChatNotFoundError,
@@ -41,6 +42,7 @@ let createPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['createPri
 let getUsersSettingsMock: jest.MockedFn<ISettingsComponent['getUsersSettings']>
 let getFriendshipMock: jest.MockedFn<IFriendsDatabaseComponent['getFriendship']>
 let isFriendshipBlockedMock: jest.MockedFn<IFriendsDatabaseComponent['isFriendshipBlocked']>
+let isUserInCommunityVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['isUserInCommunityVoiceChat']>
 let isUserInAVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['isUserInAVoiceChat']>
 let getPrivateVoiceChatCredentialsMock: jest.MockedFn<ICommsGatekeeperComponent['getPrivateVoiceChatCredentials']>
 let getPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['getPrivateVoiceChat']>
@@ -59,6 +61,7 @@ beforeEach(async () => {
   getFriendshipMock = jest.fn()
   isFriendshipBlockedMock = jest.fn()
   isUserInAVoiceChatMock = jest.fn()
+  isUserInCommunityVoiceChatMock = jest.fn().mockResolvedValue(false)
   publishInChannelMock = jest.fn()
   areUsersBeingCalledOrCallingSomeoneMock = jest.fn()
   createPrivateVoiceChatMock = jest.fn()
@@ -91,6 +94,7 @@ beforeEach(async () => {
   })
   const commsGatekeeper = createCommsGatekeeperMockedComponent({
     isUserInAVoiceChat: isUserInAVoiceChatMock,
+    isUserInCommunityVoiceChat: isUserInCommunityVoiceChatMock,
     getPrivateVoiceChatCredentials: getPrivateVoiceChatCredentialsMock,
     endPrivateVoiceChat: endPrivateVoiceChatMock
   })
@@ -124,6 +128,7 @@ describe('when starting a private voice chat', () => {
   describe('and the caller and callee are the same user', () => {
     it('should reject with a voice chat not allowed error without hitting any downstream calls', async () => {
       await expect(voice.startPrivateVoiceChat(callerAddress, callerAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+      expect(isUserInCommunityVoiceChatMock).not.toHaveBeenCalled()
       expect(isFriendshipBlockedMock).not.toHaveBeenCalled()
       expect(getUsersSettingsMock).not.toHaveBeenCalled()
       expect(createPrivateVoiceChatMock).not.toHaveBeenCalled()
@@ -137,6 +142,30 @@ describe('when starting a private voice chat', () => {
     })
   })
 
+  describe.each(['caller', 'callee'])('and the authorized %s is in a community call', (participant) => {
+    beforeEach(() => {
+      isFriendshipBlockedMock.mockResolvedValueOnce(false)
+      getUsersSettingsMock.mockResolvedValueOnce(
+        [calleeAddress, callerAddress].map((address) => ({
+          address,
+          private_messages_privacy: PrivateMessagesPrivacy.ALL,
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
+        }))
+      )
+      isUserInCommunityVoiceChatMock.mockImplementation(
+        async (address) => address === (participant === 'caller' ? callerAddress : calleeAddress)
+      )
+    })
+
+    it('should reject with a community-call conflict and not create a call', async () => {
+      await expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+        UserInCommunityVoiceChatError
+      )
+      expect(createPrivateVoiceChatMock).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and one of the users has blocked the other', () => {
     beforeEach(() => {
       isFriendshipBlockedMock.mockResolvedValueOnce(true)
@@ -144,6 +173,7 @@ describe('when starting a private voice chat', () => {
 
     it('should reject with a voice chat not allowed error and not create the chat', async () => {
       await expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+      expect(isUserInCommunityVoiceChatMock).not.toHaveBeenCalled()
       expect(createPrivateVoiceChatMock).not.toHaveBeenCalled()
     })
   })
@@ -178,10 +208,11 @@ describe('when starting a private voice chat', () => {
         })
       })
 
-      it('should reject with a voice chat not allowed error', () => {
-        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+      it('should reject without looking up community presence', async () => {
+        await expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
           VoiceChatNotAllowedError
         )
+        expect(isUserInCommunityVoiceChatMock).not.toHaveBeenCalled()
       })
     })
 
@@ -237,10 +268,11 @@ describe('when starting a private voice chat', () => {
         })
       })
 
-      it('should reject with a voice chat not allowed error', () => {
-        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+      it('should reject without looking up community presence', async () => {
+        await expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
           VoiceChatNotAllowedError
         )
+        expect(isUserInCommunityVoiceChatMock).not.toHaveBeenCalled()
       })
     })
 

@@ -45,3 +45,11 @@ export class InvalidUserAddressError extends Error {
     super('User address is required and cannot be empty')
   }
 }
+
+/** Gatekeeper could not find the room or target participant for an authorized operation. */
+export class CommunityVoiceChatResourceNotFoundError extends CommunityVoiceChatNotFoundError {
+  constructor(communityId: string) {
+    super(communityId)
+    this.message = `Community voice chat or participant not found for community ${communityId}`
+  }
+}

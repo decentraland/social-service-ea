@@ -133,7 +133,8 @@ export interface IFriendsDatabaseComponent {
     blockedAddress: string,
     txClient?: PoolClient
   ): Promise<{ id: string; blocked_at: Date }>
-  unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
+  /** Removes only this actor's block; returns whether a row was deleted. */
+  unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<boolean>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   /** Returns the complete list unless `pagination` is supplied. See the note on the implementation. */

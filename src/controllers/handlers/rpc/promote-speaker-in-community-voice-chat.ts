@@ -9,11 +9,10 @@ import {
   CommunityVoiceChatNotFoundError,
   InvalidCommunityIdError,
   InvalidUserAddressError,
-  CommunityVoiceChatPermissionError,
-  validateCommunityVoiceChatModerator,
-  validateCommunityVoiceChatTargetUser
+  CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { promoteSpeakerInCommunityVoiceChat } from '../../../logic/community-voice/moderation'
 import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function promoteSpeakerInCommunityVoiceChatService({
@@ -32,51 +31,12 @@ export function promoteSpeakerInCommunityVoiceChatService({
         moderatorAddress: context.address
       })
 
-      if (!request.communityId || request.communityId.trim() === '') {
-        logger.warn('Missing or empty community ID in request')
-        throw new InvalidCommunityIdError()
-      }
-
-      if (!request.userAddress || request.userAddress.trim() === '') {
-        logger.warn('Missing or empty user address in request')
-        throw new InvalidUserAddressError()
-      }
-
-      // Owner/moderator gate, owner protection and community lookup issued together. Authorization
-      // is reported first on purpose: a caller with no role learns nothing about the community.
-      const [community, { actingUserRole, targetUserRole, isTargetUserBanned }] = await Promise.all([
-        communitiesDb.getCommunity(request.communityId, context.address),
-        validateCommunityVoiceChatModerator(
-          communitiesDb,
-          request.communityId,
-          context.address,
-          request.userAddress,
-          'promote speakers'
-        )
-      ])
-
-      if (!community) {
-        throw new InvalidCommunityIdError()
-      }
-
-      // Validate target user can be promoted based on community privacy and membership
-      validateCommunityVoiceChatTargetUser(
-        community,
+      await promoteSpeakerInCommunityVoiceChat(
+        { logs, commsGatekeeper, communitiesDb },
         request.communityId,
-        request.userAddress,
-        targetUserRole,
-        isTargetUserBanned
+        context.address,
+        request.userAddress
       )
-
-      logger.info('Permission check passed: moderator/owner promoting speaker', {
-        communityId: request.communityId,
-        actingUserRole,
-        targetUserAddress: request.userAddress,
-        communityPrivacy: community.privacy,
-        moderatorAddress: context.address
-      })
-
-      await commsGatekeeper.promoteSpeakerInCommunityVoiceChat(request.communityId, request.userAddress)
 
       logger.info('Speaker promoted successfully', {
         communityId: request.communityId,

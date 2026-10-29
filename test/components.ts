@@ -166,7 +166,7 @@ async function initComponents(): Promise<TestComponents> {
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
-  const settings = await createSettingsComponent({ friendsDb })
+  const settings = await createSettingsComponent({ friendsDb, commsGatekeeper })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const voice = await createVoiceComponent({
     logs,

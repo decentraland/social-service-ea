@@ -12,7 +12,7 @@ import {
   CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { validateCommunityVoiceChatModerator } from '../../../logic/community-voice/validation'
+import { kickPlayerFromCommunityVoiceChat } from '../../../logic/community-voice/moderation'
 import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function kickPlayerFromCommunityVoiceChatService({
@@ -31,34 +31,12 @@ export function kickPlayerFromCommunityVoiceChatService({
         moderatorAddress: context.address
       })
 
-      if (!request.communityId || request.communityId.trim() === '') {
-        logger.warn('Missing or empty community ID in request')
-        throw new InvalidCommunityIdError()
-      }
-
-      if (!request.userAddress || request.userAddress.trim() === '') {
-        logger.warn('Missing or empty user address in request')
-        throw new InvalidUserAddressError()
-      }
-
-      // Owner/moderator gate; the owner cannot be kicked by anyone else.
-      const { actingUserRole } = await validateCommunityVoiceChatModerator(
-        communitiesDb,
+      await kickPlayerFromCommunityVoiceChat(
+        { logs, commsGatekeeper, communitiesDb },
         request.communityId,
         context.address,
-        request.userAddress,
-        'kick players'
+        request.userAddress
       )
-
-      // No further target restrictions; comms-gatekeeper validates presence in the room.
-      logger.info('Permission check passed: moderator/owner kicking player', {
-        communityId: request.communityId,
-        actingUserRole,
-        targetUserAddress: request.userAddress,
-        moderatorAddress: context.address
-      })
-
-      await commsGatekeeper.kickUserFromCommunityVoiceChat(request.communityId, request.userAddress)
 
       logger.info('Player kicked successfully', {
         communityId: request.communityId,

@@ -5,6 +5,7 @@ import { isErrorWithMessage } from '../../utils/errors'
 import {
   IncomingVoiceChatNotFoundError,
   UserAlreadyInVoiceChatError,
+  UserInCommunityVoiceChatError,
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError,
   VoiceChatNotFoundError
@@ -55,6 +56,15 @@ export async function createVoiceComponent({
       if (!friendshipStatus?.is_active) {
         throw new VoiceChatNotAllowedError()
       }
+    }
+
+    // Presence is only disclosed after block and privacy authorization has succeeded.
+    const [isCallerInCommunityCall, isCalleeInCommunityCall] = await Promise.all([
+      commsGatekeeper.isUserInCommunityVoiceChat(callerAddress),
+      commsGatekeeper.isUserInCommunityVoiceChat(calleeAddress)
+    ])
+    if (isCallerInCommunityCall || isCalleeInCommunityCall) {
+      throw new UserInCommunityVoiceChatError(isCallerInCommunityCall)
     }
 
     // Check if the callee or the caller are calling someone else
