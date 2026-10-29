@@ -1,0 +1,439 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`when comparing RPC and JSON subscription contracts and the event is block false should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "isBlocked": false,
+  },
+  "rpc": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "isBlocked": false,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is block true should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "isBlocked": true,
+  },
+  "rpc": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "isBlocked": true,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is community connectivity 0 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "communityId": "community-1",
+    "memberAddress": "0x2222222222222222222222222222222222222222",
+    "status": "online",
+  },
+  "rpc": {
+    "communityId": "community-1",
+    "member": {
+      "address": "0x2222222222222222222222222222222222222222",
+    },
+    "status": 0,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is community connectivity 1 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "communityId": "community-1",
+    "memberAddress": "0x2222222222222222222222222222222222222222",
+    "status": "offline",
+  },
+  "rpc": {
+    "communityId": "community-1",
+    "member": {
+      "address": "0x2222222222222222222222222222222222222222",
+    },
+    "status": 1,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is community connectivity 2 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "communityId": "community-1",
+    "memberAddress": "0x2222222222222222222222222222222222222222",
+    "status": "away",
+  },
+  "rpc": {
+    "communityId": "community-1",
+    "member": {
+      "address": "0x2222222222222222222222222222222222222222",
+    },
+    "status": 2,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is community voice 0 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "communityId": "community-1",
+    "communityImage": "https://example.org/image.png",
+    "communityName": "Parity",
+    "createdAt": 1700000000000,
+    "isMember": true,
+    "positions": [
+      "1,2",
+    ],
+    "status": "started",
+    "worlds": [
+      "parity.dcl.eth",
+    ],
+  },
+  "rpc": {
+    "communityId": "community-1",
+    "communityImage": "https://example.org/image.png",
+    "communityName": "Parity",
+    "createdAt": 1700000000000,
+    "endedAt": undefined,
+    "isMember": true,
+    "positions": [
+      "1,2",
+    ],
+    "status": 0,
+    "streamClosed": undefined,
+    "worlds": [
+      "parity.dcl.eth",
+    ],
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is community voice 1 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "communityId": "community-1",
+    "communityImage": "https://example.org/image.png",
+    "communityName": "Parity",
+    "createdAt": 1700000000000,
+    "endedAt": 1700000010000,
+    "isMember": true,
+    "positions": [
+      "1,2",
+    ],
+    "status": "ended",
+    "worlds": [
+      "parity.dcl.eth",
+    ],
+  },
+  "rpc": {
+    "communityId": "community-1",
+    "communityImage": "https://example.org/image.png",
+    "communityName": "Parity",
+    "createdAt": 1700000000000,
+    "endedAt": 1700000010000,
+    "isMember": true,
+    "positions": [
+      "1,2",
+    ],
+    "status": 1,
+    "streamClosed": undefined,
+    "worlds": [
+      "parity.dcl.eth",
+    ],
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friend connectivity 0 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "status": "online",
+  },
+  "rpc": {
+    "friend": {
+      "address": "0x2222222222222222222222222222222222222222",
+      "hasClaimedName": true,
+      "name": "Profile name 0x2222222222222222222222222222222222222222",
+      "nameColor": undefined,
+      "profilePictureUrl": "https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png",
+    },
+    "status": 0,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friend connectivity 1 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "status": "offline",
+  },
+  "rpc": {
+    "friend": {
+      "address": "0x2222222222222222222222222222222222222222",
+      "hasClaimedName": true,
+      "name": "Profile name 0x2222222222222222222222222222222222222222",
+      "nameColor": undefined,
+      "profilePictureUrl": "https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png",
+    },
+    "status": 1,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friend connectivity 2 should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "address": "0x2222222222222222222222222222222222222222",
+    "status": "away",
+  },
+  "rpc": {
+    "friend": {
+      "address": "0x2222222222222222222222222222222222222222",
+      "hasClaimedName": true,
+      "name": "Profile name 0x2222222222222222222222222222222222222222",
+      "nameColor": undefined,
+      "profilePictureUrl": "https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png",
+    },
+    "status": 2,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friendship accept should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "accept",
+    "address": "0x2222222222222222222222222222222222222222",
+  },
+  "rpc": {
+    "update": {
+      "$case": "accept",
+      "accept": {
+        "user": {
+          "address": "0x2222222222222222222222222222222222222222",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friendship block should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "block",
+    "address": "0x2222222222222222222222222222222222222222",
+  },
+  "rpc": {
+    "update": {
+      "$case": "block",
+      "block": {
+        "user": {
+          "address": "0x2222222222222222222222222222222222222222",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friendship cancel should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "cancel",
+    "address": "0x2222222222222222222222222222222222222222",
+  },
+  "rpc": {
+    "update": {
+      "$case": "cancel",
+      "cancel": {
+        "user": {
+          "address": "0x2222222222222222222222222222222222222222",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friendship delete should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "delete",
+    "address": "0x2222222222222222222222222222222222222222",
+  },
+  "rpc": {
+    "update": {
+      "$case": "delete",
+      "delete": {
+        "user": {
+          "address": "0x2222222222222222222222222222222222222222",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friendship reject should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "reject",
+    "address": "0x2222222222222222222222222222222222222222",
+  },
+  "rpc": {
+    "update": {
+      "$case": "reject",
+      "reject": {
+        "user": {
+          "address": "0x2222222222222222222222222222222222222222",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is friendship request should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "request",
+    "address": "0x2222222222222222222222222222222222222222",
+    "createdAt": 1700000000000,
+    "id": "request-1",
+    "message": "hello 👋",
+  },
+  "rpc": {
+    "update": {
+      "$case": "request",
+      "request": {
+        "createdAt": 1700000000000,
+        "friend": {
+          "address": "0x2222222222222222222222222222222222222222",
+          "hasClaimedName": true,
+          "name": "Profile name 0x2222222222222222222222222222222222222222",
+          "nameColor": undefined,
+          "profilePictureUrl": "https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png",
+        },
+        "id": "request-1",
+        "message": "hello 👋",
+      },
+    },
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is private call accepted should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "callId": "call-1",
+    "connectionUrl": "livekit:wss://example?token=secret",
+    "status": "accepted",
+  },
+  "rpc": {
+    "callId": "call-1",
+    "caller": undefined,
+    "credentials": {
+      "connectionUrl": "livekit:wss://example?token=secret",
+    },
+    "status": 1,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is private call ended should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "callId": "call-1",
+    "status": "ended",
+  },
+  "rpc": {
+    "callId": "call-1",
+    "caller": undefined,
+    "credentials": undefined,
+    "status": 3,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is private call expired should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "callId": "call-1",
+    "status": "expired",
+  },
+  "rpc": {
+    "callId": "call-1",
+    "caller": undefined,
+    "credentials": undefined,
+    "status": 4,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is private call rejected should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "callId": "call-1",
+    "status": "rejected",
+  },
+  "rpc": {
+    "callId": "call-1",
+    "caller": undefined,
+    "credentials": undefined,
+    "status": 2,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is private call requested should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "callId": "call-1",
+    "callerAddress": "0x2222222222222222222222222222222222222222",
+    "status": "requested",
+  },
+  "rpc": {
+    "callId": "call-1",
+    "caller": {
+      "address": "0x2222222222222222222222222222222222222222",
+    },
+    "credentials": undefined,
+    "status": 0,
+  },
+}
+`;
+
+exports[`when comparing RPC and JSON subscription contracts and the event is request without message should deliver equivalent payloads using the real RPC and JSON subscription implementations 1`] = `
+{
+  "json": {
+    "action": "request",
+    "address": "0x2222222222222222222222222222222222222222",
+    "createdAt": 1700000000001,
+    "id": "request-2",
+  },
+  "rpc": {
+    "update": {
+      "$case": "request",
+      "request": {
+        "createdAt": 1700000000001,
+        "friend": {
+          "address": "0x2222222222222222222222222222222222222222",
+          "hasClaimedName": true,
+          "name": "Profile name 0x2222222222222222222222222222222222222222",
+          "nameColor": undefined,
+          "profilePictureUrl": "https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png",
+        },
+        "id": "request-2",
+        "message": undefined,
+      },
+    },
+  },
+}
+`;

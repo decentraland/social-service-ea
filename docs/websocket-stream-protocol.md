@@ -80,3 +80,19 @@ Incoming application frames, including authentication, malformed messages and JS
 token bucket. `STREAM_WS_MESSAGES_PER_SECOND` defaults to 20, and `STREAM_WS_MESSAGE_BURST` defaults to 40.
 Exceeding it closes the connection with 1008 (`Message rate exceeded; reconnect with backoff`). Native WebSocket
 ping/pong frames are unaffected. Limits are independent for each connection and do not change the RPC protocol.
+
+## RPC parity checks
+
+`test/unit/controllers/handlers/uws/stream-parity.spec.ts` compares the generated RPC server-streaming methods,
+registered RPC routes and JSON registry. Every stream must also have shared event fixtures in
+`test/fixtures/stream-parity.ts`. Those fixtures run through both production subscription implementations;
+a test-only normalizer compares their meaning without importing production JSON mappers. Reviewed snapshots
+also pin the complete payloads, including fields intentionally omitted by normalization.
+
+The contract suite covers event variants, recipient filters, initial online-friend snapshots and the intentional
+profile lookup difference: JSON delivers addresses even when RPC skips an event after profile lookup fails.
+`test/integration/stream-parity-controller.spec.ts` checks real protobuf/JSON wire delivery for the same fixtures,
+targeted pubsub routing (friendships, blocks and private-call credentials), and unsubscribe/disconnect isolation
+for all six streams. It does not replace the shared fan-out authorization tests for community visibility and friendship membership.
+Both files run in the existing unit/integration CI jobs. When changing either protocol, add fixtures for new variants
+and review snapshot changes; do not refresh snapshots to bypass an unexplained contract mismatch.
