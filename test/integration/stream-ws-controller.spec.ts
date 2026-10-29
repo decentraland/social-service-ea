@@ -48,6 +48,52 @@ test('Stream WebSocket Controller (/v1/stream)', function ({ components, stubCom
     await sleep(300)
   })
 
+  describe('when a subscribed connection overflows its event queue', () => {
+    let client: StreamClient
+
+    beforeEach(async () => {
+      client = await open()
+      client.send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+      await client.waitFor((message) => message.type === 'subscribed')
+      for (let index = 0; index < 1002; index++) {
+        components.subscribersContext.getSubscriber(address)?.emit('blockUpdate', {
+          blockerAddress: BLOCKER,
+          blockedAddress: address,
+          isBlocked: true
+        })
+      }
+    })
+
+    it('should require a resync and release the connection', async () => {
+      await expect(client.closed).resolves.toEqual({
+        code: 1008,
+        reason: 'Subscription overflow; reconnect and resync'
+      })
+      await sleep(100)
+      expect(components.subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
+    })
+  })
+
+  describe('when a client floods incoming messages', () => {
+    let client: StreamClient
+    let healthyClient: StreamClient
+
+    beforeEach(async () => {
+      client = await open()
+      healthyClient = await open()
+      for (let index = 0; index < 100; index++) client.send({ type: 'ping' })
+    })
+
+    it('should close only the offending connection', async () => {
+      await expect(client.closed).resolves.toEqual({
+        code: 1008,
+        reason: 'Message rate exceeded; reconnect with backoff'
+      })
+      healthyClient.send({ type: 'ping' })
+      await expect(healthyClient.waitFor((message) => message.type === 'pong')).resolves.toMatchObject({ type: 'pong' })
+    })
+  })
+
   describe('when authenticating', () => {
     describe('and the first frame is a valid signed auth chain', () => {
       it('should answer ready and register the address for fan-out', async () => {

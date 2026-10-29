@@ -40,6 +40,8 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
       // being lost — a sustained rate means a client isn't keeping up with the stream.
       valueQueue.shift()
       onOverflowDrop?.()
+      // The transport may terminate this generator synchronously on overflow.
+      if (isDone) return
     }
     valueQueue.push(value)
   }

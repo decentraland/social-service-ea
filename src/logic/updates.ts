@@ -500,9 +500,10 @@ export function createUpdateHandlerComponent(
 
     rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () =>
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () => {
       metrics.increment('subscription_updates_dropped_total', { event: eventNameString })
-    )
+      rpcContext.onSubscriptionOverflow?.()
+    })
     rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {

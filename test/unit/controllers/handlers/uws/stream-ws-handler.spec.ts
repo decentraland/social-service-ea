@@ -4,7 +4,7 @@ import { registerStreamWsHandler, STREAM_WS_PATH } from '../../../../../src/cont
 import { StreamDefinition } from '../../../../../src/controllers/handlers/uws/stream-registry'
 import { WsPoolFullError } from '../../../../../src/logic/ws-pool'
 import { ISubscribersContext, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
-import emitterToAsyncGenerator from '../../../../../src/utils/emitterToGenerator'
+import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../../../src/utils/emitterToGenerator'
 import { mockConfig, mockFetcher, mockLogs, mockMetrics, mockRpcServer, mockUWs } from '../../../../mocks/components'
 import { mockTracing } from '../../../../mocks/components/tracing'
 import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
@@ -78,7 +78,7 @@ describe('stream-ws-handler', () => {
     streams = {
       block_updates: {
         open: (context) => {
-          const generator = emitterToAsyncGenerator(emitter, 'blockUpdate')
+          const generator = emitterToAsyncGenerator(emitter, 'blockUpdate', context.onSubscriptionOverflow)
           const destroy = jest.fn(() => generator.destroy())
           context.subscribersContext.registerGenerator(context.wsConnectionId!, { destroy })
           generators.push({ destroy, real: generator })
@@ -129,6 +129,75 @@ describe('stream-ws-handler', () => {
   it('should register the socket on the stream path, not on the RPC one', () => {
     expect((mockUWs.app.ws as jest.Mock).mock.calls[0][0]).toBe(STREAM_WS_PATH)
     expect(STREAM_WS_PATH).not.toBe('/')
+  })
+
+  describe('when the subscription queue overflows', () => {
+    beforeEach(async () => {
+      await authenticate()
+      await send({ type: 'subscribe', id: 'blocks', stream: 'block_updates' })
+      for (let index = 0; index < MAX_VALUE_QUEUE_SIZE + 2; index++) {
+        emitter.emit('blockUpdate', { address: '0xblocker' })
+      }
+      await flush()
+    })
+
+    it('should close with an explicit resync requirement and remove the listener', () => {
+      expect(ws.end).toHaveBeenCalledWith(1008, 'Subscription overflow; reconnect and resync')
+      expect(emitter.all.get('blockUpdate') ?? []).toHaveLength(0)
+      expect(data.isConnected).toBe(false)
+    })
+
+    it('should ignore further messages on the closing socket', async () => {
+      await send({ type: 'ping' })
+      expect(sentOfType('pong')).toHaveLength(0)
+    })
+  })
+
+  describe('when enforcing the incoming message budget', () => {
+    let now: number
+
+    beforeEach(async () => {
+      now = 0
+      jest.spyOn(performance, 'now').mockImplementation(() => now)
+      await authenticate()
+    })
+
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    describe('and the client exceeds the burst allowance', () => {
+      beforeEach(async () => {
+        for (let index = 0; index < 40; index++) await send({ type: 'ping' })
+      })
+
+      it('should close once without replying to the excess message', async () => {
+        await send({ type: 'ping' })
+        expect(ws.end).toHaveBeenCalledTimes(1)
+        expect(ws.end).toHaveBeenCalledWith(1008, 'Message rate exceeded; reconnect with backoff')
+        expect(sentOfType('pong')).toHaveLength(39)
+      })
+    })
+
+    describe('and enough time passes to replenish a token', () => {
+      beforeEach(async () => {
+        for (let index = 0; index < 39; index++) await send({ type: 'ping' })
+        now = 50
+      })
+
+      it('should allow the next message', async () => {
+        await send({ type: 'ping' })
+        expect(ws.end).not.toHaveBeenCalled()
+        expect(sentOfType('pong')).toHaveLength(40)
+      })
+    })
+
+    describe('and the client floods malformed messages', () => {
+      it('should enforce the same budget', async () => {
+        for (let index = 0; index < 40; index++) await send('invalid json')
+        expect(ws.end).toHaveBeenCalledWith(1008, 'Message rate exceeded; reconnect with backoff')
+      })
+    })
   })
 
   describe('when upgrading a connection', () => {

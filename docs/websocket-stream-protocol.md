@@ -43,7 +43,7 @@ Server to client:
 ```
 
 Error codes: `invalid_message`, `unknown_stream`, `duplicate_subscription`, `unknown_subscription`, `stream_error`,
-`auth_in_progress`. A protocol error never closes the socket.
+`auth_in_progress`. Individual protocol errors keep the socket open; exceeding the message-rate limit closes it.
 
 ## Streams
 
@@ -68,3 +68,15 @@ Both protocols are observable side by side: `rpc_procedure_call_total` and `rpc_
 RPC traffic, the `stream_ws_*` metrics count this protocol. When RPC traffic is negligible, `@dcl/rpc`,
 `src/adapters/rpc-server`, `src/controllers/handlers/rpc`, `src/controllers/handlers/uws/ws-handler.ts` and
 `src/utils/UWebSocketTransport.ts` can be removed.
+
+## Backpressure and message limits
+
+Outgoing socket buffering uses `WS_MAX_BACKPRESSURE` (default 128 KiB). A dropped socket write closes the
+connection with 1008 (`Slow consumer`). Each subscription also has a 1,000-event queue; overflow closes the
+connection with 1008 (`Subscription overflow; reconnect and resync`) instead of silently continuing after event loss.
+There is no replay: reconnect with backoff, subscribe again, and resync state through HTTP.
+
+Incoming application frames, including authentication, malformed messages and JSON pings, share a per-connection
+token bucket. `STREAM_WS_MESSAGES_PER_SECOND` defaults to 20, and `STREAM_WS_MESSAGE_BURST` defaults to 40.
+Exceeding it closes the connection with 1008 (`Message rate exceeded; reconnect with backoff`). Native WebSocket
+ping/pong frames are unaffected. Limits are independent for each connection and do not change the RPC protocol.

@@ -69,6 +69,44 @@ export async function registerStreamWsHandler(
   const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000
   const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000
 
+  const messagesPerSecond = (await config.getNumber('STREAM_WS_MESSAGES_PER_SECOND')) ?? 20
+  const messageBurst = (await config.getNumber('STREAM_WS_MESSAGE_BURST')) ?? 40
+  if (
+    !Number.isFinite(messagesPerSecond) ||
+    messagesPerSecond <= 0 ||
+    !Number.isInteger(messageBurst) ||
+    messageBurst < 1
+  ) {
+    throw new Error('Stream WebSocket message rate must be positive and burst must be a positive integer')
+  }
+  const messageBudgets = new WeakMap<WsUserData, { tokens: number; updatedAt: number }>()
+
+  function consumeMessageBudget(data: WsUserData): boolean {
+    const now = performance.now()
+    const budget = messageBudgets.get(data) ?? { tokens: messageBurst, updatedAt: now }
+    budget.tokens = Math.min(
+      messageBurst,
+      budget.tokens + (Math.max(0, now - budget.updatedAt) * messagesPerSecond) / 1000
+    )
+    budget.updatedAt = now
+    messageBudgets.set(data, budget)
+    if (budget.tokens < 1) return false
+    budget.tokens -= 1
+    return true
+  }
+
+  function closeForPolicy(ws: WebSocket<WsUserData>, type: string, reason: string): void {
+    const data = ws.getUserData()
+    if (!data.isConnected) return
+    data.isConnected = false
+    metrics.increment('stream_ws_errors', { type })
+    try {
+      destroySubscriptions(data.wsConnectionId)
+    } finally {
+      endSocket(ws, 1008, reason)
+    }
+  }
+
   // Active subscriptions per connection. Kept out of the socket's user data so the pool and the
   // reconciliation sweep keep seeing the same shape for every socket.
   const subscriptionsByConnection = new Map<string, Map<string, Subscription>>()
@@ -79,10 +117,7 @@ export async function registerStreamWsHandler(
       if (result === SEND_DROPPED) {
         // The client is not draining its socket: a dropped update cannot be replayed, so end the
         // connection and let the client resync on reconnect instead of silently missing events.
-        metrics.increment('stream_ws_errors', { type: 'slow_consumer' })
-        // Nothing else may be written to a socket that is being ended (the close handler resets this again).
-        ws.getUserData().isConnected = false
-        endSocket(ws, 1008, 'Slow consumer')
+        closeForPolicy(ws, 'slow_consumer', 'Slow consumer')
         return false
       }
       return true
@@ -221,7 +256,9 @@ export async function registerStreamWsHandler(
       const generator = definition.open({
         address: data.address,
         wsConnectionId: data.wsConnectionId,
-        subscribersContext: scopedContext
+        subscribersContext: scopedContext,
+        onSubscriptionOverflow: () =>
+          closeForPolicy(ws, 'subscription_overflow', 'Subscription overflow; reconnect and resync')
       })
 
       for await (const update of generator) {
@@ -279,7 +316,7 @@ export async function registerStreamWsHandler(
     const subscription: Subscription = { id, stream, cancelled: false, unsubscribed: false, destroy: () => {} }
     subscriptions.set(id, subscription)
 
-    safeSend(ws, { type: 'subscribed', id })
+    if (!safeSend(ws, { type: 'subscribed', id })) return
 
     // Runs for the life of the subscription; every failure is handled inside.
     void runSubscription(ws, data, subscription, streams[stream])
@@ -381,6 +418,12 @@ export async function registerStreamWsHandler(
     },
     message: async (ws, message) => {
       const data = ws.getUserData()
+
+      if (!data.isConnected) return
+      if (!consumeMessageBudget(data)) {
+        closeForPolicy(ws, 'rate_limited', 'Message rate exceeded; reconnect with backoff')
+        return
+      }
 
       if (data.authenticating) {
         safeSend(ws, { type: 'error', code: 'auth_in_progress', message: 'Authentication already in progress' })

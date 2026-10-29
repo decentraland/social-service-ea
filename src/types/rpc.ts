@@ -86,4 +86,6 @@ export type RpcServerContext = {
   // can omit it. Used to disambiguate which connection issued a subscription.
   wsConnectionId?: string
   subscribersContext: ISubscribersContext
+  /** Optional transport policy when a subscription loses queued updates. */
+  onSubscriptionOverflow?: () => void
 }

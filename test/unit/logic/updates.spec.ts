@@ -1566,6 +1566,41 @@ describe('Updates Handlers', () => {
       }
     })
 
+    describe('and updates overflow while the initial snapshot is pending', () => {
+      let onOverflow: jest.Mock
+      let generator: AsyncGenerator<unknown>
+      let first: Promise<IteratorResult<unknown>>
+      let resolveSnapshot: (updates: unknown[]) => void
+
+      beforeEach(() => {
+        onOverflow = jest.fn()
+        rpcContext.onSubscriptionOverflow = onOverflow
+        generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'blockUpdate',
+          getAddressFromUpdate: () => '0x456',
+          shouldHandleUpdate: () => true,
+          parser,
+          getInitialUpdates: () => new Promise<unknown[]>((resolve) => { resolveSnapshot = resolve })
+        })
+        first = generator.next()
+        for (let index = 0; index < 1001; index++) {
+          emitterFor(subscribersContext, '0x123').emit('blockUpdate', blockUpdate)
+        }
+      })
+
+      afterEach(async () => {
+        resolveSnapshot([{}])
+        await first
+        await generator.return(undefined)
+      })
+
+      it('should notify the transport instead of only counting the dropped update', () => {
+        expect(onOverflow).toHaveBeenCalledTimes(1)
+        expect(mockMetrics.increment).toHaveBeenCalledWith('subscription_updates_dropped_total', { event: 'blockUpdate' })
+      })
+    })
+
     describe('and an active subscription already exists for the same address and event', () => {
       let result: IteratorResult<unknown, unknown>
       let clearActiveSubscriptionSpy: jest.SpyInstance
