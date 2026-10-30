@@ -9,7 +9,7 @@ import { createLogsMockedComponent } from '../../../../mocks/components'
 import { CommunityVoiceChatNotFoundError } from '../../../../../src/logic/community-voice/errors'
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { CommunityRole } from '../../../../../src/types/entities'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 
 describe('when kicking a player from a community voice chat', () => {
   let kickPlayerMock: jest.MockedFn<ICommsGatekeeperComponent['kickUserFromCommunityVoiceChat']>
@@ -22,7 +22,7 @@ describe('when kicking a player from a community voice chat', () => {
   let actingUserAddress: string
   let targetUserAddress: string
   let payload: KickPlayerFromCommunityVoiceChatPayload
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let service: ReturnType<typeof kickPlayerFromCommunityVoiceChatService>
   let result: KickPlayerFromCommunityVoiceChatResponse
 

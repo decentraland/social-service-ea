@@ -1,3 +1,4 @@
+import { abortable } from '../utils/abortable'
 import {
   CommunityVoiceChatUpdate,
   ConnectivityStatus,
@@ -5,7 +6,7 @@ import {
   SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { Action, AppComponents, SubscriptionContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../utils/address'
@@ -23,7 +24,7 @@ type UpdateParser<T, U> = (update: U, ...args: any[]) => T | null
 export type UpdatesMessageHandler = (message: string) => void | Promise<void>
 
 export type SubscriptionHandlerParams<T, U> = {
-  rpcContext: RpcServerContext
+  rpcContext: SubscriptionContext
   eventName: keyof SubscriptionEventsEmitter
   shouldRetrieveProfile?: boolean
   getAddressFromUpdate: (update: U) => string
@@ -500,9 +501,10 @@ export function createUpdateHandlerComponent(
 
     rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () =>
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () => {
       metrics.increment('subscription_updates_dropped_total', { event: eventNameString })
-    )
+      rpcContext.onSubscriptionOverflow?.()
+    })
     rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {
@@ -512,8 +514,10 @@ export function createUpdateHandlerComponent(
       // churning (and re-running these queries every time).
       if (getInitialUpdates) {
         try {
-          const initialUpdates = await getInitialUpdates()
+          const initialUpdates = await abortable(getInitialUpdates(), rpcContext.signal)
+          if (!initialUpdates || rpcContext.signal?.aborted) return
           for (const initialUpdate of initialUpdates) {
+            if (rpcContext.signal?.aborted) return
             yield initialUpdate
           }
         } catch (error: any) {
@@ -525,6 +529,7 @@ export function createUpdateHandlerComponent(
       }
 
       for await (const update of updatesGenerator) {
+        if (rpcContext.signal?.aborted) return
         if (!shouldHandleUpdate(update as U)) {
           continue
         }

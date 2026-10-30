@@ -50,6 +50,7 @@ describe('when registering a connection', () => {
   beforeEach(() => {
     wsConnectionId = 'connection-123'
     wsUserData = {
+      protocol: 'rpc',
       isConnected: true,
       auth: true,
       authenticating: false,
@@ -81,6 +82,7 @@ describe('when registering multiple connections', () => {
 
   beforeEach(() => {
     mockWebSocket.getUserData.mockReturnValueOnce({
+      protocol: 'rpc',
       isConnected: true,
       auth: true,
       authenticating: false,
@@ -97,6 +99,7 @@ describe('when registering multiple connections', () => {
     } as unknown as jest.Mocked<WebSocket<WsUserData>>
 
     secondWsUserData = {
+      protocol: 'rpc',
       isConnected: true,
       auth: true,
       authenticating: false,
@@ -135,6 +138,7 @@ describe('when unregistering a connection', () => {
     wsConnectionId = 'connection-123'
     connectionStartTime = Date.now() - 5000 // 5 seconds ago
     wsUserData = {
+      protocol: 'rpc',
       isConnected: true,
       auth: true,
       authenticating: false,
@@ -242,6 +246,7 @@ describe('when shutting down the component', () => {
       } as unknown as jest.Mocked<WebSocket<WsUserData>>
 
       firstWsUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         authenticating: false,
@@ -253,6 +258,7 @@ describe('when shutting down the component', () => {
       }
 
       secondWsUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         authenticating: false,
@@ -295,6 +301,7 @@ describe('when shutting down the component', () => {
       } as unknown as jest.Mocked<WebSocket<WsUserData>>
 
       firstWsUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         authenticating: false,
@@ -306,6 +313,7 @@ describe('when shutting down the component', () => {
       }
 
       secondWsUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         authenticating: false,
@@ -341,6 +349,7 @@ describe('when shutting down the component', () => {
       } as unknown as jest.Mocked<WebSocket<WsUserData>>
 
       firstWsUserData = {
+        protocol: 'rpc',
         isConnected: true,
         auth: true,
         authenticating: false,
@@ -372,6 +381,7 @@ describe('when handling connection with non-authenticated user data', () => {
   beforeEach(() => {
     wsConnectionId = 'connection-123'
     wsUserData = {
+      protocol: 'rpc',
       isConnected: true,
       auth: false,
       authenticating: true,
@@ -462,6 +472,7 @@ describe('when getting the connection ids', () => {
   describe('and there are registered connections', () => {
     beforeEach(() => {
       mockWebSocket.getUserData.mockReturnValue({
+        protocol: 'rpc',
         isConnected: true,
         auth: false,
         authenticating: false,
@@ -480,5 +491,69 @@ describe('when getting the connection ids', () => {
     it('should return an empty array', () => {
       expect(wsPool.getConnectionIds()).toEqual([])
     })
+  })
+})
+
+describe('when ending a connection by id', () => {
+  let userData: WsUserData
+
+  beforeEach(() => {
+    userData = {
+      isConnected: true,
+      auth: false,
+      authenticating: false,
+      wsConnectionId: 'connection-to-end',
+      connectionStartTime: Date.now(),
+      protocol: 'stream'
+    }
+    mockWebSocket.getUserData.mockReturnValue(userData)
+    wsPool.registerConnection(mockWebSocket)
+    wsPool.endConnection('connection-to-end', 3005, 'Replaced by a newer connection')
+  })
+
+  it('should end that socket with the given code and reason', () => {
+    expect(mockWebSocket.end).toHaveBeenCalledWith(3005, 'Replaced by a newer connection')
+  })
+
+  it('should track the connection under its protocol', () => {
+    expect(mockMetricsComponent.observe).toHaveBeenCalledWith(
+      'ws_active_connections_by_protocol',
+      { protocol: 'stream' },
+      1
+    )
+  })
+})
+
+describe('when ending a connection that is not registered', () => {
+  beforeEach(() => {
+    wsPool.endConnection('unknown-connection', 3005, 'Replaced by a newer connection')
+  })
+
+  it('should do nothing', () => {
+    expect(mockWebSocket.end).not.toHaveBeenCalled()
+  })
+})
+
+describe('when ending a socket that is already closing', () => {
+  let userData: WsUserData
+
+  beforeEach(() => {
+    userData = {
+      isConnected: true,
+      auth: false,
+      authenticating: false,
+      wsConnectionId: 'closing-connection',
+      connectionStartTime: Date.now(),
+      protocol: 'rpc'
+    }
+    mockWebSocket.getUserData.mockReturnValue(userData)
+    mockWebSocket.end.mockImplementation(() => {
+      throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+    })
+    wsPool.registerConnection(mockWebSocket)
+  })
+
+  it('should not throw', () => {
+    expect(() => wsPool.endConnection('closing-connection', 3005, 'Replaced by a newer connection')).not.toThrow()
   })
 })

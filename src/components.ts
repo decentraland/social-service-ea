@@ -1,3 +1,5 @@
+import { createStreamSessionsComponent } from './adapters/stream-sessions'
+import { createStreamRegistry } from './controllers/handlers/uws/stream-registry'
 import { resolve } from 'path'
 import {
   createServerComponent,
@@ -58,6 +60,7 @@ import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
 import { createWsPoolComponent } from './logic/ws-pool'
+import { createWsAdmissionComponent } from './logic/ws-admission'
 import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
 import { createEmailComponent } from './adapters/email'
 import { createFriendsComponent } from './logic/friends'
@@ -186,6 +189,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const storage = await createS3Adapter({ config })
   const wsPool = await createWsPoolComponent({ logs, metrics, config })
+  const wsAdmission = await createWsAdmissionComponent({ config, metrics })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
@@ -306,6 +310,11 @@ export async function initComponents(): Promise<AppComponents> {
     peersStats
   })
 
+  const streamSessions = await createStreamSessionsComponent(
+    { logs, metrics, fetcher, voice, config, tracing, wsPool, wsAdmission, subscribersContext },
+    createStreamRegistry({ updateHandler, friendsDb, peersStats })
+  )
+
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,
@@ -413,6 +422,7 @@ export async function initComponents(): Promise<AppComponents> {
     sns,
     statusChecks,
     storage,
+    streamSessions,
     subscribersContext,
     tracing,
     updateHandler,
@@ -421,6 +431,7 @@ export async function initComponents(): Promise<AppComponents> {
     voiceDb,
     worldsStats,
     wsPool,
+    wsAdmission,
     schemaValidator,
     userMutesDb,
     userMutes

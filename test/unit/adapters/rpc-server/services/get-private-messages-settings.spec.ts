@@ -13,13 +13,13 @@ import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
-  RpcServerContext
+  SubscriptionContext
 } from '../../../../../src/types'
 
 describe('getPrivateMessagesSettingsService', () => {
   const testAddress1 = '0x1234567890abcdef'
   const testAddress2 = '0xabcdef1234567890'
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let getSocialSettingsMock: jest.MockedFunction<IFriendsDatabaseComponent['getSocialSettings']>
   let getFriendsFromListMock: jest.MockedFunction<IFriendsDatabaseComponent['getFriendsFromList']>
   let getPrivateMessagesSettings: ReturnType<typeof getPrivateMessagesSettingsService>

@@ -2,7 +2,8 @@ import {
   PromoteSpeakerInCommunityVoiceChatPayload,
   PromoteSpeakerInCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError,
@@ -21,7 +22,7 @@ export function promoteSpeakerInCommunityVoiceChatService({
 
   return async function (
     request: PromoteSpeakerInCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<PromoteSpeakerInCommunityVoiceChatResponse> {
     try {
       logger.info('Promoting speaker in community voice chat', {

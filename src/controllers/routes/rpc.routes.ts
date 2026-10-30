@@ -34,7 +34,8 @@ import {
   muteSpeakerFromCommunityVoiceChatService,
   subscribeToCommunityVoiceChatUpdatesService
 } from '../handlers/rpc'
-import { ServiceType, StreamEvent } from '../../adapters/rpc-server/metrics-wrapper'
+import { ServiceType } from '../../adapters/rpc-server/metrics-wrapper'
+import { StreamEvent } from '../../types/subscriptions'
 
 export type RpcServiceCreator = {
   creator: any

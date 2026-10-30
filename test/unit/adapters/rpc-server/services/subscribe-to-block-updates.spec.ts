@@ -4,7 +4,7 @@ import {
   SubscriptionStreamClosed,
   SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
@@ -15,7 +15,7 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to block updates', () => {
   let subscribeToBlockUpdates: ReturnType<typeof subscribeToBlockUpdatesService>
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
   let logs: jest.Mocked<ILoggerComponent>
@@ -28,7 +28,10 @@ describe('when subscribing to block updates', () => {
 
   beforeEach(() => {
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext(
+      { logs, metrics: mockMetrics, config: mockConfig },
+      createWsPoolMockedComponent()
+    )
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToBlockUpdates = subscribeToBlockUpdatesService({

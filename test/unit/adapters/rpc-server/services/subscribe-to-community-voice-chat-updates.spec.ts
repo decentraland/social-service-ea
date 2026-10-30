@@ -7,7 +7,7 @@ import {
   SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { subscribeToCommunityVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-voice-chat-updates'
-import { IUpdateHandlerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
+import { IUpdateHandlerComponent, SubscriptionContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { mockMetrics } from '../../../../mocks/components/metrics'
@@ -17,7 +17,7 @@ import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-poo
 describe('when subscribing to community voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
   let service: ReturnType<typeof subscribeToCommunityVoiceChatUpdatesService>
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
   let userAddress: string
   let communityId: string

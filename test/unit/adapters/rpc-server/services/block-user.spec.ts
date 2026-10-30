@@ -2,7 +2,7 @@ import { EthAddress } from '@dcl/schemas'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { blockUserService } from '../../../../../src/controllers/handlers/rpc/block-user'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToBlockedUser } from '../../../../../src/logic/friends'
 import { ProfileNotFoundError } from '../../../../../src/logic/friends/errors'
@@ -14,7 +14,7 @@ describe('when blocking a user', () => {
   let blockedAddress: EthAddress
   let userAddress: EthAddress
 
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
 
   beforeEach(async () => {
     userAddress = '0x1111111111111111111111111111111111111111'

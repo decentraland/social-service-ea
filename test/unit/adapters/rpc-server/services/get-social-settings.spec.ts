@@ -11,13 +11,13 @@ import {
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
-  RpcServerContext
+  SubscriptionContext
 } from '../../../../../src/types'
 import { createSettingsMockedComponent } from '../../../../mocks/components/settings'
 
 describe('getSocialSettingsService', () => {
   const testAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
-  let context: RpcServerContext
+  let context: SubscriptionContext
   let getUsersSettingsMock: jest.MockedFunction<ISettingsComponent['getUsersSettings']>
   let getSocialSettings: ReturnType<typeof getSocialSettingsService>
 

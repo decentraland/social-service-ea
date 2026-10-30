@@ -7,7 +7,7 @@ import {
   convertRPCSettingsIntoDBSettings,
   InvalidSocialSettingsError
 } from '../../../logic/settings/utils'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 /**
@@ -23,7 +23,7 @@ export function upsertSocialSettingsService({
 
   return async function (
     request: UpsertSocialSettingsPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<UpsertSocialSettingsResponse> {
     try {
       if (

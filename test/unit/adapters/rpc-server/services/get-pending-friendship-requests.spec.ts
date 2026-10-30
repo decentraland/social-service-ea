@@ -1,6 +1,6 @@
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getPendingFriendshipRequestsService } from '../../../../../src/controllers/handlers/rpc/get-pending-friendship-requests'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
@@ -14,7 +14,7 @@ describe('when getting pending friendship requests', () => {
   let friendsComponent: IFriendsComponent
   let getPendingFriendshipRequestsMethod: jest.MockedFunction<typeof friendsComponent.getPendingFriendshipRequests>
 
-  const rpcContext: RpcServerContext = {
+  const rpcContext: SubscriptionContext = {
     address: '0x1234567890123456789012345678901234567890',
     subscribersContext: undefined
   }

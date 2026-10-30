@@ -2,7 +2,8 @@ import {
   StartCommunityVoiceChatPayload,
   StartCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import {
   UserNotCommunityMemberError,
   CommunityVoiceChatPermissionError,
@@ -18,7 +19,7 @@ export function startCommunityVoiceChatService({
 
   return async function (
     request: StartCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<StartCommunityVoiceChatResponse> {
     try {
       logger.info('Starting community voice chat', {

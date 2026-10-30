@@ -1,5 +1,5 @@
 import { WsUserData } from '../../../src/types'
-import { isAuthenticated, isNotAuthenticated } from '../../../src/utils/wsUserData'
+import { isAuthenticated, isNotAuthenticated, isRpcAuthenticated } from '../../../src/utils/wsUserData'
 import { IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
 import { Emitter } from 'mitt'
 
@@ -9,6 +9,7 @@ describe('wsUserData', () => {
   describe('isAuthenticated', () => {
     it('should return true if the user is authenticated and not authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: true,
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
@@ -24,6 +25,7 @@ describe('wsUserData', () => {
 
     it('should return false if the user is not authenticated', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: false,
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
@@ -37,6 +39,7 @@ describe('wsUserData', () => {
 
     it('should return false if the user is authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: true,
         isConnected: false,
         authenticating: true,
@@ -48,9 +51,31 @@ describe('wsUserData', () => {
     })
   })
 
+  describe('when an authenticated socket uses the JSON protocol', () => {
+    let data: WsUserData
+
+    beforeEach(() => {
+      data = {
+        protocol: 'stream',
+        auth: true,
+        authenticating: false,
+        isConnected: true,
+        address: '0x123',
+        wsConnectionId,
+        connectionStartTime: 0
+      }
+    })
+
+    it('should recognize authentication without promising an RPC transport', () => {
+      expect(isAuthenticated(data)).toBe(true)
+      expect(isRpcAuthenticated(data)).toBe(false)
+    })
+  })
+
   describe('isNotAuthenticated', () => {
     it('should return false if the user is authenticated and not authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: true,
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
@@ -66,6 +91,7 @@ describe('wsUserData', () => {
 
     it('should return true with the correct type if the user is not authenticated', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: false,
         isConnected: false,
         wsConnectionId,
@@ -78,6 +104,7 @@ describe('wsUserData', () => {
 
     it('should return true if the user is authenticating', () => {
       const data: WsUserData = {
+        protocol: 'rpc',
         auth: false,
         isConnected: false,
         authenticating: true,

@@ -8,7 +8,7 @@ import {
 } from '../../../../mocks/components'
 import { unblockUserService } from '../../../../../src/controllers/handlers/rpc/unblock-user'
 import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
+import { Action, Friendship, SubscriptionContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { PoolClient } from 'pg'
 import { IFriendsComponent, parseProfileToBlockedUser } from '../../../../../src/logic/friends'
@@ -22,7 +22,7 @@ describe('when unblocking a user', () => {
   let friends: jest.Mocked<IFriendsComponent>
   let blockedAddress: EthAddress
   let mockProfile: Profile
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let userAddress: EthAddress
 
   beforeEach(async () => {

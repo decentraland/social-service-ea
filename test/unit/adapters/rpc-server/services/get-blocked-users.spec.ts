@@ -1,6 +1,6 @@
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getBlockedUsersService } from '../../../../../src/controllers/handlers/rpc/get-blocked-users'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfilesToBlockedUsers } from '../../../../../src/logic/friends'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
@@ -10,7 +10,7 @@ describe('when getting blocked users', () => {
   let friendsComponent: IFriendsComponent
   let getBlockedUsersMethod: jest.MockedFunction<typeof friendsComponent.getBlockedUsers>
 
-  const rpcContext: RpcServerContext = {
+  const rpcContext: SubscriptionContext = {
     address: '0x123',
     subscribersContext: undefined
   }

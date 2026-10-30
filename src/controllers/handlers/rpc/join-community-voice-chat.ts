@@ -2,7 +2,8 @@ import {
   JoinCommunityVoiceChatPayload,
   JoinCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import { NotAuthorizedError } from '@dcl/http-commons'
 import {
   CommunityVoiceChatNotFoundError,
@@ -18,7 +19,7 @@ export function joinCommunityVoiceChatService({
 
   return async function (
     request: JoinCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<JoinCommunityVoiceChatResponse> {
     try {
       logger.info('Joining community voice chat', {

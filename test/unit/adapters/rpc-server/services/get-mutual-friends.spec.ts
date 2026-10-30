@@ -1,7 +1,7 @@
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getMutualFriendsService } from '../../../../../src/controllers/handlers/rpc/get-mutual-friends'
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext } from '../../../../../src/types'
+import { SubscriptionContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseExpectedFriends } from '../../../../mocks/friend'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
@@ -11,7 +11,7 @@ describe('when getting mutual friends', () => {
   let friendsComponent: IFriendsComponent
   let getMutualFriendsProfilesMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriendsProfiles>
 
-  const rpcContext: RpcServerContext = {
+  const rpcContext: SubscriptionContext = {
     address: '0x1234567890123456789012345678901234567890',
     subscribersContext: undefined
   }

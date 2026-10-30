@@ -1,5 +1,6 @@
+import { createSubscriptionPolicies } from '../../../logic/subscriptions/policies'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
+import { SubscriptionContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { CommunityVoiceChatUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { isErrorWithMessage } from '../../../utils/errors'
 
@@ -30,7 +31,7 @@ export function subscribeToCommunityVoiceChatUpdatesService({
 }: RPCServiceContext<'logs' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-community-voice-chat-updates-service')
 
-  return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<CommunityVoiceChatUpdate> {
+  return async function* (_request: Empty, context: SubscriptionContext): AsyncGenerator<CommunityVoiceChatUpdate> {
     try {
       yield* updateHandler.handleSubscriptionUpdates<
         CommunityVoiceChatUpdate,
@@ -38,10 +39,9 @@ export function subscribeToCommunityVoiceChatUpdatesService({
       >({
         rpcContext: context,
         eventName: 'communityVoiceChatUpdate',
+        ...createSubscriptionPolicies(context).communityVoiceChatUpdate,
         shouldRetrieveProfile: false,
-        getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToCommunityVoiceChatUpdate,
-        shouldHandleUpdate: () => true, // Handle all community voice chat updates for now
         // fromPartial fills the remaining fields with protobuf defaults so the final
         // "stream closed" message is safe to encode.
         buildStreamClosedUpdate: (streamClosed) => CommunityVoiceChatUpdate.fromPartial({ streamClosed })

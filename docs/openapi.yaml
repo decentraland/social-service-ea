@@ -37,8 +37,7 @@ info:
     - Filter by single address or multiple addresses
 
     ### 👥 Social Features
-    - **Friendship management** (via RPC/gRPC - not covered in this REST API)
-    - **Blocking and privacy controls** (via RPC/gRPC)
+    - **Friendship management**, **blocking and privacy controls** and **private voice chats**, with their real-time updates over the WebSocket stream protocol described in [websocket-stream-protocol.md](./websocket-stream-protocol.md)
     - **User profiles** with claimed names and avatars
     - **Online status tracking** for community members
 

@@ -17,6 +17,8 @@ export async function connectAuthenticatedRpcClient(
 ): Promise<{
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
   authAddress: string
+  /** Resolves when the server or the client closes the socket. */
+  closed: Promise<void>
   close: () => void
 }> {
   const logger = logs.getLogger('test:rpc-multi-client')
@@ -25,6 +27,7 @@ export async function connectAuthenticatedRpcClient(
   const headers = createAuthHeaders('get', '/', {}, identity)
   const authMessage = new TextEncoder().encode(JSON.stringify(headers))
   const transport = createWebSocketTransport(serverUrl)
+  const closed = new Promise<void>((resolve) => transport.on('close', () => resolve()))
 
   const client = await new Promise<RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>>(
     (resolve, reject) => {
@@ -53,6 +56,7 @@ export async function connectAuthenticatedRpcClient(
   return {
     client,
     authAddress: identity.realAccount.address.toLowerCase(),
+    closed,
     close: () => transport.close()
   }
 }

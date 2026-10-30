@@ -32,7 +32,8 @@ import {
   IRewardComponent,
   IEmailComponent,
   ICdnCacheInvalidatorComponent,
-  IRegistryComponent
+  IRegistryComponent,
+  IStreamSessionsComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -61,6 +62,7 @@ import { IQueueComponent } from '@dcl/sqs-component'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
+import { IWsAdmissionComponent } from '../logic/ws-admission'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
 import { IUserMutesComponent } from '../logic/user-mutes'
@@ -137,7 +139,9 @@ export type BaseComponents = {
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
   worldsStats: IWorldsStatsComponent
+  streamSessions: IStreamSessionsComponent
   wsPool: IWsPoolComponent
+  wsAdmission: IWsAdmissionComponent
   cdnCacheInvalidator: ICdnCacheInvalidatorComponent
   friends: IFriendsComponent
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent

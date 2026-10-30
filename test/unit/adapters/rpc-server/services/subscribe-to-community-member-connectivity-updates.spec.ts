@@ -1,5 +1,5 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
+import { SubscriptionContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { subscribeToCommunityMemberConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-member-connectivity-updates'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
@@ -19,7 +19,7 @@ describe('when subscribing to community member connectivity updates', () => {
   let subscribeToCommunityMemberConnectivityUpdates: ReturnType<
     typeof subscribeToCommunityMemberConnectivityUpdatesService
   >
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
   let logs: jest.Mocked<ILoggerComponent>
@@ -32,7 +32,10 @@ describe('when subscribing to community member connectivity updates', () => {
 
   beforeEach(() => {
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext(
+      { logs, metrics: mockMetrics, config: mockConfig },
+      createWsPoolMockedComponent()
+    )
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToCommunityMemberConnectivityUpdates = subscribeToCommunityMemberConnectivityUpdatesService({

@@ -1,6 +1,7 @@
 import { HttpRequest, HttpResponse, createMetricsHandler, onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
 import { AppComponents, IHandler, TestComponents } from '../../types'
 import { createStatusHandler, registerWsHandler, createPrivacyHandler } from '../handlers/uws'
+import { registerStreamWsHandler } from '../handlers/uws/stream-ws-handler'
 
 export async function setupUWSRoutes(components: AppComponents | TestComponents): Promise<void> {
   const { metrics, uwsServer } = components
@@ -54,6 +55,8 @@ export async function setupUWSRoutes(components: AppComponents | TestComponents)
   }
 
   await registerWsHandler(components)
+  // Plain-JSON stream protocol next to the RPC socket. Registered before the catch-all 404 below.
+  await registerStreamWsHandler(components)
 
   {
     const handler = await createStatusHandler(components)

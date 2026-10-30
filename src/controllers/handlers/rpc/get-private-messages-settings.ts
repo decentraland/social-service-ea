@@ -2,7 +2,7 @@ import {
   GetPrivateMessagesSettingsPayload,
   GetPrivateMessagesSettingsResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import {
   convertDBPrivateMessagesPrivacyToRPCSetting,
   MAX_PRIVATE_MESSAGES_SETTINGS_ADDRESSES
@@ -16,7 +16,7 @@ export function getPrivateMessagesSettingsService({
 
   return async function (
     request: GetPrivateMessagesSettingsPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<GetPrivateMessagesSettingsResponse> {
     try {
       const userAddresses = request.user.map((user) => user.address)

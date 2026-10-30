@@ -1,11 +1,7 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-private-voice-chat-updates'
-import {
-  IUpdateHandlerComponent,
-  RpcServerContext,
-  SubscriptionEventsEmitter
-} from '../../../../../src/types'
+import { IUpdateHandlerComponent, SubscriptionContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { mockMetrics } from '../../../../mocks/components/metrics'
@@ -22,7 +18,7 @@ import { VoiceChatStatus } from '../../../../../src/logic/voice/types'
 describe('when subscribing to private voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
   let service: ReturnType<typeof subscribeToPrivateVoiceChatUpdatesService>
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
   let callerAddress: string
   let calleeAddress: string
@@ -41,7 +37,10 @@ describe('when subscribing to private voice chat updates', () => {
 
     rpcContext = {
       address: callerAddress,
-      subscribersContext: createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+      subscribersContext: createSubscribersContext(
+        { logs, metrics: mockMetrics, config: mockConfig },
+        createWsPoolMockedComponent()
+      )
     }
   })
 
@@ -255,8 +254,8 @@ describe('when subscribing to private voice chat updates', () => {
     })
 
     it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
-      const buildStreamClosedUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0]
-        .buildStreamClosedUpdate!
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate!
 
       // callId/status are the protobuf zero-value defaults; clients must ignore them when
       // streamClosed is present.

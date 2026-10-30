@@ -2,19 +2,13 @@ import mitt from 'mitt'
 import { randomUUID } from 'crypto'
 import { WebSocket } from 'uWebSockets.js'
 import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
-import { RequestError, verify } from '@dcl/crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
-import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
+import { isRpcAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection } from '../../../utils/errors'
 import { WsPoolFullError } from '../../../logic/ws-pool'
-import { rejectSceneSigner } from '../../../utils/auth-metadata'
-
-type AuthChainHeaders = Parameters<typeof verify>[2]
-
-// Shared by the auth chain, timestamp and metadata headers (`x-identity-auth-chain-N`, ...).
-const AUTH_HEADER_PREFIX = 'x-identity-'
+import { getWsAuthSettings, verifyWsIdentity } from '../../../utils/ws-session'
 
 const textDecoder = new TextDecoder()
 
@@ -22,20 +16,19 @@ export const FIVE_MINUTES_IN_SECONDS = 300
 export const THREE_MINUTES_IN_MS = 180000
 
 const getAddress = (data: WsUserData) => {
-  return isAuthenticated(data) ? data.address : 'Not authenticated'
+  return isRpcAuthenticated(data) ? data.address : 'Not authenticated'
 }
 
 export async function registerWsHandler(
   components: Pick<
     AppComponents,
-    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool'
+    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool' | 'wsAdmission'
   >
 ) {
-  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool, wsAdmission } = components
   const logger = logs.getLogger('ws-handler')
 
-  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 5 minutes in ms
-  const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000 // 5 minutes in ms
+  const { authTimeoutInMs, authSignatureExpirationInMs } = await getWsAuthSettings({ config })
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
@@ -89,7 +82,7 @@ export async function registerWsHandler(
     // path — otherwise it would rely on ws.end() throwing on the already-closing socket.
     data.isConnected = false
 
-    if (isAuthenticated(data)) {
+    if (isRpcAuthenticated(data)) {
       // Each step is independent — a failure in one must not prevent the others.
       // Previously these were in a single try/catch, so a throw in transport.close()
       // would skip detachUser() and emitter.clear(), permanently leaking the subscriber.
@@ -103,6 +96,7 @@ export async function registerWsHandler(
       delete data.timeout
     }
 
+    wsAdmission.releaseConnection(wsConnectionId)
     wsPool.unregisterConnection(data)
 
     metrics.increment('ws_close_codes', { code })
@@ -114,54 +108,11 @@ export async function registerWsHandler(
     })
   }
 
-  /**
-   * Parses the client's first frame into the auth chain headers `verify()` expects. A frame that is
-   * not JSON, is not a plain object, or carries an auth header value that is neither a string nor an
-   * array of strings is the client's fault, like any other malformed chain. Left to `verify()`, some of
-   * these crash it instead (`null` as a TypeError, a numeric timestamp inside `createPayload`) and
-   * would be reported as server errors. So each is raised as the 400 `RequestError` the middleware
-   * uses for a malformed chain, and leaves through the catch below as an expected rejection. The
-   * messages are fixed and never echo the frame back into the logs.
-   */
-  function parseAuthChainHeaders(authChainMessage: string): AuthChainHeaders {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(authChainMessage)
-    } catch {
-      throw new RequestError('Invalid auth chain payload: not valid JSON', 400)
-    }
-
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new RequestError('Invalid auth chain payload: expected an object', 400)
-    }
-
-    // Every `x-identity-*` key (case-insensitive) must carry a string or string[]; any other field is left alone, as before.
-    for (const [key, value] of Object.entries(parsed)) {
-      if (!key.toLowerCase().startsWith(AUTH_HEADER_PREFIX)) continue
-      const isHeaderValue =
-        typeof value === 'string' || (Array.isArray(value) && value.every((item) => typeof item === 'string'))
-      if (!isHeaderValue) {
-        throw new RequestError('Invalid auth chain payload: header values must be strings', 400)
-      }
-    }
-
-    return parsed as AuthChainHeaders
-  }
-
   async function authenticateUser(ws: WebSocket<WsUserData>, data: WsNotAuthenticatedUserData, message: ArrayBuffer) {
     try {
       changeStage(data, { authenticating: true })
 
-      const authChainMessage = textDecoder.decode(message)
-
-      const verifyResult = await verify('get', '/', parseAuthChainHeaders(authChainMessage), {
-        fetcher,
-        expiration: authSignatureExpirationInMs,
-        // Scene signers are not accepted on this surface, matching the HTTP routes. Runs before
-        // signature verification, and the rejection it raises leaves through the catch below as a
-        // 3003 close — there is no weaker check for it to fall back to.
-        metadataValidator: rejectSceneSigner
-      })
+      const verifyResult = await verifyWsIdentity({ fetcher }, message, authSignatureExpirationInMs)
 
       if (data.timeout) {
         clearTimeout(data.timeout)
@@ -201,6 +152,7 @@ export async function registerWsHandler(
 
       changeStage(data, {
         auth: true,
+        authenticating: false,
         address,
         eventEmitter,
         isConnected: true,
@@ -237,6 +189,9 @@ export async function registerWsHandler(
         })
       })
 
+      const { evictedConnectionId } = wsAdmission.claimConnection(address, data.wsConnectionId, 'rpc')
+      if (evictedConnectionId) wsPool.endConnection(evictedConnectionId, 3005, 'Replaced by a newer connection')
+
       rpcServer.attachUser({ transport, address, wsConnectionId: data.wsConnectionId })
     } catch (error: any) {
       const expectedRejection = isExpectedAuthRejection(error)
@@ -260,6 +215,10 @@ export async function registerWsHandler(
         })
       }
 
+      metrics.increment('ws_auth_errors_by_protocol', {
+        protocol: 'rpc',
+        type: expectedRejection ? 'client_rejected' : 'server_error'
+      })
       metrics.increment('ws_auth_errors', { type: expectedRejection ? 'client_rejected' : 'server_error' })
       // The client may have disconnected while verify() was in flight; end() on an
       // already-closed socket throws and would escape the async message handler as an
@@ -326,7 +285,7 @@ export async function registerWsHandler(
 
       // Let the transport retry queued messages now that the socket drained, instead of
       // waiting for its backoff timer.
-      if (isAuthenticated(data)) {
+      if (isRpcAuthenticated(data)) {
         data.eventEmitter.emit('drain')
       }
     },
@@ -339,6 +298,7 @@ export async function registerWsHandler(
           isConnected: false,
           auth: false,
           wsConnectionId,
+          protocol: 'rpc',
           transport: null
         },
         req.getHeader('sec-websocket-key'),
@@ -427,7 +387,7 @@ export async function registerWsHandler(
 
       if (isNotAuthenticated(data)) {
         await authenticateUser(ws, data, message)
-      } else {
+      } else if (isRpcAuthenticated(data)) {
         forwardMessage(ws, data, message)
       }
     },
@@ -437,7 +397,7 @@ export async function registerWsHandler(
       const messageText = textDecoder.decode(message)
       // Captured before cleanup: cleanupConnection resets the auth flag, so the type guard
       // never matches afterwards.
-      const address = isAuthenticated(data) ? data.address : undefined
+      const address = isRpcAuthenticated(data) ? data.address : undefined
 
       cleanupConnection(data, code)
 

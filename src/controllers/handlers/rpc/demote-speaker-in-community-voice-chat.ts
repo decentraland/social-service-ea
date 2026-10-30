@@ -2,7 +2,8 @@ import {
   DemoteSpeakerInCommunityVoiceChatPayload,
   DemoteSpeakerInCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { RPCServiceContext } from '../../../types/rpc'
+import { SubscriptionContext } from '../../../types/subscriptions'
 import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError,
@@ -21,7 +22,7 @@ export function demoteSpeakerInCommunityVoiceChatService({
 
   return async function (
     request: DemoteSpeakerInCommunityVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<DemoteSpeakerInCommunityVoiceChatResponse> {
     try {
       logger.info('Demoting speaker in community voice chat', {

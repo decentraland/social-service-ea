@@ -2,7 +2,7 @@ import {
   StartPrivateVoiceChatPayload,
   StartPrivateVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 import {
   UserAlreadyInVoiceChatError,
@@ -16,7 +16,7 @@ export function startPrivateVoiceChatService({ components: { logs, voice } }: RP
 
   return async function (
     request: StartPrivateVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<StartPrivateVoiceChatResponse> {
     try {
       if (!request.callee?.address) {

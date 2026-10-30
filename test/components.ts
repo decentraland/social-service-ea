@@ -1,3 +1,5 @@
+import { createStreamSessionsComponent } from '../src/adapters/stream-sessions'
+import { createStreamRegistry } from '../src/controllers/handlers/uws/stream-registry'
 // This file is the "test-environment" analogous for src/components.ts
 // Here we define the test components to be used in the testing environment
 
@@ -72,6 +74,7 @@ import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
+import { createWsAdmissionComponent } from '../src/logic/ws-admission'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
@@ -160,6 +163,7 @@ async function initComponents(): Promise<TestComponents> {
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const wsPool = await createWsPoolComponent({ logs, metrics, config })
+  const wsAdmission = await createWsAdmissionComponent({ config, metrics })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
@@ -290,6 +294,11 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     communitiesDb
   })
+  const streamSessions = await createStreamSessionsComponent(
+    { logs, metrics, fetcher, voice, config, tracing: mockTracing, wsPool, wsAdmission, subscribersContext },
+    createStreamRegistry({ updateHandler, friendsDb, peersStats })
+  )
+
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,
@@ -403,7 +412,9 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     voiceDb,
     worldsStats,
+    streamSessions,
     wsPool,
+    wsAdmission,
     schemaValidator
   }
 }

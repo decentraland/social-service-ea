@@ -1,5 +1,6 @@
+import { StreamEvent } from '../../types/subscriptions'
 import * as Sentry from '@sentry/node'
-import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
+import { BaseComponents, SubscriptionContext, RPCServiceContext } from '../../types'
 import { withoutTracing } from '../../utils/tracing'
 import {
   BlockUserResponse,
@@ -23,15 +24,6 @@ export enum ServiceType {
   COMMUNITIES = 'communities'
 }
 
-export enum StreamEvent {
-  FRIENDSHIP_UPDATES = 'friendship_updates',
-  FRIEND_CONNECTIVITY_UPDATES = 'friend_connectivity_updates',
-  BLOCK_UPDATES = 'block_updates',
-  PRIVATE_VOICE_CHAT_UPDATES = 'private_voice_chat_updates',
-  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES = 'community_member_connectivity_updates',
-  COMMUNITY_VOICE_CHAT_UPDATES = 'community_voice_chat_updates'
-}
-
 type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (
   params: TParams,
   context: TContext
@@ -44,11 +36,11 @@ type RpcStreamMethod<TParams, TResult, TContext> = (
 
 export type ServiceMethodDefinition =
   | {
-      creator: RpcCallMethod<any, any, RpcServerContext>
+      creator: RpcCallMethod<any, any, SubscriptionContext>
       type: ServiceType.CALL
     }
   | {
-      creator: RpcStreamMethod<any, any, RpcServerContext>
+      creator: RpcStreamMethod<any, any, SubscriptionContext>
       type: ServiceType.STREAM
       event: StreamEvent
     }
@@ -190,9 +182,9 @@ export async function createRpcServerMetricsWrapper({
 
   function measureRpcCall<TParams extends Record<string, unknown> | void, TResult extends SocialServiceResponse>(
     procedureName: string,
-    serviceFunction: RpcCallMethod<TParams, TResult, RpcServerContext>
-  ): RpcCallMethod<TParams, TResult, RpcServerContext> {
-    return async (params: TParams, context: RpcServerContext) => {
+    serviceFunction: RpcCallMethod<TParams, TResult, SubscriptionContext>
+  ): RpcCallMethod<TParams, TResult, SubscriptionContext> {
+    return async (params: TParams, context: SubscriptionContext) => {
       const startTime = Date.now()
 
       const runCall = async () => {
@@ -237,10 +229,10 @@ export async function createRpcServerMetricsWrapper({
 
   function measureRpcStream<TParams extends Record<string, unknown> | void, TResult>(
     procedureName: string,
-    serviceFunction: RpcStreamMethod<TParams, TResult, RpcServerContext>,
+    serviceFunction: RpcStreamMethod<TParams, TResult, SubscriptionContext>,
     event: string
-  ): RpcStreamMethod<TParams, TResult, RpcServerContext> {
-    return async function* (params: TParams, context: RpcServerContext) {
+  ): RpcStreamMethod<TParams, TResult, SubscriptionContext> {
+    return async function* (params: TParams, context: SubscriptionContext) {
       const startTime = Date.now()
 
       recordRequestSize(procedureName, params)

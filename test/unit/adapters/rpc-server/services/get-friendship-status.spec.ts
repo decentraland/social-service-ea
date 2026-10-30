@@ -4,7 +4,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getFriendshipStatusService } from '../../../../../src/controllers/handlers/rpc/get-friendship-status'
-import { RpcServerContext, Action } from '../../../../../src/types'
+import { SubscriptionContext, Action } from '../../../../../src/types'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
 describe('when getting friendship status', () => {
@@ -12,7 +12,7 @@ describe('when getting friendship status', () => {
   let friendsComponent: IFriendsComponent
   let getFriendshipStatusMethod: jest.MockedFunction<typeof friendsComponent.getFriendshipStatus>
 
-  const rpcContext: RpcServerContext = {
+  const rpcContext: SubscriptionContext = {
     address: '0x1234567890123456789012345678901234567890',
     subscribersContext: undefined
   }

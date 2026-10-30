@@ -2,7 +2,7 @@ import {
   EndPrivateVoiceChatPayload,
   EndPrivateVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { VoiceChatNotFoundError } from '../../../logic/voice/errors'
 
@@ -11,7 +11,7 @@ export function endPrivateVoiceChatService({ components: { logs, voice } }: RPCS
 
   return async function (
     request: EndPrivateVoiceChatPayload,
-    context: RpcServerContext
+    context: SubscriptionContext
   ): Promise<EndPrivateVoiceChatResponse> {
     try {
       await voice.endPrivateVoiceChat(request.callId, context.address)

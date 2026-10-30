@@ -69,9 +69,8 @@ export function createWebSocketTransport(url: string): Transport {
     },
 
     sendMessage(message: Uint8Array): void {
-      if (!this.isConnected) {
-        throw new Error('WebSocket is not connected')
-      }
+      // Dropped like a browser WebSocket does: the RPC client closes its ports by sending after a server close.
+      if (!this.isConnected) return
       socket!.send(message)
     },
 

@@ -5,7 +5,7 @@ import {
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { upsertFriendshipService } from '../../../../../src/controllers/handlers/rpc/upsert-friendship'
-import { FriendshipRequest, RpcServerContext } from '../../../../../src/types'
+import { FriendshipRequest, SubscriptionContext } from '../../../../../src/types'
 import { IFriendsComponent, parseFriendshipRequestToFriendshipRequestResponse } from '../../../../../src/logic/friends'
 import { createMockProfile } from '../../../../mocks/profile'
 import { InvalidRequestError as HttpInvalidRequestError } from '@dcl/http-commons'
@@ -16,7 +16,7 @@ describe('when upserting a friendship', () => {
   let upsertFriendship: ReturnType<typeof upsertFriendshipService>
   let upsertFriendshipMock: jest.MockedFunction<IFriendsComponent['upsertFriendship']>
   let mockRequest: UpsertFriendshipPayload
-  let rpcContext: RpcServerContext
+  let rpcContext: SubscriptionContext
   let userAddress: string
   let receiverAddress: string
   let message: string

@@ -8,6 +8,8 @@ export interface IWsPoolComponent extends IBaseComponent {
    * @throws {WsPoolFullError} When the configured connection limit is reached.
    */
   registerConnection: (ws: WebSocket<WsUserData>) => void
+  /** Ends a registered socket by id; a no-op when it is gone. */
+  endConnection: (wsConnectionId: string, code: number, reason: string) => void
   unregisterConnection: (data: WsUserData) => void
   getAuthenticatedAddresses: () => string[]
   /**

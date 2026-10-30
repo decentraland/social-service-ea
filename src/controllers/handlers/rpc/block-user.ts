@@ -3,7 +3,7 @@ import {
   BlockUserPayload,
   BlockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionContext, RPCServiceContext } from '../../../types'
 import { parseAddressToBlockedUser, parseProfileToBlockedUser } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 import { FriendshipRateLimitError, ProfileNotFoundError } from '../../../logic/friends/errors'
@@ -12,7 +12,7 @@ import { normalizeAddress } from '../../../utils/address'
 export function blockUserService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('block-user-service')
 
-  return async function (request: BlockUserPayload, context: RpcServerContext): Promise<BlockUserResponse> {
+  return async function (request: BlockUserPayload, context: SubscriptionContext): Promise<BlockUserResponse> {
     try {
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
