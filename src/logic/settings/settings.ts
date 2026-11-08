@@ -37,7 +37,9 @@ export function createSettingsComponent({
 
     if (privacyUpdate === PrivateMessagesPrivacy.ONLY_FRIENDS) {
       // Tightening must reach Gatekeeper first. If it fails, the permissive database value is
-      // left untouched and the client receives an error instead of a false success.
+      // left untouched and the client receives an error instead of a false success. A user not
+      // connected to the private messages room counts as success: Gatekeeper reads the stored
+      // value when it issues their next private messages token.
       try {
         await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(address, privacyUpdate)
       } catch (error) {

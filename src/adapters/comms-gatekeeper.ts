@@ -49,23 +49,24 @@ function pathSegment(value: string): string {
   return encodeURIComponent(value)
 }
 
-// Message Comms Gatekeeper answers (with a 400) when the user is not connected to the private messages room.
+// Message Comms Gatekeeper answers (with a 400) when the user is not connected to the private messages room
+// (comms-gatekeeper src/controllers/handlers/private-messages/patch-user-metadata-handler.ts).
 const PARTICIPANT_NOT_CONNECTED_MESSAGE = 'Participant is not connected to the room'
 
 /** Raised when Comms Gatekeeper reports that the user is not connected to the private messages room. */
 class PrivateMessagesParticipantNotConnectedError extends Error {
   constructor() {
     super(PARTICIPANT_NOT_CONNECTED_MESSAGE)
+    this.name = 'PrivateMessagesParticipantNotConnectedError'
   }
 }
 
-async function privateMessagesPrivacyError(response: {
-  status: number
-  json?: () => Promise<unknown>
-}): Promise<Error> {
+async function privateMessagesPrivacyError(
+  response: Parameters<NonNullable<Parameters<typeof fetchVoid>[1]>>[0]
+): Promise<Error> {
   if (response.status === 400) {
     try {
-      const body = (await response.json?.()) as { error?: unknown } | undefined
+      const body = (await response.json()) as { error?: unknown } | null
       if (body?.error === PARTICIPANT_NOT_CONNECTED_MESSAGE) {
         return new PrivateMessagesParticipantNotConnectedError()
       }
@@ -104,6 +105,8 @@ export const createCommsGatekeeperComponent = async ({
 
   /**
    * Updates the private message privacy metadata for a user.
+   * Resolves without updating anything when the user is not connected to the private messages room:
+   * Gatekeeper reads the stored setting from this service when it issues the private messages token.
    * @param address - The address of the user to update
    * @param privateMessagesPrivacy - The new private message privacy setting
    */
