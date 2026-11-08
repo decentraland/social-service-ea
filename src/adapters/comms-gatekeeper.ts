@@ -49,6 +49,33 @@ function pathSegment(value: string): string {
   return encodeURIComponent(value)
 }
 
+// Message Comms Gatekeeper answers (with a 400) when the user is not connected to the private messages room.
+const PARTICIPANT_NOT_CONNECTED_MESSAGE = 'Participant is not connected to the room'
+
+/** Raised when Comms Gatekeeper reports that the user is not connected to the private messages room. */
+class PrivateMessagesParticipantNotConnectedError extends Error {
+  constructor() {
+    super(PARTICIPANT_NOT_CONNECTED_MESSAGE)
+  }
+}
+
+async function privateMessagesPrivacyError(response: {
+  status: number
+  json?: () => Promise<unknown>
+}): Promise<Error> {
+  if (response.status === 400) {
+    try {
+      const body = (await response.json?.()) as { error?: unknown } | undefined
+      if (body?.error === PARTICIPANT_NOT_CONNECTED_MESSAGE) {
+        return new PrivateMessagesParticipantNotConnectedError()
+      }
+    } catch {
+      // An unreadable body is treated as any other failure.
+    }
+  }
+  return new Error(`Server responded with status ${response.status}`)
+}
+
 export class PrivateVoiceChatNotFoundError extends Error {
   constructor(callId: string) {
     super(`Voice chat for call ${callId} not found`)
@@ -86,21 +113,31 @@ export const createCommsGatekeeperComponent = async ({
   ): Promise<void> {
     const normalizedAddress = requireAddress(address)
     try {
-      await fetchVoid(() =>
-        fetch(`${commsUrl}/users/${pathSegment(normalizedAddress)}/private-messages-privacy`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${commsGateKeeperToken}`
-          },
-          body: JSON.stringify({
-            private_messages_privacy: privateMessagesPrivacy
-          })
-        })
+      await fetchVoid(
+        () =>
+          fetch(`${commsUrl}/users/${pathSegment(normalizedAddress)}/private-messages-privacy`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${commsGateKeeperToken}`
+            },
+            body: JSON.stringify({
+              private_messages_privacy: privateMessagesPrivacy
+            })
+          }),
+        privateMessagesPrivacyError
       )
 
       logger.info(`Updated user private message privacy metadata for user ${address} to ${privateMessagesPrivacy}`)
     } catch (error) {
+      // A user who is not connected has no room metadata to update: Gatekeeper reads the stored
+      // privacy setting from this service when it issues the private messages token on connect.
+      if (error instanceof PrivateMessagesParticipantNotConnectedError) {
+        logger.info(
+          `Skipped private message privacy metadata update for user ${address}: not connected to the private messages room`
+        )
+        return
+      }
       logger.error(
         `Failed to update user private message privacy metadata for user ${address}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
       )

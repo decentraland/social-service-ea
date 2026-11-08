@@ -75,6 +75,77 @@ describe('when updating the user privacy message metadata', () => {
     })
   })
 
+  describe('and the request resolves with a 400 because the user is not connected to the private messages room', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'Participant is not connected to the room' })
+      })
+    })
+
+    it('should resolve without logging an error', async () => {
+      await expect(
+        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ONLY_FRIENDS)
+      ).resolves.toBeUndefined()
+      expect(errorLogMock).not.toHaveBeenCalled()
+      expect(infoLogMock).toHaveBeenCalledWith(
+        `Skipped private message privacy metadata update for user ${testUserAddress}: not connected to the private messages room`
+      )
+    })
+  })
+
+  describe('and the request resolves with a 400 for any other reason', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'Invalid private_messages_privacy' })
+      })
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(
+        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ONLY_FRIENDS)
+      ).rejects.toThrow('Server responded with status 400')
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Failed to update user private message privacy metadata for user ${testUserAddress}: Server responded with status 400`
+      )
+    })
+  })
+
+  describe('and the request resolves with a 400 whose body is not valid JSON', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.reject(new SyntaxError('Unexpected token'))
+      })
+    })
+
+    it('should reject with the status error', async () => {
+      await expect(
+        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ONLY_FRIENDS)
+      ).rejects.toThrow('Server responded with status 400')
+    })
+  })
+
+  describe('and the request resolves with a non 400 status code carrying the not connected message', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: 'Participant is not connected to the room' })
+      })
+    })
+
+    it('should reject with the status error', async () => {
+      await expect(
+        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ALL)
+      ).rejects.toThrow('Server responded with status 500')
+    })
+  })
+
   describe('and the request resolves with a 200 status code', () => {
     beforeEach(() => {
       fetchMock.mockResolvedValueOnce({
