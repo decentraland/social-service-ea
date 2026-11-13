@@ -148,6 +148,8 @@ export async function createReferralComponent(
     }
   }
 
+  const MAX_CHAIN_DEPTH = 5
+
   async function assertReferrerNotBanned(referrer: string, ip: string | null | undefined): Promise<void> {
     const denyList = await fetchDenyList()
     const context = ip !== null && ip !== undefined ? `${referrer}, ${ip}` : referrer
@@ -156,12 +158,37 @@ export async function createReferralComponent(
       throw new ReferralInvalidInputError(`Referrer is on the deny list ${context}`)
     }
 
-    const referrerAsInvitedRecords = await referralDb.findReferralProgress({ invitedUser: referrer, limit: 1 })
-    if (referrerAsInvitedRecords.length > 0) {
-      const originalReferrer = referrerAsInvitedRecords[0].referrer
-      if (denyList.has(originalReferrer.toLowerCase())) {
+    // Walk up the referral chain to detect banned ancestors
+    let currentAddress = referrer.toLowerCase()
+    const visited = new Set<string>([currentAddress])
+
+    for (let depth = 0; depth < MAX_CHAIN_DEPTH; depth++) {
+      const records = await referralDb.findReferralProgress({ invitedUser: currentAddress, limit: 1 })
+
+      if (records.length === 0) {
+        // No record found for this address — chain ends here
+        break
+      }
+
+      const parentReferrer = records[0].referrer.toLowerCase()
+
+      if (denyList.has(parentReferrer)) {
         throw new ReferralInvalidInputError(`Referrer is part of a banned referral chain ${context}`)
       }
+
+      // Prevent infinite loops in case of circular referrals
+      if (visited.has(parentReferrer)) {
+        logger.warn('Circular referral chain detected', {
+          referrer,
+          currentAddress,
+          parentReferrer,
+          depth
+        })
+        break
+      }
+
+      visited.add(parentReferrer)
+      currentAddress = parentReferrer
     }
   }
 
