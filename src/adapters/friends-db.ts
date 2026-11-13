@@ -116,9 +116,15 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const [addressRequester, addressRequested] = users
       const uuid = randomUUID()
 
+      // A pair has one friendship whichever way round it was created, and the last-action read that
+      // decides between insert and update happens outside this transaction — so two people
+      // requesting each other at the same moment both arrive here. The no-op update returns the row
+      // that won instead of raising, so the loser records its action against the same relationship.
       const query = SQL`
       INSERT INTO friendships (id, address_requester, address_requested, is_active)
       VALUES (${uuid}, ${normalizeAddress(addressRequester)}, ${normalizeAddress(addressRequested)}, ${isActive})
+      ON CONFLICT (LEAST(address_requester, address_requested), GREATEST(address_requester, address_requested))
+      DO UPDATE SET id = friendships.id
       RETURNING id, created_at`
 
       const {
